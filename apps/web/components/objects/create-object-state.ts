@@ -5,6 +5,8 @@
 export interface CreateObjectState {
   status: 'idle' | 'success' | 'error';
   message?: string;
+  /** Set on success so the UI can link to the new object. */
+  createdKey?: string;
 }
 
 export const INITIAL_CREATE_OBJECT_STATE: CreateObjectState = { status: 'idle' };

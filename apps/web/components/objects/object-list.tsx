@@ -1,10 +1,7 @@
+import Link from 'next/link';
 import type { BusinessObject } from '@opvaryn/contracts';
 
-const TIMESTAMP_FORMAT = new Intl.DateTimeFormat('vi-VN', {
-  dateStyle: 'short',
-  timeStyle: 'short',
-  timeZone: 'Asia/Ho_Chi_Minh',
-});
+import { formatTimestamp } from '@/lib/format';
 
 /** ObjectList renders the business object definitions stored in the database. */
 export function ObjectList({ objects }: { objects: BusinessObject[] }) {
@@ -13,9 +10,10 @@ export function ObjectList({ objects }: { objects: BusinessObject[] }) {
       <div className="rounded-xl border border-dashed border-border-strong px-5 py-10 text-center">
         <p className="text-sm font-medium">Chưa có business object nào</p>
         <p className="mx-auto mt-1 max-w-md text-sm text-on-surface-muted">
-          Tạo định nghĩa đầu tiên ở biểu mẫu bên cạnh. Ví dụ từ playbook:{' '}
+          Tạo định nghĩa đầu tiên ở biểu mẫu bên cạnh, hoặc nạp bộ dữ liệu mẫu bằng{' '}
+          <code className="font-mono text-xs">make seed-demo</code>. Ví dụ từ playbook:{' '}
           <code className="font-mono text-xs">purchase_request</code> hoặc{' '}
-          <code className="font-mono text-xs">asset</code>.
+          <code className="font-mono text-xs">it_incident</code>.
         </p>
       </div>
     );
@@ -38,6 +36,7 @@ export function ObjectList({ objects }: { objects: BusinessObject[] }) {
             <th scope="col" className="px-4 py-3 font-medium">
               Tạo lúc
             </th>
+            <th scope="col" className="px-4 py-3" />
           </tr>
         </thead>
         <tbody className="divide-y divide-border bg-surface-raised/40">
@@ -45,14 +44,32 @@ export function ObjectList({ objects }: { objects: BusinessObject[] }) {
             <tr key={object.id}>
               <td className="px-4 py-3 font-mono text-xs">{object.key}</td>
               <td className="px-4 py-3">
-                <p className="font-medium">{object.name}</p>
+                <Link
+                  href={`/objects/${object.key}`}
+                  className="font-medium hover:text-accent-strong"
+                >
+                  {object.name}
+                </Link>
                 {object.description ? (
                   <p className="mt-0.5 text-xs text-on-surface-muted">{object.description}</p>
                 ) : null}
               </td>
-              <td className="px-4 py-3 text-on-surface-muted">{object.fields.length}</td>
+              <td className="px-4 py-3 text-on-surface-muted">
+                {object.fields.length}
+                <span className="ml-1 text-xs">
+                  ({object.fields.filter((field) => field.required).length} bắt buộc)
+                </span>
+              </td>
               <td className="px-4 py-3 text-xs text-on-surface-muted">
-                {TIMESTAMP_FORMAT.format(new Date(object.createdAt))}
+                {formatTimestamp(object.createdAt)}
+              </td>
+              <td className="px-4 py-3 text-right">
+                <Link
+                  href={`/objects/${object.key}`}
+                  className="text-xs font-medium text-accent-strong hover:underline"
+                >
+                  Nhập bản ghi →
+                </Link>
               </td>
             </tr>
           ))}

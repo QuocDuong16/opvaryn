@@ -20,6 +20,8 @@ export function describeApiError(error: unknown): string {
     switch (error.code) {
       case 'invalid_request':
         return `Dữ liệu chưa hợp lệ: ${error.message}`;
+      case 'not_found':
+        return 'Không tìm thấy dữ liệu được yêu cầu. Có thể nó vừa bị xoá hoặc key chưa tồn tại.';
       case 'conflict':
         return 'Key này đã tồn tại. Chọn key khác.';
       case 'service_unavailable':

@@ -60,7 +60,21 @@ export const NAV_ITEMS: readonly NavItem[] = [
   },
 ];
 
-/** navItemFor returns the nav entry matching a pathname, if any. */
+/**
+ * navItemFor returns the nav entry matching a pathname, if any. Nested routes
+ * (/objects/purchase_request) resolve to their area (/objects); the longest
+ * matching path wins so overlapping hrefs cannot shadow each other.
+ */
 export function navItemFor(pathname: string): NavItem | undefined {
-  return NAV_ITEMS.find((item) => item.href === pathname);
+  let match: NavItem | undefined;
+  for (const item of NAV_ITEMS) {
+    const matches =
+      item.href === '/'
+        ? pathname === '/'
+        : pathname.startsWith(`${item.href}/`) || pathname === item.href;
+    if (matches && (!match || item.href.length > match.href.length)) {
+      match = item;
+    }
+  }
+  return match;
 }

@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { Meta } from '@opvaryn/contracts';
 
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
@@ -28,6 +29,56 @@ async function loadPlatformStatus(): Promise<PlatformStatus> {
     return { api: false, database: false, meta: null, message: describeApiError(cause) };
   }
 }
+
+const DEMO_TOUR: readonly {
+  href: string;
+  stage: StatusKind;
+  title: string;
+  body: string;
+}[] = [
+  {
+    href: '/objects',
+    stage: 'live',
+    title: 'Business Objects & bản ghi',
+    body: 'Khai schema với field có kiểu, tạo định nghĩa và nhập bản ghi thật vào PostgreSQL.',
+  },
+  {
+    href: '/forms',
+    stage: 'live',
+    title: 'Form Builder preview',
+    body: 'Form nhập liệu sinh trực tiếp từ schema; thử submit để thấy validate ở server.',
+  },
+  {
+    href: '/workflows',
+    stage: 'mock',
+    title: 'Workflow Designer',
+    body: 'Sơ đồ hai quy trình mẫu với nhánh điều kiện và inspector node — chưa có runtime.',
+  },
+  {
+    href: '/tasks',
+    stage: 'mock',
+    title: 'Task Inbox',
+    body: 'Duyệt, trả về, từ chối trên dữ liệu mô phỏng kèm timeline và người giữ việc.',
+  },
+  {
+    href: '/analytics',
+    stage: 'mock',
+    title: 'Analytics Studio',
+    body: 'Chọn metric, dimension và chart trên số liệu fixture; lưu bố cục thuộc MVP.',
+  },
+  {
+    href: '/apps',
+    stage: 'live',
+    title: 'Application showcase',
+    body: 'Cùng một object dưới dạng list, detail, kanban và panel tích hợp — hai dạng xem đọc dữ liệu thật.',
+  },
+  {
+    href: '/settings',
+    stage: 'live',
+    title: 'Cài đặt & môi trường demo',
+    body: 'Endpoint đang chạy, cổng local và toolchain được pin cho buổi trình diễn.',
+  },
+];
 
 const PRINCIPLES: readonly { title: string; body: string }[] = [
   {
@@ -170,6 +221,28 @@ export default async function OverviewPage() {
           note="Ước lượng từ playbook, chưa phải cam kết."
         />
       </div>
+
+      <section className="mb-6">
+        <h2 className="mb-3 text-lg font-semibold tracking-tight">Walkthrough bản demo</h2>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {DEMO_TOUR.map((stop, index) => (
+            <Link key={stop.href} href={stop.href} className="group">
+              <Card className="h-full transition-colors group-hover:border-border-strong">
+                <div className="flex items-start justify-between gap-3">
+                  <p className="text-sm font-semibold">
+                    <span className="mr-2 font-mono text-xs text-accent-strong">
+                      {String(index + 1).padStart(2, '0')}
+                    </span>
+                    {stop.title}
+                  </p>
+                  <StatusBadge kind={stop.stage} />
+                </div>
+                <p className="mt-2 text-sm leading-relaxed text-on-surface-muted">{stop.body}</p>
+              </Card>
+            </Link>
+          ))}
+        </div>
+      </section>
 
       <section className="mb-6">
         <h2 className="mb-3 text-lg font-semibold tracking-tight">Nguyên tắc đã thống nhất</h2>

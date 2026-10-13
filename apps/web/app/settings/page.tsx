@@ -10,6 +10,21 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
   { method: 'GET', path: '/api/v1/meta', purpose: 'Tên, phiên bản và giai đoạn build' },
   { method: 'GET', path: '/api/v1/business-objects', purpose: 'Danh sách business object' },
   { method: 'POST', path: '/api/v1/business-objects', purpose: 'Tạo business object mới' },
+  {
+    method: 'GET',
+    path: '/api/v1/business-objects/{key}',
+    purpose: 'Đọc một định nghĩa theo key',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/business-objects/{key}/records',
+    purpose: 'Danh sách bản ghi, mới nhất trước',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/business-objects/{key}/records',
+    purpose: 'Tạo bản ghi, validate theo field schema',
+  },
 ];
 
 export default function SettingsPage() {
@@ -53,6 +68,35 @@ export default function SettingsPage() {
             Toolchain được pin bằng mise (<code>go 1.27.2</code>, <code>node 26.9.0</code>,{' '}
             <code>pnpm 12.12.0</code>). Chạy <code>mise install</code> sau khi clone.
           </p>
+        </Card>
+
+        <Card className="lg:col-span-2">
+          <CardTitle>Dữ liệu demo</CardTitle>
+          <CardDescription>
+            Bản ghi nằm trong PostgreSQL local; mọi màn hình đọc lại từ đó nên dữ liệu bạn nhập sẽ
+            còn sau khi khởi động lại API/web.
+          </CardDescription>
+          <dl className="mt-4 space-y-3 text-sm">
+            <div>
+              <dt className="font-mono text-xs text-accent-strong">make seed-demo</dt>
+              <dd className="mt-0.5 text-xs text-on-surface-muted">
+                Nạp hai business object mẫu (purchase_request, it_incident) và một số bản ghi qua
+                chính API. Idempotent: chạy lại không tạo trùng.
+              </dd>
+            </div>
+            <div>
+              <dt className="font-mono text-xs text-accent-strong">make smoke-api</dt>
+              <dd className="mt-0.5 text-xs text-on-surface-muted">
+                Kiểm tra API end-to-end gồm cả tạo bản ghi và các nhánh lỗi 400/404/409.
+              </dd>
+            </div>
+            <div>
+              <dt className="font-mono text-xs text-accent-strong">make docker-clean</dt>
+              <dd className="mt-0.5 text-xs text-on-surface-muted">
+                Xoá volume Postgres — toàn bộ business object và bản ghi sẽ mất.
+              </dd>
+            </div>
+          </dl>
         </Card>
       </div>
     </>

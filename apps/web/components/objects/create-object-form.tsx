@@ -1,10 +1,12 @@
 'use client';
 
+import Link from 'next/link';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { createBusinessObjectAction } from '@/app/objects/actions';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+import { FieldEditor } from '@/components/objects/field-editor';
 import { INITIAL_CREATE_OBJECT_STATE } from '@/components/objects/create-object-state';
 
 const INPUT_CLASS =
@@ -75,6 +77,8 @@ export function CreateObjectForm() {
           />
         </div>
 
+        <FieldEditor />
+
         <SubmitButton />
 
         {state.status === 'error' && state.message ? (
@@ -86,12 +90,20 @@ export function CreateObjectForm() {
           </p>
         ) : null}
         {state.status === 'success' && state.message ? (
-          <p
+          <div
             role="status"
             className="rounded-lg border border-success/40 px-3 py-2 text-sm text-success"
           >
-            {state.message}
-          </p>
+            <p>{state.message}</p>
+            {state.createdKey ? (
+              <Link
+                href={`/objects/${state.createdKey}`}
+                className="mt-1 inline-block font-medium underline underline-offset-2"
+              >
+                Mở object và nhập bản ghi →
+              </Link>
+            ) : null}
+          </div>
         ) : null}
       </form>
     </Card>

@@ -1,21 +1,95 @@
-import { ModulePlaceholder } from '@/components/ui/module-placeholder';
+import { DashboardStudio } from '@/components/analytics/dashboard-studio';
+import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+import { PageHeader } from '@/components/ui/page-header';
+import { StatusBadge } from '@/components/ui/status-badge';
 
 export const metadata = { title: 'Analytics' };
 
+const METRIC_DEFINITIONS: readonly { metric: string; definition: string; note: string }[] = [
+  {
+    metric: 'Cycle Time',
+    definition: 'Thời gian từ submit đến hoàn thành / kết thúc',
+    note: 'Chọn rõ terminal status nào được tính',
+  },
+  {
+    metric: 'Step Processing Time',
+    definition: 'Thời gian từ khi task được giao đến khi kết thúc',
+    note: 'Tách waiting time và active time nếu đo được',
+  },
+  {
+    metric: 'Approval Rate',
+    definition: 'Instance approved / tổng instance đã có kết quả cuối',
+    note: 'Định nghĩa mẫu số, loại trừ đang xử lý',
+  },
+  {
+    metric: 'Rejection Rate',
+    definition: 'Instance rejected cuối / tổng instance đã có kết quả',
+    note: 'Không gộp returned và rejected',
+  },
+  {
+    metric: 'SLA Breach Rate',
+    definition: 'Task quá SLA / số task có SLA hợp lệ',
+    note: 'Cần chính sách thời gian làm việc và ngày nghỉ',
+  },
+  {
+    metric: 'Rework Rate',
+    definition: 'Instance có ít nhất một vòng return / instance hợp lệ',
+    note: 'Đếm instance khác với đếm số vòng trả về',
+  },
+];
+
 export default function AnalyticsPage() {
   return (
-    <ModulePlaceholder
-      eyebrow="06 / Analytics studio"
-      title="Analytics"
-      stage="mock"
-      lead="Self-service dashboard với metric có cấu trúc: người quản lý chọn metric, dimension, filter và chart rồi lưu bố cục — không cần viết SQL và không vượt quyền dữ liệu."
-      features={[
-        'Metric catalog giới hạn: cycle time, approval rate, SLA breach, rework…',
-        'Widget KPI, line, bar, pie/donut và table',
-        'Kéo thả, resize và lưu bố cục dashboard',
-        'Query được scope theo quyền, không mở raw SQL cho end-user',
-      ]}
-      note="Metric cần read model có kiểu từ event và instance — việc này chỉ có ý nghĩa sau khi workflow runtime chạy thật. Dashboard trong demo dùng dữ liệu mô phỏng và phải gắn nhãn Mock."
-    />
+    <>
+      <PageHeader
+        eyebrow="06 / Analytics studio"
+        title="Analytics"
+        lead="Self-service dashboard với metric có cấu trúc: chọn metric, dimension và chart rồi đọc kết quả — không viết SQL, không vượt quyền dữ liệu. Bộ chọn dưới đây hoạt động thật, nhưng số liệu là fixture."
+        aside={<StatusBadge kind="mock" />}
+      />
+
+      <Card className="mb-6 border-warning/40">
+        <CardTitle className="text-warning">Mô phỏng — số liệu không đến từ dữ liệu thật</CardTitle>
+        <CardDescription>
+          Metric cần read model có kiểu, dựng từ event của process instance — thứ chưa tồn tại khi
+          runtime chưa được viết (D05/D08). Vì vậy trang này minh họa trải nghiệm chọn metric và
+          chart; nút lưu bố cục bị khoá cho tới MVP.
+        </CardDescription>
+      </Card>
+
+      <DashboardStudio />
+
+      <section className="mt-8">
+        <h2 className="mb-3 text-lg font-semibold tracking-tight">
+          Định nghĩa metric làm việc (từ playbook)
+        </h2>
+        <div className="overflow-x-auto rounded-xl border border-border">
+          <table className="w-full text-sm">
+            <thead className="bg-surface-raised text-left text-xs tracking-wide text-on-surface-muted uppercase">
+              <tr>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Metric
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Định nghĩa làm việc
+                </th>
+                <th scope="col" className="px-4 py-3 font-medium">
+                  Lưu ý
+                </th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-border bg-surface-raised/40">
+              {METRIC_DEFINITIONS.map((row) => (
+                <tr key={row.metric}>
+                  <td className="px-4 py-3 font-medium whitespace-nowrap">{row.metric}</td>
+                  <td className="px-4 py-3 text-on-surface-muted">{row.definition}</td>
+                  <td className="px-4 py-3 text-on-surface-muted">{row.note}</td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      </section>
+    </>
   );
 }
