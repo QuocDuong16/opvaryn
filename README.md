@@ -17,16 +17,17 @@ Các màn hình theo kế hoạch 8 tuần của bản demo đã dựng xong, m�
 - **Live**: Business Objects và bản ghi — khai schema, tạo định nghĩa, nhập bản ghi bằng form sinh
   từ schema; dữ liệu đi qua API Go và lưu trong PostgreSQL. Form Builder preview dùng đúng
   component nhập liệu đó. Overview đọc trạng thái API/database thật. Application showcase đọc
-  danh sách và chi tiết từ bản ghi thật.
+  danh sách và chi tiết từ bản ghi thật. Bố cục dashboard ở Analytics lưu thật (cookie trình duyệt).
 - **Mock**: Workflows (sơ đồ quy trình đọc từ fixture), Tasks (inbox duyệt/trả về/từ chối đổi state
-  trong trình duyệt), Analytics (metric catalog trên số liệu fixture), kanban và connector trong
+  trong trình duyệt), số liệu Analytics (metric catalog trên fixture), kanban và connector trong
   Application showcase.
-- **Concept**: điều kiện hiển thị và calculated field của Form Builder, escalation, template
-  library — các phần phụ thuộc quyết định còn mở.
+- **Concept**: điều kiện hiển thị và calculated field của Form Builder, tab Cấu hình của Application
+  Builder, escalation, template library, và nội dung Roadmap — các phần phụ thuộc quyết định còn mở.
 
 Workflow runtime chưa được viết vì Process Execution Contract (D05/D08 trong playbook) chưa chốt;
-chi tiết phạm vi nằm ở [ADR 0002](docs/adr/0002-demo-scope-and-labels.md) và
-[ADR 0003](docs/adr/0003-demo-data-slice-and-mock-surfaces.md).
+chi tiết phạm vi nằm ở [ADR 0002](docs/adr/0002-demo-scope-and-labels.md),
+[ADR 0003](docs/adr/0003-demo-data-slice-and-mock-surfaces.md) và
+[ADR 0004](docs/adr/0004-dashboard-layout-storage-and-demo-flow-tests.md).
 
 ## Bắt đầu nhanh
 
@@ -58,6 +59,7 @@ Các target thường dùng:
 | `make quality-check` | Toàn bộ gate phía trên + kiểm tra docs |
 | `make contract-generate` | Sinh types Go/TypeScript từ OpenAPI |
 | `make smoke-api` | Build API, chạy thử lát cắt business object + bản ghi trên PostgreSQL thật |
+| `make smoke-demo-flows` | Build cả API và web, replay form của các luồng demo và kiểm chứng kết quả |
 | `make seed-demo` | Nạp business object và bản ghi mẫu qua API (idempotent) |
 | `make docker-up` / `make docker-down` | Bật/tắt PostgreSQL local |
 | `make actions-lint` | Lint workflow GitHub Actions bằng actionlint |
@@ -67,7 +69,8 @@ Các target thường dùng:
 - `make quality-check` là gate duy nhất: contract freshness, format, lint, quét bảo mật
   (gosec, govulncheck), test, build production, lint workflow và kiểm tra docs.
 - GitHub Actions chạy đúng gate đó ([`.github/workflows/ci.yml`](.github/workflows/ci.yml)), kèm
-  một job integration dùng PostgreSQL thật để apply migration và chạy `make smoke-api`.
+  một job integration dùng PostgreSQL thật: apply migration, chạy `make smoke-api` rồi
+  `make smoke-demo-flows` (build cả web, replay form của các luồng demo và kiểm chứng dữ liệu lưu).
 - [CodeQL](.github/workflows/codeql.yml) quét Go và TypeScript trên mỗi PR, mỗi lần push lên
   `main` và hằng tuần; [dependency review](.github/workflows/dependency-review.yml) chặn
   dependency mới có lỗ hổng mức high hoặc license copyleft.

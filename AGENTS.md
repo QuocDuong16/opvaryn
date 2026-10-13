@@ -29,9 +29,10 @@ Working agreement for agents and contributors in this repository.
   new dependencies, and broad refactors.
 - Add tests for important business and security behavior, including rejected input.
 - Backend checks: `make api-check`. Frontend checks: `make web-check`. Full gate:
-  `make quality-check`. End-to-end behaviour: `make smoke-api` (needs Postgres running and
-  migrations applied). Demo dataset: `make seed-demo`. Report checks that were not run or
-  failed.
+  `make quality-check`. End-to-end behaviour: `make smoke-api` (API + PostgreSQL) and
+  `make smoke-demo-flows` (builds and starts both servers, replays the demo forms, verifies the
+  stored rows; stop any dev server first). Demo dataset: `make seed-demo`. Report checks that
+  were not run or failed.
 
 ## Architecture boundaries
 
@@ -86,8 +87,14 @@ Working agreement for agents and contributors in this repository.
   (`components/workflows/demo-definitions.ts`, `components/tasks/demo-tasks.ts`,
   `components/analytics/demo-metrics.ts`). Keep them typed, keep their state transitions in
   pure modules that are unit-tested, and never let a fixture pretend to be server data.
+- Never build interactivity that does nothing. A control that cannot work yet is rendered
+  disabled with an explanation (the Application Builder configuration tab, ADR 0004); toggles,
+  drag handles or forms that silently discard input are not acceptable demo material.
+- User configuration that needs no new entity goes in a cookie behind an httpOnly server action
+  (`opvaryn.theme`, `opvaryn.dashboard`) and is validated on write by a pure module, never stored
+  loosely in the browser.
 - Screens that generate UI from a business object schema (record form, record table, mini-app
-  views) must render from the definition, not from hard-coded field lists.
+  views, configuration preview) must render from the definition, not from hard-coded field lists.
 
 ## Docker and operations
 
@@ -99,8 +106,11 @@ Working agreement for agents and contributors in this repository.
 ## CI and compliance
 
 - CI is GitHub Actions. It runs the same local gate (`make quality-check`) plus an integration
-  job that applies migrations and runs `make smoke-api` against PostgreSQL. Workflows call
-  Makefile targets and stay in sync with them — do not re-implement checks inline in a workflow.
+  job that applies migrations, runs `make smoke-api` against PostgreSQL and then
+  `make smoke-demo-flows` against a production build of the web app. Workflows call Makefile
+  targets and stay in sync with them — do not re-implement checks inline in a workflow. The
+  integration job's name is part of the branch ruleset's required checks: renaming it blocks
+  every PR, so change the ruleset in the same effort.
 - `actionlint` is part of `quality-check`; a workflow change that fails it fails the gate.
 - Actions stay pinned by full commit SHA with a version comment; Dependabot updates them.
 - OPVARYN is proprietary, non-commercial software (`LICENSE.md`). New dependencies must be

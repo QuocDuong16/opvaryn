@@ -28,3 +28,4 @@
 - [0001 — Modular monolith với Go, Next.js và PostgreSQL](adr/0001-modular-monolith-stack.md)
 - [0002 — Phạm vi demo và quy ước nhãn live/mock/concept](adr/0002-demo-scope-and-labels.md)
 - [0003 — Lát cắt dữ liệu của demo: bản ghi business object và phân chia live/mock](adr/0003-demo-data-slice-and-mock-surfaces.md)
+- [0004 — Bố cục dashboard lưu bằng cookie, và cách kiểm thử luồng demo](adr/0004-dashboard-layout-storage-and-demo-flow-tests.md)
