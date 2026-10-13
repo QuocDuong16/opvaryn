@@ -13,6 +13,9 @@ playbook page `demo-mvp.html`), not MVP V1.
 - `operations-playbook/` — requirements source: standalone offline HTML notebook, NOT code.
 - `docs/adr/` — decisions binding for this repository (0001 stack, 0002 demo scope + labels,
   0003 demo data slice + mock surfaces, 0004 dashboard layout storage + demo-flow tests).
+  0005 is **Proposed**: the execution-contract decision brief for D04/D05/D08 — the workflow
+  runtime must not be written until the owner answers it. 0006 is the first MVP item done
+  (definition versioning + publish).
 - `scripts/` — quality gates (`check-docs.mjs`), `smoke-api.sh` (end-to-end API smoke test),
   `smoke-demo-flows.sh` (web flows: builds both servers, replays the demo forms),
   `seed-demo.sh` (idempotent demo dataset through the public API) and `playbook-rename.py`

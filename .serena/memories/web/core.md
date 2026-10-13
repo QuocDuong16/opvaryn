@@ -22,9 +22,10 @@
   the API is off), plus a `DEMO_TOUR` grid that is the walkthrough entry point.
 - `/objects` **live**: definition list (`object-list.tsx`, rows link to the detail page) and the
   create form with the schema editor.
-- `/objects/[key]` **live**: field schema table, records table and the generated entry form;
-  `params` is a Promise; a missing key calls `notFound()` (custom `not-found.tsx` in that
-  segment).
+- `/objects/[key]` **live**: version badge, field schema table, version history table, records
+  grouped by definition version and the generated entry form, plus `UpdateObjectForm` which
+  publishes the next version (schema editor prefilled with the current fields). `params` is a
+  Promise; a missing key calls `notFound()` (custom `not-found.tsx` in that segment).
 - `/forms` **live** + concept list: object picker via `?object=key` (defaults to the first
   object), the same entry form as a preview, schema table, and the not-yet-built capabilities.
 - `/workflows` **mock**: `WorkflowCanvas` (SVG graph, clickable/keyboard-selectable nodes,
@@ -75,6 +76,14 @@
   success via `key={state.recordId}` so the next entry starts blank.
 - `components/objects/record-list.tsx` and `field-schema.tsx` derive their columns from the
   definition, so changing an object changes the table without code changes.
+- `components/objects/record-grouping.ts` (pure, tested) buckets records by the definition version
+  they were created under; the record table renders one section per version with that version's
+  columns, and keeps records whose version is missing instead of dropping them.
+  `field-draft.ts` holds both directions of the editor conversion (`definitionsToDrafts` ↔
+  `fieldDraftsToDefinitions`), and their round trip is pinned by a test.
+- An edit publishes a version rather than mutating the schema: `UpdateObjectForm` +
+  `updateBusinessObjectAction` → `PUT /business-objects/{key}`. Page copy must keep saying that old
+  records keep their schema (ADR 0006); do not "fix" a rendering mismatch by rewriting records.
 
 ## Styling and UI primitives
 
@@ -99,8 +108,9 @@
   run, so `next dev` leaves it dirty. Revert it before committing; never hand-edit it.
 - Tests in `apps/web/__tests__/`: `shell.test.tsx` (badge labels, nav integrity and numbering),
   `inbox-reducer.test.ts` (task transitions, no fixture mutation),
-  `record-values.test.ts` (FormData → API values), `field-draft.test.ts` (editor serialization),
-  `dashboard-layout.test.ts` (lenient read vs strict write validation, every transition).
+  `record-values.test.ts` (FormData → API values), `field-draft.test.ts` (editor serialization and
+  round trip), `dashboard-layout.test.ts` (lenient read vs strict write validation, every
+  transition), `record-grouping.test.ts` (per-version grouping, orphan buckets).
   Vitest aliases `@` → app root and sets `environment: 'jsdom'`; coverage has no thresholds yet.
 - There is no browser backend in this environment, so interactive flows are verified by
   `make smoke-demo-flows` (`scripts/smoke-demo-flows.sh`): it builds and starts both servers,

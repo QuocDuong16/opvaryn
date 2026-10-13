@@ -21,6 +21,11 @@
 - Record values are validated in the service against the object's field definitions before the
   store sees them (`validateRecordValues`), because only the service knows the schema. The store
   owns persistence and constraint mapping, never business rules.
+- Definition schemas are versioned and only grow (ADR 0006): create publishes v1, edit publishes
+  the next version inside one transaction with the object row locked, and a published version is
+  never updated. Records store the version they were created under and are always read with it —
+  never re-render or rewrite old data with a newer schema. The version table is the single source
+  of truth; do not reintroduce a fields column on the object row.
 
 ## Web (`apps/web`)
 

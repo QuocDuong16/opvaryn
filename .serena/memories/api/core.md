@@ -14,7 +14,9 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   envelope.
 - Implemented: `GET /healthz`, `GET /readyz` (2s DB ping timeout → 503 `unavailable`),
   `GET /api/v1/meta` (from `internal/buildinfo`), `GET/POST /api/v1/business-objects`,
-  `GET /api/v1/business-objects/{key}` and `GET/POST /api/v1/business-objects/{key}/records`.
+  `GET/PUT /api/v1/business-objects/{key}` (PUT publishes the next immutable version),
+  `GET /api/v1/business-objects/{key}/versions` (newest first) and
+  `GET/POST /api/v1/business-objects/{key}/records` (each record reports `objectVersion`).
 - `system.go` = health/readiness/meta handlers; `businessobject.go` = list/create/get handlers
   plus the domain ↔ `apiv1` mapping helpers (`toAPIBusinessObject` including optional select
   `options`, `toDomainFields`, `pointerOrNil`/`stringValue` for optional fields);
@@ -26,9 +28,11 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
 ## Service (`internal/service`)
 
 - `BusinessObjects` wraps the narrow `businessObjectStore` interface (fakeable in tests).
-- `Create` validates (`validateNewBusinessObject` → `validateFields`), then normalizes
-  (trim) before persisting. Limits: 100 fields, name ≤120, description ≤500, label ≤120,
-  50 select options ≤120 chars.
+- `Create` validates (`validateNewBusinessObject`: key shape + `validateDefinition`) then
+  normalizes (trim) before persisting; `Update` reuses `validateDefinition`, so a definition edit
+  and a definition create enforce exactly the same rules. `ListVersions` resolves the object first
+  (404 for an unknown key) and reads its snapshots.
+- Limits: 100 fields, name ≤120, description ≤500, label ≤120, 50 select options ≤120 chars.
 - `FieldDefinition.Options` rules (only the `select` type carries options): select must declare
   at least one option, values must be non-empty/unique after trimming, options on other types are
   rejected.
@@ -44,11 +48,17 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
 
 - `Store` wraps `*pgxpool.Pool`; `New` connects lazily so the API starts while the DB is down
   (`Ping`/`readyz` report reality).
-- `businessobject.go`: SQL + scanning; `fields` JSONB ↔ `[]domain.FieldDefinition`;
-  `GetBusinessObjectByKey` maps `pgx.ErrNoRows` → `ErrNotFound`.
-- `objectrecord.go`: `ListObjectRecords` (ordered `created_at DESC, id`) and `CreateObjectRecord`;
-  a foreign-key violation (23503) becomes `ErrNotFound` because the addressed definition was
-  deleted concurrently.
+- `businessobject.go`: the schema lives in `business_object_versions` (single source of truth);
+  `business_objects` stores identity + metadata only and `businessObjectSelect` joins the newest
+  version with `JOIN LATERAL (...) ORDER BY version DESC LIMIT 1`. `CreateBusinessObject` inserts
+  the object and publishes v1 in one `pgx.BeginFunc` transaction; `UpdateBusinessObject` locks the
+  row (`SELECT ... FOR UPDATE`), computes `MAX(version) + 1`, inserts the snapshot and updates the
+  row — so two concurrent publishes cannot pick the same version number. Published rows are never
+  updated. `GetBusinessObjectByKey` maps `pgx.ErrNoRows` → `ErrNotFound`.
+- `objectrecord.go`: `ListObjectRecords` joins `business_object_versions` to return the record's
+  `ObjectVersion` (ordered `created_at DESC, id`); `CreateObjectRecord` stores `object_version_id`
+  and the service fills the version number it already knows. A foreign-key violation (23503)
+  becomes `ErrNotFound` because the addressed definition or version was deleted concurrently.
 - `errors.go`: `classify()` maps `*pgconn.PgError` connectivity (`*pgconn.ConnectError`) to
   `ErrUnavailable`; unique-violation 23505 → `ErrConflict` in the repo method.
 - `migrate.go`: `ApplyMigrations` creates `schema_migrations(version, checksum, applied_at)`,
@@ -58,7 +68,9 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   (avoids gosec G304). Run from `apps/api` because of the default `-dir`.
 - Migrations: `0001_business_objects.sql` (definitions), `0002_business_object_records.sql`
   (`object_id` FK with ON DELETE CASCADE, `values` JSONB object, index on `(object_id,
-  created_at DESC)`).
+  created_at DESC)`), `0003_definition_versions.sql` (version table, backfills every existing
+  definition as v1 keeping `created_at` as `published_at`, binds existing records to their v1,
+  then drops `business_objects.fields`).
 
 ## Contract and tests
 
@@ -70,7 +82,9 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   type, normalization, `ErrNotFound` propagation); fake stores assert invalid input never reaches
   persistence.
 - `scripts/smoke-api.sh` (`make smoke-api`) exercises every endpoint against real PostgreSQL,
-  including record creation, the unknown-key/option/required/duplicate branches and the 404
-  envelope; `scripts/seed-demo.sh` (`make seed-demo`) seeds demo data through the API.
+  including record creation, the unknown-key/option/required/duplicate branches, the 404 envelope,
+  publishing a definition version, the version history order and that records keep the version
+  they were created under; `scripts/seed-demo.sh` (`make seed-demo`) seeds demo data through the
+  API.
 - Adding an endpoint: `openapi/openapi.yaml` → `make contract-generate` → service rule + test →
   store method (+ new migration when schema changes) → handler mapping → `make api-check`.
