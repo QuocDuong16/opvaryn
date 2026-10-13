@@ -54,8 +54,11 @@ func run() error {
 	defer st.Close()
 
 	server := &http.Server{
-		Addr:              net.JoinHostPort("", strconv.Itoa(cfg.Port)),
-		Handler:           httpapi.NewRouter(cfg, st, service.NewBusinessObjects(st), log),
+		Addr: net.JoinHostPort("", strconv.Itoa(cfg.Port)),
+		Handler: httpapi.NewRouter(cfg, st, httpapi.Services{
+			BusinessObjects: service.NewBusinessObjects(st),
+			ObjectRecords:   service.NewObjectRecords(st),
+		}, log),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       cfg.ReadTimeout,
 		WriteTimeout:      cfg.WriteTimeout,

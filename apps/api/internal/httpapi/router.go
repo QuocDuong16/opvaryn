@@ -14,8 +14,14 @@ import (
 	"github.com/QuocDuong16/opvaryn/api/internal/store"
 )
 
+// Services groups the API services the router exposes.
+type Services struct {
+	BusinessObjects *service.BusinessObjects
+	ObjectRecords   *service.ObjectRecords
+}
+
 // NewRouter builds the HTTP handler for the demo API.
-func NewRouter(cfg config.Config, st *store.Store, objects *service.BusinessObjects, log *slog.Logger) http.Handler {
+func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.Logger) http.Handler {
 	router := chi.NewRouter()
 
 	router.Use(middleware.RequestID)
@@ -39,8 +45,13 @@ func NewRouter(cfg config.Config, st *store.Store, objects *service.BusinessObje
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/meta", handleMeta(log))
 		r.Route("/business-objects", func(r chi.Router) {
-			r.Get("/", handleListBusinessObjects(objects, log))
-			r.Post("/", handleCreateBusinessObject(objects, log))
+			r.Get("/", handleListBusinessObjects(services.BusinessObjects, log))
+			r.Post("/", handleCreateBusinessObject(services.BusinessObjects, log))
+			r.Route("/{key}", func(r chi.Router) {
+				r.Get("/", handleGetBusinessObject(services.BusinessObjects, log))
+				r.Get("/records", handleListObjectRecords(services.ObjectRecords, log))
+				r.Post("/records", handleCreateObjectRecord(services.ObjectRecords, log))
+			})
 		})
 	})
 

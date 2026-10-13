@@ -106,6 +106,13 @@ type CreateBusinessObjectRequest struct {
 	Name string `json:"name"`
 }
 
+// CreateObjectRecordRequest defines model for CreateObjectRecordRequest.
+type CreateObjectRecordRequest struct {
+	// Values Field key → value map. Every key must exist on the object; required fields
+	// must be present and every value must match the declared field type.
+	Values map[string]interface{} `json:"values"`
+}
+
 // ErrorResponse Stable error envelope. `code` is a machine-readable identifier; clients switch on
 // it and never on the human-readable message.
 type ErrorResponse struct {
@@ -122,11 +129,23 @@ type FieldDefinition struct {
 	Key string `json:"key"`
 
 	// Label Example: Số tiền dự kiến
-	Label    string `json:"label"`
-	Required *bool  `json:"required,omitempty"`
+	Label string `json:"label"`
+
+	// Options Allowed options. Required for `select` fields, rejected on other types.
+	Options  *[]FieldOption `json:"options,omitempty"`
+	Required *bool          `json:"required,omitempty"`
 
 	// Type Field kinds supported by the form builder.
 	Type FieldType `json:"type"`
+}
+
+// FieldOption One selectable option of a `select` field.
+type FieldOption struct {
+	// Label Example: Kinh doanh
+	Label string `json:"label"`
+
+	// Value Example: kinh_doanh
+	Value string `json:"value"`
 }
 
 // FieldType Field kinds supported by the form builder.
@@ -155,9 +174,34 @@ type Meta struct {
 // MetaStage Example: demo
 type MetaStage string
 
+// ObjectRecord defines model for ObjectRecord.
+type ObjectRecord struct {
+	CreatedAt time.Time          `json:"createdAt"`
+	Id        openapi_types.UUID `json:"id"`
+
+	// ObjectKey Key of the business object this record belongs to.
+	ObjectKey string    `json:"objectKey"`
+	UpdatedAt time.Time `json:"updatedAt"`
+
+	// Values Field key → value map. Values are validated against the field definitions.
+	Values map[string]interface{} `json:"values"`
+}
+
+// ObjectRecordList defines model for ObjectRecordList.
+type ObjectRecordList struct {
+	Data []ObjectRecord `json:"data"`
+}
+
+// ObjectKey defines model for ObjectKey.
+type ObjectKey = string
+
 // BadRequest Stable error envelope. `code` is a machine-readable identifier; clients switch on
 // it and never on the human-readable message.
 type BadRequest = ErrorResponse
+
+// NotFound Stable error envelope. `code` is a machine-readable identifier; clients switch on
+// it and never on the human-readable message.
+type NotFound = ErrorResponse
 
 // ServiceUnavailable Stable error envelope. `code` is a machine-readable identifier; clients switch on
 // it and never on the human-readable message.
@@ -165,3 +209,6 @@ type ServiceUnavailable = ErrorResponse
 
 // CreateBusinessObjectJSONRequestBody defines body for CreateBusinessObject for application/json ContentType.
 type CreateBusinessObjectJSONRequestBody = CreateBusinessObjectRequest
+
+// CreateObjectRecordJSONRequestBody defines body for CreateObjectRecord for application/json ContentType.
+type CreateObjectRecordJSONRequestBody = CreateObjectRecordRequest

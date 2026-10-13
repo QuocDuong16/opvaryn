@@ -89,6 +89,52 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/business-objects/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Get one business object definition
+         * @description Returns the definition stored under the given key.
+         */
+        get: operations["getBusinessObject"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/business-objects/{key}/records": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List records of a business object
+         * @description Returns the stored records, newest first.
+         */
+        get: operations["listObjectRecords"];
+        put?: never;
+        /**
+         * Create a record of a business object
+         * @description Stores one record whose `values` are validated against the field definitions of
+         *     the addressed object: unknown field keys, missing required fields and values that
+         *     do not match the declared field type are all rejected.
+         */
+        post: operations["createObjectRecord"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -123,6 +169,13 @@ export interface components {
          * @enum {string}
          */
         FieldType: "text" | "number" | "date" | "select" | "file" | "rows";
+        /** @description One selectable option of a `select` field. */
+        FieldOption: {
+            /** @example kinh_doanh */
+            value: string;
+            /** @example Kinh doanh */
+            label: string;
+        };
         FieldDefinition: {
             /** @example estimated_amount */
             key: string;
@@ -131,6 +184,8 @@ export interface components {
             type: components["schemas"]["FieldType"];
             /** @default false */
             required: boolean;
+            /** @description Allowed options. Required for `select` fields, rejected on other types. */
+            options?: components["schemas"]["FieldOption"][];
         };
         BusinessObject: {
             /** Format: uuid */
@@ -155,10 +210,45 @@ export interface components {
             description?: string;
             fields?: components["schemas"]["FieldDefinition"][];
         };
+        ObjectRecord: {
+            /** Format: uuid */
+            id: string;
+            /** @description Key of the business object this record belongs to. */
+            objectKey: string;
+            /** @description Field key → value map. Values are validated against the field definitions. */
+            values: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ObjectRecordList: {
+            data: components["schemas"]["ObjectRecord"][];
+        };
+        CreateObjectRecordRequest: {
+            /**
+             * @description Field key → value map. Every key must exist on the object; required fields
+             *     must be present and every value must match the declared field type.
+             */
+            values: {
+                [key: string]: unknown;
+            };
+        };
     };
     responses: {
         /** @description The request body or parameters are invalid */
         BadRequest: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description The addressed resource does not exist */
+        NotFound: {
             headers: {
                 [name: string]: unknown;
             };
@@ -176,7 +266,10 @@ export interface components {
             };
         };
     };
-    parameters: never;
+    parameters: {
+        /** @description Stable machine key of the business object. */
+        ObjectKey: string;
+    };
     requestBodies: never;
     headers: never;
     pathItems: never;
@@ -305,6 +398,86 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getBusinessObject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The business object definition */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessObject"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listObjectRecords: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Records of the business object */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObjectRecordList"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    createObjectRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateObjectRecordRequest"];
+            };
+        };
+        responses: {
+            /** @description Record created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObjectRecord"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };

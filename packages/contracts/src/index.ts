@@ -6,8 +6,14 @@ export type BusinessObject = components['schemas']['BusinessObject'];
 export type FieldDefinition = components['schemas']['FieldDefinition'];
 /** Field kinds supported by the form builder. */
 export type FieldType = components['schemas']['FieldType'];
+/** One selectable option of a `select` field. */
+export type FieldOption = components['schemas']['FieldOption'];
 /** Request body for creating a business object definition. */
 export type CreateBusinessObjectRequest = components['schemas']['CreateBusinessObjectRequest'];
+/** One stored record of a business object. */
+export type ObjectRecord = components['schemas']['ObjectRecord'];
+/** Request body for creating a business object record. */
+export type CreateObjectRecordRequest = components['schemas']['CreateObjectRecordRequest'];
 /** Stable error envelope returned by every failing endpoint. */
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 /** Build identity reported by the API. */
@@ -19,7 +25,10 @@ export interface ApiClient {
   getMeta(): Promise<Meta>;
   getReadiness(): Promise<HealthStatus>;
   listBusinessObjects(): Promise<BusinessObject[]>;
+  getBusinessObject(key: string): Promise<BusinessObject>;
   createBusinessObject(input: CreateBusinessObjectRequest): Promise<BusinessObject>;
+  listObjectRecords(key: string): Promise<ObjectRecord[]>;
+  createObjectRecord(key: string, input: CreateObjectRecordRequest): Promise<ObjectRecord>;
 }
 
 /** ApiError carries the HTTP status and the stable machine-readable error code. */
@@ -91,7 +100,23 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
       return payload.data;
     },
 
+    getBusinessObject: (key) =>
+      request<BusinessObject>(`/api/v1/business-objects/${encodeURIComponent(key)}`),
+
     createBusinessObject: (input) =>
       request<BusinessObject>('/api/v1/business-objects', { method: 'POST', body: input }),
+
+    async listObjectRecords(key) {
+      const payload = await request<{ data: ObjectRecord[] }>(
+        `/api/v1/business-objects/${encodeURIComponent(key)}/records`,
+      );
+      return payload.data;
+    },
+
+    createObjectRecord: (key, input) =>
+      request<ObjectRecord>(`/api/v1/business-objects/${encodeURIComponent(key)}/records`, {
+        method: 'POST',
+        body: input,
+      }),
   };
 }

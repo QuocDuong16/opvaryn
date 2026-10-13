@@ -6,6 +6,7 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/QuocDuong16/opvaryn/api/internal/domain"
@@ -34,6 +35,22 @@ func (s *Store) ListBusinessObjects(ctx context.Context) ([]domain.BusinessObjec
 		return nil, classify(fmt.Errorf("iterate business objects: %w", err))
 	}
 	return objects, nil
+}
+
+// GetBusinessObjectByKey returns one definition. It returns ErrNotFound when no
+// definition uses the key.
+func (s *Store) GetBusinessObjectByKey(ctx context.Context, key string) (domain.BusinessObject, error) {
+	row := s.pool.QueryRow(ctx,
+		`SELECT `+businessObjectColumns+` FROM business_objects WHERE key = $1`, key)
+
+	object, err := scanBusinessObject(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.BusinessObject{}, fmt.Errorf("%w: business object %q", ErrNotFound, key)
+		}
+		return domain.BusinessObject{}, classify(err)
+	}
+	return object, nil
 }
 
 // CreateBusinessObject inserts a definition and returns the stored row.

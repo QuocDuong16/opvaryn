@@ -5,6 +5,8 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+
 	apiv1 "github.com/QuocDuong16/opvaryn/api/internal/api/v1"
 	"github.com/QuocDuong16/opvaryn/api/internal/domain"
 	"github.com/QuocDuong16/opvaryn/api/internal/service"
@@ -46,12 +48,25 @@ func handleCreateBusinessObject(objects *service.BusinessObjects, log *slog.Logg
 	}
 }
 
+func handleGetBusinessObject(objects *service.BusinessObjects, log *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		object, err := objects.Get(r.Context(), chi.URLParam(r, "key"))
+		if err != nil {
+			writeStoreError(w, log, err, "get business object")
+			return
+		}
+		writeJSON(w, log, http.StatusOK, toAPIBusinessObject(object))
+	}
+}
+
 // writeStoreError maps service and store failures onto the stable error envelope.
 func writeStoreError(w http.ResponseWriter, log *slog.Logger, err error, action string) {
 	var validation *service.ValidationError
 	switch {
 	case errors.As(err, &validation):
 		writeError(w, log, http.StatusBadRequest, codeInvalidRequest, validation.Error())
+	case errors.Is(err, store.ErrNotFound):
+		writeError(w, log, http.StatusNotFound, codeNotFound, "the requested resource does not exist")
 	case errors.Is(err, store.ErrConflict):
 		writeError(w, log, http.StatusConflict, codeConflict, "a business object with this key already exists")
 	case errors.Is(err, store.ErrUnavailable):
@@ -75,12 +90,20 @@ func toAPIBusinessObject(object domain.BusinessObject) apiv1.BusinessObject {
 	fields := make([]apiv1.FieldDefinition, len(object.Fields))
 	for i, field := range object.Fields {
 		required := field.Required
-		fields[i] = apiv1.FieldDefinition{
+		converted := apiv1.FieldDefinition{
 			Key:      field.Key,
 			Label:    field.Label,
 			Type:     apiv1.FieldType(field.Type),
 			Required: &required,
 		}
+		if len(field.Options) > 0 {
+			options := make([]apiv1.FieldOption, len(field.Options))
+			for j, option := range field.Options {
+				options[j] = apiv1.FieldOption{Value: option.Value, Label: option.Label}
+			}
+			converted.Options = &options
+		}
+		fields[i] = converted
 	}
 	return apiv1.BusinessObject{
 		Id:          object.ID,
@@ -99,12 +122,20 @@ func toDomainFields(fields *[]apiv1.FieldDefinition) []domain.FieldDefinition {
 	}
 	result := make([]domain.FieldDefinition, len(*fields))
 	for i, field := range *fields {
-		result[i] = domain.FieldDefinition{
+		converted := domain.FieldDefinition{
 			Key:      field.Key,
 			Label:    field.Label,
 			Type:     domain.FieldType(field.Type),
 			Required: field.Required != nil && *field.Required,
 		}
+		if field.Options != nil {
+			options := make([]domain.FieldOption, len(*field.Options))
+			for j, option := range *field.Options {
+				options[j] = domain.FieldOption{Value: option.Value, Label: option.Label}
+			}
+			converted.Options = options
+		}
+		result[i] = converted
 	}
 	return result
 }

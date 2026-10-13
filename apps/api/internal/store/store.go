@@ -12,6 +12,9 @@ import (
 // ErrConflict reports that a write violates a uniqueness constraint.
 var ErrConflict = errors.New("store: conflict")
 
+// ErrNotFound reports that the addressed row does not exist.
+var ErrNotFound = errors.New("store: not found")
+
 // ErrUnavailable reports that the database cannot serve the request.
 var ErrUnavailable = errors.New("store: unavailable")
 

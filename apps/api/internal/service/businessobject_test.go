@@ -11,11 +11,19 @@ import (
 // fakeStore records what the service asked the store to persist.
 type fakeStore struct {
 	created domain.BusinessObject
+	object  domain.BusinessObject
 	err     error
 }
 
 func (f *fakeStore) ListBusinessObjects(context.Context) ([]domain.BusinessObject, error) {
 	return nil, f.err
+}
+
+func (f *fakeStore) GetBusinessObjectByKey(context.Context, string) (domain.BusinessObject, error) {
+	if f.err != nil {
+		return domain.BusinessObject{}, f.err
+	}
+	return f.object, nil
 }
 
 func (f *fakeStore) CreateBusinessObject(_ context.Context, object domain.BusinessObject) (domain.BusinessObject, error) {
@@ -85,6 +93,39 @@ func TestCreateRejectsInvalidInput(t *testing.T) {
 			},
 			wantProblem: "label: must not be empty",
 		},
+		{
+			name: "select field without options is rejected",
+			mutate: func(in *NewBusinessObjectInput) {
+				in.Fields[0].Type = domain.FieldTypeSelect
+			},
+			wantProblem: "select fields must define at least one option",
+		},
+		{
+			name: "options on a non-select field are rejected",
+			mutate: func(in *NewBusinessObjectInput) {
+				in.Fields[0].Options = []domain.FieldOption{{Value: "a", Label: "A"}}
+			},
+			wantProblem: "only allowed on select fields",
+		},
+		{
+			name: "blank option value is rejected",
+			mutate: func(in *NewBusinessObjectInput) {
+				in.Fields[0].Type = domain.FieldTypeSelect
+				in.Fields[0].Options = []domain.FieldOption{{Value: " ", Label: "A"}}
+			},
+			wantProblem: "value: must not be empty",
+		},
+		{
+			name: "duplicate option values are rejected",
+			mutate: func(in *NewBusinessObjectInput) {
+				in.Fields[0].Type = domain.FieldTypeSelect
+				in.Fields[0].Options = []domain.FieldOption{
+					{Value: "kinh_doanh", Label: "Kinh doanh"},
+					{Value: "kinh_doanh", Label: "Kinh doanh (nhóm)"},
+				}
+			},
+			wantProblem: "duplicate option value",
+		},
 	}
 
 	for _, test := range tests {
@@ -117,6 +158,14 @@ func TestCreateNormalizesAndPersists(t *testing.T) {
 	input := validInput()
 	input.Name = "  Đề nghị mua hàng  "
 	input.Fields[0].Label = "  Số tiền dự kiến "
+	input.Fields = append(input.Fields, domain.FieldDefinition{
+		Key:   "department",
+		Label: "Bộ phận",
+		Type:  domain.FieldTypeSelect,
+		Options: []domain.FieldOption{
+			{Value: "  kinh_doanh ", Label: "  Kinh doanh "},
+		},
+	})
 
 	st := &fakeStore{}
 	created, err := NewBusinessObjects(st).Create(context.Background(), input)
@@ -129,6 +178,9 @@ func TestCreateNormalizesAndPersists(t *testing.T) {
 	}
 	if created.Fields[0].Label != "Số tiền dự kiến" {
 		t.Errorf("field label not trimmed: %q", created.Fields[0].Label)
+	}
+	if got := created.Fields[1].Options[0]; got.Value != "kinh_doanh" || got.Label != "Kinh doanh" {
+		t.Errorf("select option not trimmed: %+v", got)
 	}
 	if created.ID.String() == "" || created.Key != "purchase_request" {
 		t.Errorf("unexpected object identity: %+v", created)

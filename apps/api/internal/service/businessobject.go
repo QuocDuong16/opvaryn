@@ -22,6 +22,8 @@ const (
 	maxNameLength    = 120
 	maxDescLength    = 500
 	maxFieldLabelLen = 120
+	maxFieldOptions  = 50
+	maxOptionLength  = 120
 )
 
 // ValidationError reports user-correctable input problems. All problems are
@@ -35,6 +37,7 @@ func (e *ValidationError) Error() string { return strings.Join(e.Problems, "; ")
 // businessObjectStore is the slice of the persistence layer this service needs.
 type businessObjectStore interface {
 	ListBusinessObjects(ctx context.Context) ([]domain.BusinessObject, error)
+	GetBusinessObjectByKey(ctx context.Context, key string) (domain.BusinessObject, error)
 	CreateBusinessObject(ctx context.Context, object domain.BusinessObject) (domain.BusinessObject, error)
 }
 
@@ -59,6 +62,16 @@ type NewBusinessObjectInput struct {
 // List returns every business object definition ordered by key.
 func (s *BusinessObjects) List(ctx context.Context) ([]domain.BusinessObject, error) {
 	return s.store.ListBusinessObjects(ctx)
+}
+
+// Get returns one definition. A missing key surfaces as the store's ErrNotFound,
+// which the HTTP layer maps to a 404 envelope.
+func (s *BusinessObjects) Get(ctx context.Context, key string) (domain.BusinessObject, error) {
+	object, err := s.store.GetBusinessObjectByKey(ctx, key)
+	if err != nil {
+		return domain.BusinessObject{}, fmt.Errorf("look up business object %q: %w", key, err)
+	}
+	return object, nil
 }
 
 // Create validates the input and stores a new business object definition.
@@ -127,6 +140,53 @@ func validateFields(fields []domain.FieldDefinition) []string {
 		if !field.Type.Valid() {
 			problems = append(problems, fmt.Sprintf("%s.type: %q is not a supported field type", where, field.Type))
 		}
+
+		problems = append(problems, validateFieldOptions(field, where)...)
+	}
+	return problems
+}
+
+// validateFieldOptions keeps select fields usable: a select without options cannot
+// be entered, and options on other field types would never be shown.
+func validateFieldOptions(field domain.FieldDefinition, where string) []string {
+	if field.Type != domain.FieldTypeSelect {
+		if len(field.Options) > 0 {
+			return []string{fmt.Sprintf("%s.options: only allowed on select fields", where)}
+		}
+		return nil
+	}
+
+	switch {
+	case len(field.Options) == 0:
+		return []string{fmt.Sprintf("%s.options: select fields must define at least one option", where)}
+	case len(field.Options) > maxFieldOptions:
+		return []string{fmt.Sprintf("%s.options: must contain at most %d entries", where, maxFieldOptions)}
+	}
+
+	problems := make([]string, 0)
+	seen := make(map[string]struct{}, len(field.Options))
+	for i, option := range field.Options {
+		at := fmt.Sprintf("%s.options[%d]", where, i)
+
+		value := strings.TrimSpace(option.Value)
+		switch {
+		case value == "":
+			problems = append(problems, fmt.Sprintf("%s.value: must not be empty", at))
+		case len(value) > maxOptionLength:
+			problems = append(problems, fmt.Sprintf("%s.value: must be at most %d characters", at, maxOptionLength))
+		}
+		if _, ok := seen[value]; ok && value != "" {
+			problems = append(problems, fmt.Sprintf("%s.value: duplicate option value %q", at, value))
+		}
+		seen[value] = struct{}{}
+
+		label := strings.TrimSpace(option.Label)
+		switch {
+		case label == "":
+			problems = append(problems, fmt.Sprintf("%s.label: must not be empty", at))
+		case len(label) > maxOptionLength:
+			problems = append(problems, fmt.Sprintf("%s.label: must be at most %d characters", at, maxOptionLength))
+		}
 	}
 	return problems
 }
@@ -135,6 +195,16 @@ func normalizeFields(fields []domain.FieldDefinition) []domain.FieldDefinition {
 	normalized := make([]domain.FieldDefinition, len(fields))
 	for i, field := range fields {
 		field.Label = strings.TrimSpace(field.Label)
+		if len(field.Options) > 0 {
+			options := make([]domain.FieldOption, len(field.Options))
+			for j, option := range field.Options {
+				options[j] = domain.FieldOption{
+					Value: strings.TrimSpace(option.Value),
+					Label: strings.TrimSpace(option.Label),
+				}
+			}
+			field.Options = options
+		}
 		normalized[i] = field
 	}
 	return normalized

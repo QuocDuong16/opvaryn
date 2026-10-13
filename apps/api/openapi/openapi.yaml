@@ -21,6 +21,8 @@ tags:
     description: Health, readiness and product metadata
   - name: business-objects
     description: Business object definitions (demo vertical slice)
+  - name: object-records
+    description: Records stored against a business object definition
 paths:
   /healthz:
     get:
@@ -112,10 +114,92 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/business-objects/{key}:
+    get:
+      operationId: getBusinessObject
+      tags: [business-objects]
+      summary: Get one business object definition
+      description: Returns the definition stored under the given key.
+      parameters:
+        - $ref: '#/components/parameters/ObjectKey'
+      responses:
+        '200':
+          description: The business object definition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessObject'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/business-objects/{key}/records:
+    get:
+      operationId: listObjectRecords
+      tags: [object-records]
+      summary: List records of a business object
+      description: Returns the stored records, newest first.
+      parameters:
+        - $ref: '#/components/parameters/ObjectKey'
+      responses:
+        '200':
+          description: Records of the business object
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectRecordList'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      operationId: createObjectRecord
+      tags: [object-records]
+      summary: Create a record of a business object
+      description: |
+        Stores one record whose `values` are validated against the field definitions of
+        the addressed object: unknown field keys, missing required fields and values that
+        do not match the declared field type are all rejected.
+      parameters:
+        - $ref: '#/components/parameters/ObjectKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateObjectRecordRequest'
+      responses:
+        '201':
+          description: Record created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 components:
+  parameters:
+    ObjectKey:
+      name: key
+      in: path
+      required: true
+      description: Stable machine key of the business object.
+      schema:
+        type: string
+        pattern: '^[a-z][a-z0-9_]{1,63}$'
   responses:
     BadRequest:
       description: The request body or parameters are invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    NotFound:
+      description: The addressed resource does not exist
       content:
         application/json:
           schema:
@@ -165,6 +249,21 @@ components:
       type: string
       description: Field kinds supported by the form builder.
       enum: [text, number, date, select, file, rows]
+    FieldOption:
+      type: object
+      description: One selectable option of a `select` field.
+      required: [value, label]
+      properties:
+        value:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: kinh_doanh
+        label:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: Kinh doanh
     FieldDefinition:
       type: object
       required: [key, label, type]
@@ -180,6 +279,11 @@ components:
         required:
           type: boolean
           default: false
+        options:
+          type: array
+          description: Allowed options. Required for `select` fields, rejected on other types.
+          items:
+            $ref: '#/components/schemas/FieldOption'
     BusinessObject:
       type: object
       required: [id, key, name, fields, createdAt, updatedAt]
@@ -231,3 +335,41 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/FieldDefinition'
+    ObjectRecord:
+      type: object
+      required: [id, objectKey, values, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        objectKey:
+          type: string
+          description: Key of the business object this record belongs to.
+        values:
+          type: object
+          additionalProperties: true
+          description: Field key → value map. Values are validated against the field definitions.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ObjectRecordList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ObjectRecord'
+    CreateObjectRecordRequest:
+      type: object
+      required: [values]
+      properties:
+        values:
+          type: object
+          additionalProperties: true
+          description: |
+            Field key → value map. Every key must exist on the object; required fields
+            must be present and every value must match the declared field type.
