@@ -81,12 +81,13 @@ echo "smoke: GET /api/v1/meta"
 grep -q '"name":"OPVARYN"' "$body_file" || fail "GET /api/v1/meta does not report the product name"
 
 object_key="smoke_$(date +%s)"
-object_body="$(printf '{"key":"%s","name":"Smoke test object","description":"created by scripts/smoke-api.sh","fields":[{"key":"amount","label":"Số tiền","type":"number","required":true}]}' "$object_key")"
+object_body="$(printf '{"key":"%s","name":"Smoke test object","description":"created by scripts/smoke-api.sh","fields":[{"key":"amount","label":"Số tiền","type":"number","required":true},{"key":"priority","label":"Mức ưu tiên","type":"select","options":[{"value":"normal","label":"Bình thường"},{"value":"urgent","label":"Gấp"}]}]}' "$object_key")"
 
 echo "smoke: POST /api/v1/business-objects (create)"
 status="$(request POST /api/v1/business-objects "$object_body")"
 [[ "$status" == "201" ]] || fail "creating a business object returned $status, expected 201"
 grep -q "\"key\":\"$object_key\"" "$body_file" || fail "create response does not contain the created key"
+grep -q '"value":"urgent"' "$body_file" || fail "create response dropped the select options"
 
 echo "smoke: POST /api/v1/business-objects (duplicate -> 409)"
 status="$(request POST /api/v1/business-objects "$object_body")"
@@ -101,6 +102,41 @@ grep -q '"code":"invalid_request"' "$body_file" || fail "invalid create did not 
 echo "smoke: GET /api/v1/business-objects (list contains the created object)"
 [[ "$(request GET /api/v1/business-objects)" == "200" ]] || fail "listing business objects did not return 200"
 grep -q "\"key\":\"$object_key\"" "$body_file" || fail "the created object is missing from the list"
+
+echo "smoke: GET /api/v1/business-objects/{key} (known and unknown keys)"
+[[ "$(request GET "/api/v1/business-objects/$object_key")" == "200" ]] || fail "reading a business object did not return 200"
+grep -q "\"key\":\"$object_key\"" "$body_file" || fail "the read object does not match the requested key"
+status="$(request GET /api/v1/business-objects/smoke_missing_key)"
+[[ "$status" == "404" ]] || fail "reading an unknown object returned $status, expected 404"
+grep -q '"code":"not_found"' "$body_file" || fail "unknown object did not return the not_found error code"
+
+echo "smoke: POST /api/v1/business-objects/{key}/records (create)"
+status="$(request POST "/api/v1/business-objects/$object_key/records" '{"values":{"amount":1500000,"priority":"urgent"}}')"
+[[ "$status" == "201" ]] || fail "creating a record returned $status, expected 201"
+grep -q '"objectKey"' "$body_file" || fail "record response does not report its object key"
+
+echo "smoke: POST records (unknown field key -> 400)"
+status="$(request POST "/api/v1/business-objects/$object_key/records" '{"values":{"amount":1,"note":"not declared"}}')"
+[[ "$status" == "400" ]] || fail "record with an undeclared field returned $status, expected 400"
+grep -q 'field is not defined on this object' "$body_file" || fail "undeclared field was not reported as such"
+
+echo "smoke: POST records (missing required -> 400)"
+status="$(request POST "/api/v1/business-objects/$object_key/records" '{"values":{"priority":"normal"}}')"
+[[ "$status" == "400" ]] || fail "record without the required field returned $status, expected 400"
+grep -q '"code":"invalid_request"' "$body_file" || fail "invalid record did not return the invalid_request error code"
+
+echo "smoke: POST records (value outside the declared options -> 400)"
+status="$(request POST "/api/v1/business-objects/$object_key/records" '{"values":{"amount":10,"priority":"later"}}')"
+[[ "$status" == "400" ]] || fail "record with an undeclared option returned $status, expected 400"
+grep -q 'not one of the declared options' "$body_file" || fail "undeclared option was not reported as such"
+
+echo "smoke: POST records (unknown object -> 404)"
+status="$(request POST /api/v1/business-objects/smoke_missing_key/records '{"values":{}}')"
+[[ "$status" == "404" ]] || fail "record for an unknown object returned $status, expected 404"
+
+echo "smoke: GET /api/v1/business-objects/{key}/records (list contains the created record)"
+[[ "$(request GET "/api/v1/business-objects/$object_key/records")" == "200" ]] || fail "listing records did not return 200"
+grep -q '"amount":1500000' "$body_file" || fail "the created record is missing from the list"
 
 echo "smoke: GET /api/v1/does-not-exist (unknown route -> 404 envelope)"
 status="$(request GET /api/v1/does-not-exist)"

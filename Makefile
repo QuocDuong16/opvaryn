@@ -6,7 +6,7 @@
         docker-up docker-down docker-logs docker-config docker-clean \
         contract-generate contract-check \
         api-tools-check api-fix api-build api-test api-lint api-vuln api-check \
-        smoke-api \
+        smoke-api seed-demo \
         web-install web-lint web-format web-typecheck web-test web-build web-check \
         actions-lint docs-check quality-check clean
 
@@ -150,6 +150,9 @@ web-check: ## Run web lint, format, type, test, and build checks
 
 smoke-api: ## Build the API, start it and smoke test it against local Postgres
 	bash scripts/smoke-api.sh
+
+seed-demo: ## Seed the demo business objects and records through the running API
+	bash scripts/seed-demo.sh
 
 actions-lint: ## Lint the GitHub Actions workflows
 	@command -v mise >/dev/null 2>&1 || { echo "Missing mise — install mise, then run 'mise install'." >&2; exit 1; }
