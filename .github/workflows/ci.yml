@@ -1,0 +1,96 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# Least privilege by default; jobs widen only what they need.
+permissions:
+  contents: read
+
+# A new push to the same ref cancels the previous run.
+concurrency:
+  group: ci-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+env:
+  # mise loads the project config from the checkout without an interactive trust prompt.
+  MISE_TRUSTED_CONFIG_PATHS: ${{ github.workspace }}
+
+jobs:
+  quality:
+    name: Quality gate (lint, types, tests, build)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install toolchain from mise.toml
+        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        with:
+          cache: true
+
+      - name: Restore Go module and build caches
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: |
+            ~/go/pkg/mod
+            ~/.cache/go-build
+          key: go-${{ runner.os }}-${{ hashFiles('apps/api/go.sum') }}
+          restore-keys: go-${{ runner.os }}-
+
+      - name: Restore pnpm store
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
+        with:
+          path: ~/.pnpm-store
+          key: pnpm-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: pnpm-${{ runner.os }}-
+
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile --store-dir "$HOME/.pnpm-store"
+
+      # The same gate contributors run locally: contract freshness, formatting,
+      # lint, vulnerability and security scans, tests, production builds,
+      # workflow linting and the docs check.
+      - name: Run quality gate
+        run: make quality-check
+
+  integration:
+    name: API integration (PostgreSQL + smoke test)
+    runs-on: ubuntu-24.04
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      - name: Install toolchain from mise.toml
+        uses: jdx/mise-action@08ae2a091c038e1e05ec6f5115dc5c69d5a2a6b8 # v5.1.2
+        with:
+          cache: true
+
+      # Uses the same pinned image as local development (deployments/docker-compose.yml).
+      - name: Start PostgreSQL
+        run: make docker-up
+
+      - name: Apply migrations
+        run: cd apps/api && go run ./cmd/migrate
+
+      # Builds the server, starts it and exercises the vertical slice:
+      # health, readiness, metadata, create, duplicate and validation responses.
+      - name: Smoke test the API
+        run: make smoke-api
+
+      - name: Show container logs on failure
+        if: failure()
+        run: make docker-logs
+
+      - name: Stop PostgreSQL
+        if: always()
+        run: make docker-down

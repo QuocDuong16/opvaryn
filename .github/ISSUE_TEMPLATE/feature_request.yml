@@ -1,0 +1,51 @@
+name: Feature request
+description: Propose a capability or a change in scope
+title: 'feat: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        OPVARYN is proprietary and driven by its roadmap; requests are reviewed but not
+        automatically accepted. Read [CONTRIBUTING.md](../../CONTRIBUTING.md) first.
+
+        Scope note: the current milestone is the interactive demo. Check whether your request
+        belongs to the demo, MVP V1 or a later version in `operations-playbook/roadmap.html`.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: Which business problem does this solve? Who hits it and how often?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed capability
+      description: Describe the behaviour you expect, not the implementation if possible.
+    validations:
+      required: true
+  - type: dropdown
+    id: milestone
+    attributes:
+      label: Where does it belong?
+      options:
+        - Interactive demo (current milestone)
+        - MVP V1
+        - Later version (V1.x / V2 / V3)
+        - Not sure
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+      description: Existing ways to achieve this, workarounds, or why they are insufficient.
+    validations:
+      required: false
+  - type: textarea
+    id: impact
+    attributes:
+      label: Impact if not done
+      description: What breaks, slows down or stays manual without this?
+    validations:
+      required: false

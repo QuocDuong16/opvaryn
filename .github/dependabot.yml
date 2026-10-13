@@ -1,0 +1,55 @@
+# Dependency updates. Only the ecosystems Dependabot supports are listed here;
+# the mise tool pins (go, node, pnpm, Go analysis tools) are updated by hand in
+# mise.toml + mise.lock, and container digests follow the same manual review
+# (this repository deliberately does not use Renovate).
+version: 2
+updates:
+  - package-ecosystem: gomod
+    directory: /apps/api
+    schedule:
+      interval: weekly
+      day: tuesday
+      timezone: Asia/Ho_Chi_Minh
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'deps(go)'
+    groups:
+      go-minor-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  - package-ecosystem: npm
+    directory: /
+    schedule:
+      interval: weekly
+      day: monday
+      timezone: Asia/Ho_Chi_Minh
+    open-pull-requests-limit: 5
+    commit-message:
+      prefix: 'deps(web)'
+    groups:
+      next-react-stack:
+        patterns: ['next', 'react', 'react-dom', '@types/react', '@types/react-dom', 'eslint-config-next']
+        update-types: [minor, patch]
+      npm-minor-patch:
+        patterns: ['*']
+        update-types: [minor, patch]
+
+  # Keeps the SHA-pinned actions in .github/workflows current.
+  - package-ecosystem: github-actions
+    directory: /
+    schedule:
+      interval: weekly
+      day: wednesday
+      timezone: Asia/Ho_Chi_Minh
+    commit-message:
+      prefix: 'deps(actions)'
+
+  - package-ecosystem: docker-compose
+    directory: /deployments
+    schedule:
+      interval: weekly
+      day: thursday
+      timezone: Asia/Ho_Chi_Minh
+    commit-message:
+      prefix: 'deps(docker)'

@@ -1,0 +1,13 @@
+# Review routing. Code Owners reviews are only enforced once branch protection
+# (or a repository ruleset) requires "Require review from Code Owners".
+*                       @QuocDuong16
+
+# Contract surface: a change here ripples into the API and the web app.
+/apps/api/openapi/      @QuocDuong16
+/packages/contracts/    @QuocDuong16
+
+# Quality gate, CI configuration and legal/compliance documents.
+/.github/               @QuocDuong16
+/scripts/               @QuocDuong16
+/LICENSE.md             @QuocDuong16
+/SECURITY.md            @QuocDuong16

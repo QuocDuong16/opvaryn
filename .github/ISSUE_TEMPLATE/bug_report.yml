@@ -1,0 +1,52 @@
+name: Bug report
+description: Something in the repository does not work as documented
+title: 'bug: '
+body:
+  - type: markdown
+    attributes:
+      value: |
+        **Do not report security problems here.** Follow [SECURITY.md](../../SECURITY.md) instead.
+
+        OPVARYN is a proprietary project in demo stage; please read
+        [CONTRIBUTING.md](../../CONTRIBUTING.md) before filing anything.
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: What you observed, and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Steps to reproduce
+      placeholder: |
+        1. mise install && pnpm install
+        2. make docker-up
+        3. cd apps/api && go run ./cmd/migrate
+        4. make dev
+        5. ...
+    validations:
+      required: true
+  - type: input
+    id: revision
+    attributes:
+      label: Commit / version
+      description: 'Output of `git rev-parse HEAD`; the OPVARYN version from /api/v1/meta if relevant.'
+    validations:
+      required: true
+  - type: textarea
+    id: environment
+    attributes:
+      label: Environment
+      placeholder: OS, Docker version, `mise --version`, browser (for web issues)
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or output
+      description: Relevant server logs, browser console output or command output. Remove secrets first.
+      render: shell
+    validations:
+      required: false
