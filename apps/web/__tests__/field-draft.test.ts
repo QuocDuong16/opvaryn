@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  definitionsToDrafts,
   EMPTY_FIELD_DRAFT,
   fieldDraftsToDefinitions,
   parseOptionLines,
@@ -65,5 +66,51 @@ describe('fieldDraftsToDefinitions', () => {
     ]);
 
     expect(definitions[0]?.options).toBeUndefined();
+  });
+});
+
+describe('definitionsToDrafts', () => {
+  it('round-trips a definition through the editor rows', () => {
+    const definitions = [
+      { key: 'title', label: 'Nội dung', type: 'text' as const, required: true },
+      { key: 'amount', label: 'Số tiền', type: 'number' as const, required: false },
+      {
+        key: 'department',
+        label: 'Bộ phận',
+        type: 'select' as const,
+        required: true,
+        options: [
+          { value: 'ky_thuat', label: 'Kỹ thuật' },
+          { value: 'kinh_doanh', label: 'Kinh doanh' },
+        ],
+      },
+    ];
+
+    expect(fieldDraftsToDefinitions(definitionsToDrafts(definitions))).toEqual(definitions);
+  });
+
+  it('writes an option whose label matches its value as a bare line', () => {
+    const drafts = definitionsToDrafts([
+      {
+        key: 'state',
+        label: 'Trạng thái',
+        type: 'select',
+        required: false,
+        options: [
+          { value: 'in_use', label: 'in_use' },
+          { value: 'retired', label: 'Đã thanh lý' },
+        ],
+      },
+    ]);
+
+    expect(drafts[0]?.options).toBe('in_use\nretired = Đã thanh lý');
+  });
+
+  it('treats a missing required flag as optional', () => {
+    const drafts = definitionsToDrafts([
+      { key: 'note', label: 'Ghi chú', type: 'text', required: false },
+    ]);
+
+    expect(drafts[0]?.required).toBe(false);
   });
 });

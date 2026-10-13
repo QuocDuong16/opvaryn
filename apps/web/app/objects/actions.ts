@@ -6,6 +6,7 @@ import type { BusinessObject, FieldDefinition } from '@opvaryn/contracts';
 
 import type { CreateObjectState } from '@/components/objects/create-object-state';
 import type { CreateRecordState } from '@/components/forms/object-form-state';
+import type { UpdateObjectState } from '@/components/objects/update-object-state';
 import { recordValuesFromForm } from '@/components/forms/record-values';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 
@@ -58,6 +59,47 @@ function parseFields(raw: string): FieldDefinition[] | null {
     return Array.isArray(parsed) ? (parsed as FieldDefinition[]) : null;
   } catch {
     return null;
+  }
+}
+
+/**
+ * Publishes the next version of a business object definition. The action only
+ * assembles the request; the Go service validates the definition and writes the
+ * immutable snapshot, so the editor and the create form enforce the same rules.
+ */
+export async function updateBusinessObjectAction(
+  _previous: UpdateObjectState,
+  formData: FormData,
+): Promise<UpdateObjectState> {
+  const key = String(formData.get('key') ?? '').trim();
+  const name = String(formData.get('name') ?? '').trim();
+  const description = String(formData.get('description') ?? '').trim();
+
+  const fields = parseFields(String(formData.get('fields') ?? ''));
+  if (fields === null) {
+    return {
+      status: 'error',
+      message: 'Không đọc được danh sách field. Tải lại trang rồi nhập lại schema.',
+    };
+  }
+
+  try {
+    const updated = await createServerApiClient().updateBusinessObject(key, {
+      name,
+      description: description === '' ? undefined : description,
+      fields,
+    });
+    revalidatePath(`/objects/${key}`);
+    revalidatePath('/objects');
+    revalidatePath('/forms');
+    revalidatePath('/apps');
+    return {
+      status: 'success',
+      message: `Đã publish phiên bản v${updated.version} với ${updated.fields.length} field. Bản ghi cũ vẫn đọc theo phiên bản của chúng.`,
+      publishedVersion: updated.version,
+    };
+  } catch (cause) {
+    return { status: 'error', message: describeApiError(cause) };
   }
 }
 

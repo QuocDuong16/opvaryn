@@ -70,3 +70,22 @@ export function fieldDraftsToDefinitions(drafts: FieldDraft[]): FieldDefinition[
 
   return definitions;
 }
+
+/**
+ * definitionsToDrafts is the inverse, used when the schema editor opens on an
+ * existing definition (publishing a new version). Options become `value = Nhãn`
+ * lines again; the two functions round-trip, which their test pins down.
+ */
+export function definitionsToDrafts(fields: readonly FieldDefinition[]): FieldDraft[] {
+  return fields.map((field) => ({
+    key: field.key,
+    label: field.label,
+    type: field.type,
+    required: field.required ?? false,
+    options: (field.options ?? [])
+      .map((option) =>
+        option.label === option.value ? option.value : `${option.value} = ${option.label}`,
+      )
+      .join('\n'),
+  }));
+}

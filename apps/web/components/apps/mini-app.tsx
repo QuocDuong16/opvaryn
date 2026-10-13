@@ -164,7 +164,7 @@ function ListView({ app, onOpen }: { app: MiniAppData; onOpen: (recordId: string
           >
             <span className="min-w-0">
               <span className="block text-sm font-medium">
-                {primaryFieldValue(app.object, record)}
+                {primaryFieldValue(app.object.fields, record)}
               </span>
               <span className="mt-0.5 block font-mono text-[11px] text-on-surface-muted">
                 {app.object.key} · {record.id.slice(0, 8)}
@@ -199,7 +199,7 @@ function DetailView({ app, record }: { app: MiniAppData; record: ObjectRecord | 
     <div className="grid gap-4 lg:grid-cols-[1fr_18rem]">
       <div className="rounded-xl border border-border bg-surface-raised p-5">
         <h3 className="text-base font-semibold tracking-tight">
-          {primaryFieldValue(app.object, record)}
+          {primaryFieldValue(app.object.fields, record)}
         </h3>
         <dl className="mt-4 divide-y divide-border">
           {app.object.fields.map((field) => (
@@ -292,7 +292,7 @@ function KanbanView({ app, statusFieldKey }: { app: MiniAppData; statusFieldKey?
                   key={record.id}
                   className="rounded-lg border border-border bg-surface-raised px-3 py-2 text-sm"
                 >
-                  {primaryFieldValue(app.object, record)}
+                  {primaryFieldValue(app.object.fields, record)}
                 </li>
               ))}
               {column.records.length === 0 ? (

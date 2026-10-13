@@ -9,6 +9,7 @@ function objectWithFields(fields: readonly { key: string; type: FieldType }[]): 
     key: 'purchase_request',
     name: 'Đề nghị mua hàng',
     fields: fields.map((field) => ({ ...field, label: field.key, required: false })),
+    version: 1,
     createdAt: '2026-10-13T00:00:00Z',
     updatedAt: '2026-10-13T00:00:00Z',
   };

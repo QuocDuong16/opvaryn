@@ -1,9 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import type { FieldType } from '@opvaryn/contracts';
+import type { FieldDefinition, FieldType } from '@opvaryn/contracts';
 
 import {
+  definitionsToDrafts,
   EMPTY_FIELD_DRAFT,
   fieldDraftsToDefinitions,
   type FieldDraft,
@@ -21,12 +22,20 @@ interface FieldRow extends FieldDraft {
 }
 
 /**
- * FieldEditor edits the field schema as part of the create form. Rows live in
- * React state and are submitted as one JSON hidden input; the Go service remains
- * the validation gate, so every rule is enforced in one place.
+ * FieldEditor edits a field schema: empty for a new object, prefilled with an
+ * existing definition when publishing the next version of one. Rows live in React
+ * state and are submitted as one JSON hidden input; the Go service remains the
+ * validation gate, so every rule is enforced in one place.
  */
-export function FieldEditor() {
-  const [rows, setRows] = useState<FieldRow[]>([]);
+export function FieldEditor({
+  initialFields = [],
+}: {
+  /** Definition the editor opens on; defaults to an empty schema. */
+  initialFields?: readonly FieldDefinition[];
+}) {
+  const [rows, setRows] = useState<FieldRow[]>(() =>
+    definitionsToDrafts(initialFields).map((draft) => ({ ...draft, id: crypto.randomUUID() })),
+  );
 
   function addRow() {
     setRows((current) => [...current, { ...EMPTY_FIELD_DRAFT, id: crypto.randomUUID() }]);

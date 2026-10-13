@@ -13,17 +13,27 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
   {
     method: 'GET',
     path: '/api/v1/business-objects/{key}',
-    purpose: 'Đọc một định nghĩa theo key',
+    purpose: 'Đọc một định nghĩa theo key (kèm phiên bản đang dùng)',
+  },
+  {
+    method: 'PUT',
+    path: '/api/v1/business-objects/{key}',
+    purpose: 'Publish phiên bản mới của định nghĩa (bất biến)',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/business-objects/{key}/versions',
+    purpose: 'Lịch sử phiên bản đã publish, mới nhất trước',
   },
   {
     method: 'GET',
     path: '/api/v1/business-objects/{key}/records',
-    purpose: 'Danh sách bản ghi, mới nhất trước',
+    purpose: 'Danh sách bản ghi kèm phiên bản định nghĩa của chúng',
   },
   {
     method: 'POST',
     path: '/api/v1/business-objects/{key}/records',
-    purpose: 'Tạo bản ghi, validate theo field schema',
+    purpose: 'Tạo bản ghi, validate theo schema của phiên bản đang dùng',
   },
 ];
 

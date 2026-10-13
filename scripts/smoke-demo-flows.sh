@@ -210,7 +210,10 @@ assert_status "$status" "201" "creating the flow object through the API"
 
 status="$(web_get "/objects/$object_key" "$tmp_dir/detail.html")"
 assert_status "$status" "200" "object detail page"
-assert_contains "$tmp_dir/detail.html" "Field schema (" "object detail page"
+# React splits interpolated text into separate nodes, so page assertions use
+# literals only; version numbers are pinned through the API instead.
+assert_contains "$tmp_dir/detail.html" "Field schema — v" "object detail page"
+assert_contains "$tmp_dir/detail.html" "phiên bản đang dùng" "object detail page"
 for label in 'Nội dung' 'Số tiền' 'Hạn' 'Mức ưu tiên' 'Danh mục'; do
   assert_contains "$tmp_dir/detail.html" "$label" "object detail page (schema table)"
 done
@@ -388,5 +391,59 @@ check_surface "/tasks" "tasks" "PR-2026-014" "Đang chờ bạn"
 check_surface "/apps" "applications" "Kanban" "Cấu hình" "Tích hợp"
 check_surface "/roadmap" "roadmap" "Điều kiện nghiệm thu MVP V1" "Quyết định đang mở chặn tiến độ" "Concept"
 check_surface "/settings" "settings" "make seed-demo" "make smoke-api"
+
+# --------------------------------- flow F: publishing a new definition version ----
+
+echo "flows: [F] the schema editor publishes an immutable new version"
+status="$(web_get "/objects/$object_key" "$tmp_dir/detail-v1.html")"
+assert_status "$status" "200" "object detail page before the edit"
+assert_contains "$tmp_dir/detail-v1.html" "phiên bản đang dùng" "version badge before the edit"
+assert_contains "$tmp_dir/detail-v1.html" "Lịch sử phiên bản" "version history"
+
+curl -sS -o "$tmp_dir/versions-before.json" "$api_base/api/v1/business-objects/$object_key/versions"
+python3 - "$tmp_dir/versions-before.json" <<'PY' || fail "[F] the object should start with exactly one published version"
+import json, sys
+
+versions = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+if [version["version"] for version in versions] != [1]:
+    sys.exit(f"expected only version 1 before the edit, got {[v['version'] for v in versions]}")
+print("flows: the object starts at version 1")
+PY
+
+# The edit form is the one carrying the schema hidden input on this page; its SSR
+# value is excluded because formData.get returns the first value of a name.
+mapfile -t edit_args < <(form_args "$tmp_dir/detail-v1.html" fields fields)
+[[ ${#edit_args[@]} -ge 4 ]] || fail "[F] the edit form has no server-action fields"
+
+edit_schema='[{"key":"title","label":"Nội dung (v2)","type":"text","required":true},{"key":"amount","label":"Số tiền","type":"number","required":true},{"key":"due_on","label":"Hạn","type":"date"}]'
+status="$(web_post "/objects/$object_key" "$tmp_dir/published.html" \
+  "${edit_args[@]}" \
+  --form-string 'name=Luồng demo (v2)' \
+  --form-string 'description=publish bởi scripts/smoke-demo-flows.sh' \
+  --form-string "fields=$edit_schema")"
+assert_status "$status" "200" "definition publish"
+assert_contains "$tmp_dir/published.html" "Đã publish phiên bản v2" "definition publish"
+
+curl -sS -o "$tmp_dir/versions.json" "$api_base/api/v1/business-objects/$object_key/versions"
+python3 - "$tmp_dir/versions.json" <<'PY' || fail "[F] the published version history is wrong"
+import json, sys
+
+versions = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+numbers = [version["version"] for version in versions]
+if numbers != [2, 1]:
+    sys.exit(f"expected versions [2, 1], got {numbers}")
+newest = [field["key"] for field in versions[0]["fields"]]
+oldest = [field["key"] for field in versions[-1]["fields"]]
+if newest != ["title", "amount", "due_on"] or oldest != ["title", "amount", "due_on", "priority", "items"]:
+    sys.exit(f"version schemas are wrong: newest {newest}, oldest {oldest}")
+print("flows: version history verified")
+PY
+
+status="$(web_get "/objects/$object_key" "$tmp_dir/detail-v2.html")"
+assert_status "$status" "200" "object detail page after the edit"
+assert_contains "$tmp_dir/detail-v2.html" "phiên bản đang dùng" "version badge after the edit"
+assert_contains "$tmp_dir/detail-v2.html" "Nội dung (v2)" "the new schema is rendered"
+assert_contains "$tmp_dir/detail-v2.html" "phiên bản cũ — bản ghi giữ nguyên schema" "old records keep their version"
+assert_contains "$tmp_dir/detail-v2.html" "Kiểm thử luồng demo" "the v1 record is still listed"
 
 echo "flows: PASS"

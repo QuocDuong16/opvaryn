@@ -1,4 +1,4 @@
-import type { BusinessObject, FieldDefinition, ObjectRecord } from '@opvaryn/contracts';
+import type { FieldDefinition, ObjectRecord } from '@opvaryn/contracts';
 
 /** Vietnamese labels for the field types in the contract enum. */
 export const FIELD_TYPE_LABELS: Record<FieldDefinition['type'], string> = {
@@ -64,10 +64,15 @@ export function formatFieldValue(
 
 /**
  * primaryFieldValue picks the value that identifies a record in a list: the first
- * text field by convention, falling back to the record id.
+ * text field by convention, falling back to the record id. It takes the field list
+ * rather than the object, because a record is read with the definition version it
+ * was created under.
  */
-export function primaryFieldValue(object: BusinessObject, record: ObjectRecord): string {
-  const preferred = object.fields.find((field) => field.type === 'text') ?? object.fields[0];
+export function primaryFieldValue(
+  fields: readonly FieldDefinition[],
+  record: ObjectRecord,
+): string {
+  const preferred = fields.find((field) => field.type === 'text') ?? fields[0];
   if (!preferred) {
     return record.id;
   }
