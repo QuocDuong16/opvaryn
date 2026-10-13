@@ -64,8 +64,13 @@ Working agreement for agents and contributors in this repository.
 - Storage is PostgreSQL. Dynamic payloads are JSONB, but every field that is filtered,
   joined or measured gets a typed projection or read model.
 - `business_object_records.values` is the JSONB payload of one record, keyed by field key and
-  validated in the service against the object's definition before insert. Editing a schema
-  after records exist (and migrating those values) is not part of the demo.
+  validated in the service against the object's definition before insert. Each record also stores
+  the definition version it was created under and is always read with that version's schema.
+- Definition schemas are versioned: `business_object_versions` holds every published snapshot and
+  is the single source of truth (`business_objects` stores no fields). Creating publishes v1;
+  editing publishes the next version in one transaction and never rewrites an earlier one
+  (invariant 1). Never add a code path that mutates a published version, and never read a record
+  with the newest schema instead of its own version. See `docs/adr/0006`.
 - Every schema change is a new deterministic migration in `apps/api/sql/migrations/`.
   Never edit a migration that has been applied anywhere.
 - A published process definition version is immutable; instances keep the version they
@@ -95,6 +100,8 @@ Working agreement for agents and contributors in this repository.
   loosely in the browser.
 - Screens that generate UI from a business object schema (record form, record table, mini-app
   views, configuration preview) must render from the definition, not from hard-coded field lists.
+- A record is rendered with its own definition version (`components/objects/record-grouping.ts`
+  groups them); rewriting old rows to match a new schema is not an option.
 
 ## Docker and operations
 

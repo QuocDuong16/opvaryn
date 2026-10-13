@@ -15,9 +15,11 @@ trong playbook; [docs/README.md](docs/README.md) giải thích quan hệ giữa 
 Các màn hình theo kế hoạch 8 tuần của bản demo đã dựng xong, mỗi màn hình gắn nhãn trạng thái:
 
 - **Live**: Business Objects và bản ghi — khai schema, tạo định nghĩa, nhập bản ghi bằng form sinh
-  từ schema; dữ liệu đi qua API Go và lưu trong PostgreSQL. Form Builder preview dùng đúng
-  component nhập liệu đó. Overview đọc trạng thái API/database thật. Application showcase đọc
-  danh sách và chi tiết từ bản ghi thật. Bố cục dashboard ở Analytics lưu thật (cookie trình duyệt).
+  từ schema; dữ liệu đi qua API Go và lưu trong PostgreSQL. **Sửa định nghĩa sẽ publish một phiên
+  bản mới bất biến, và bản ghi giữ phiên bản nó được tạo ra** (MVP: "Config versioning"). Form
+  Builder preview dùng đúng component nhập liệu đó. Overview đọc trạng thái API/database thật.
+  Application showcase đọc danh sách và chi tiết từ bản ghi thật. Bố cục dashboard ở Analytics lưu
+  thật (cookie trình duyệt).
 - **Mock**: Workflows (sơ đồ quy trình đọc từ fixture), Tasks (inbox duyệt/trả về/từ chối đổi state
   trong trình duyệt), số liệu Analytics (metric catalog trên fixture), kanban và connector trong
   Application showcase.
@@ -25,9 +27,11 @@ Các màn hình theo kế hoạch 8 tuần của bản demo đã dựng xong, m�
   Builder, escalation, template library, và nội dung Roadmap — các phần phụ thuộc quyết định còn mở.
 
 Workflow runtime chưa được viết vì Process Execution Contract (D05/D08 trong playbook) chưa chốt;
-chi tiết phạm vi nằm ở [ADR 0002](docs/adr/0002-demo-scope-and-labels.md),
-[ADR 0003](docs/adr/0003-demo-data-slice-and-mock-surfaces.md) và
-[ADR 0004](docs/adr/0004-dashboard-layout-storage-and-demo-flow-tests.md).
+bản đề xuất để chốt nằm ở [ADR 0005](docs/adr/0005-runtime-decisions-proposal.md). Chi tiết phạm vi
+demo ở [ADR 0002](docs/adr/0002-demo-scope-and-labels.md),
+[ADR 0003](docs/adr/0003-demo-data-slice-and-mock-surfaces.md),
+[ADR 0004](docs/adr/0004-dashboard-layout-storage-and-demo-flow-tests.md) và hạng mục MVP đã làm ở
+[ADR 0006](docs/adr/0006-definition-versioning.md).
 
 ## Bắt đầu nhanh
 

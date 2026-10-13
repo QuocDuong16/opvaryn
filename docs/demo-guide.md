@@ -67,6 +67,7 @@ Thứ tự gợi ý, kèm phần cần nói rõ để không trình bày quá:
 | 1 | **Tổng quan** `/` | Trạng thái API/database đọc trực tiếp (không phải ảnh chụp), thẻ Walkthrough, quy ước nhãn | live |
 | 2 | **Business Objects** `/objects` | Tạo object mới ngay tại chỗ: thêm vài field, một field `select` kèm danh sách lựa chọn | live |
 | 3 | **Object detail** `/objects/<key>` | Form nhập liệu sinh từ schema vừa tạo; lưu một bản ghi; thử để trống field bắt buộc để thấy server chặn và báo lỗi | live |
+| 3b | **Publish phiên bản** (cùng trang) | Sửa schema rồi **Publish phiên bản v2**: bản ghi cũ vẫn nằm ở nhóm "phiên bản cũ" với đúng schema cũ, bản ghi mới dùng schema mới. Đây là bất biến #1 của playbook chạy thật | live |
 | 4 | **Forms** `/forms` | Đổi schema, thấy form đổi theo; danh sách "chưa có trong demo" | live + concept |
 | 5 | **Workflows** `/workflows` | Sơ đồ hai quy trình, click từng node xem cấu hình và nhánh điều kiện | **mock** |
 | 6 | **Tasks** `/tasks` | Duyệt / trả về / từ chối, timeline đổi theo; người giữ việc | **mock** |
