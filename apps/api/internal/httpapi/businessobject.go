@@ -59,6 +59,41 @@ func handleGetBusinessObject(objects *service.BusinessObjects, log *slog.Logger)
 	}
 }
 
+func handleUpdateBusinessObject(objects *service.BusinessObjects, log *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		var body apiv1.UpdateBusinessObjectJSONRequestBody
+		if err := decodeJSON(w, r, &body); err != nil {
+			log.Warn("rejected request body", "error", err)
+			writeError(w, log, http.StatusBadRequest, codeInvalidRequest,
+				"request body must be a single JSON object matching the UpdateBusinessObjectRequest schema")
+			return
+		}
+
+		updated, err := objects.Update(r.Context(), chi.URLParam(r, "key"), service.UpdateBusinessObjectInput{
+			Name:        body.Name,
+			Description: stringValue(body.Description),
+			Fields:      toDomainFields(body.Fields),
+		})
+		if err != nil {
+			writeStoreError(w, log, err, "update business object")
+			return
+		}
+		writeJSON(w, log, http.StatusOK, toAPIBusinessObject(updated))
+	}
+}
+
+func handleListBusinessObjectVersions(objects *service.BusinessObjects, log *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		versions, err := objects.ListVersions(r.Context(), chi.URLParam(r, "key"))
+		if err != nil {
+			writeStoreError(w, log, err, "list definition versions")
+			return
+		}
+		writeJSON(w, log, http.StatusOK,
+			apiv1.BusinessObjectVersionList{Data: toAPIBusinessObjectVersions(versions)})
+	}
+}
+
 // writeStoreError maps service and store failures onto the stable error envelope.
 func writeStoreError(w http.ResponseWriter, log *slog.Logger, err error, action string) {
 	var validation *service.ValidationError
@@ -87,8 +122,37 @@ func toAPIBusinessObjects(objects []domain.BusinessObject) []apiv1.BusinessObjec
 }
 
 func toAPIBusinessObject(object domain.BusinessObject) apiv1.BusinessObject {
-	fields := make([]apiv1.FieldDefinition, len(object.Fields))
-	for i, field := range object.Fields {
+	return apiv1.BusinessObject{
+		Id:          object.ID,
+		Key:         object.Key,
+		Name:        object.Name,
+		Description: pointerOrNil(object.Description),
+		Fields:      toAPIFieldDefinitions(object.Fields),
+		Version:     object.Version,
+		CreatedAt:   object.CreatedAt,
+		UpdatedAt:   object.UpdatedAt,
+	}
+}
+
+func toAPIBusinessObjectVersions(versions []domain.BusinessObjectVersion) []apiv1.BusinessObjectVersion {
+	result := make([]apiv1.BusinessObjectVersion, len(versions))
+	for i, version := range versions {
+		result[i] = apiv1.BusinessObjectVersion{
+			Id:          version.ID,
+			Version:     version.Version,
+			Name:        version.Name,
+			Description: pointerOrNil(version.Description),
+			Fields:      toAPIFieldDefinitions(version.Fields),
+			PublishedAt: version.PublishedAt,
+			PublishedBy: version.PublishedBy,
+		}
+	}
+	return result
+}
+
+func toAPIFieldDefinitions(fields []domain.FieldDefinition) []apiv1.FieldDefinition {
+	result := make([]apiv1.FieldDefinition, len(fields))
+	for i, field := range fields {
 		required := field.Required
 		converted := apiv1.FieldDefinition{
 			Key:      field.Key,
@@ -103,17 +167,9 @@ func toAPIBusinessObject(object domain.BusinessObject) apiv1.BusinessObject {
 			}
 			converted.Options = &options
 		}
-		fields[i] = converted
+		result[i] = converted
 	}
-	return apiv1.BusinessObject{
-		Id:          object.ID,
-		Key:         object.Key,
-		Name:        object.Name,
-		Description: pointerOrNil(object.Description),
-		Fields:      fields,
-		CreatedAt:   object.CreatedAt,
-		UpdatedAt:   object.UpdatedAt,
-	}
+	return result
 }
 
 func toDomainFields(fields *[]apiv1.FieldDefinition) []domain.FieldDefinition {

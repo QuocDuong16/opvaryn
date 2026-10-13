@@ -55,13 +55,36 @@ type FieldDefinition struct {
 }
 
 // BusinessObject is the definition of one business entity kind: identity, schema
-// and metadata. Its records are stored in ObjectRecord, keyed by this definition.
+// and metadata. Its published snapshots live in BusinessObjectVersion, and its
+// records are stored in ObjectRecord against the version they were created under.
 type BusinessObject struct {
 	ID          uuid.UUID
 	Key         string
 	Name        string
 	Description string
 	Fields      []FieldDefinition
-	CreatedAt   time.Time
-	UpdatedAt   time.Time
+	// Version is the newest published version number; VersionID identifies that
+	// snapshot. Both come from the version table, which is the single source of
+	// truth for the schema — the object row itself no longer stores fields.
+	Version   int
+	VersionID uuid.UUID
+	CreatedAt time.Time
+	UpdatedAt time.Time
+}
+
+// BusinessObjectVersion is one immutable snapshot of a definition. Editing a
+// definition publishes the next version; records keep the version they were
+// created under, so a later edit never changes what an existing record means
+// (playbook invariant 1: published versions are immutable).
+type BusinessObjectVersion struct {
+	ID          uuid.UUID
+	ObjectID    uuid.UUID
+	Version     int
+	Name        string
+	Description string
+	Fields      []FieldDefinition
+	PublishedAt time.Time
+	// PublishedBy records the actor once identity exists (playbook D09); until
+	// then every publish is attributed to "system".
+	PublishedBy string
 }

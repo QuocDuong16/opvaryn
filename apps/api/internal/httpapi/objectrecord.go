@@ -55,10 +55,11 @@ func toAPIObjectRecord(record domain.ObjectRecord) apiv1.ObjectRecord {
 		values = map[string]interface{}{}
 	}
 	return apiv1.ObjectRecord{
-		Id:        record.ID,
-		ObjectKey: record.ObjectKey,
-		Values:    values,
-		CreatedAt: record.CreatedAt,
-		UpdatedAt: record.UpdatedAt,
+		Id:            record.ID,
+		ObjectKey:     record.ObjectKey,
+		ObjectVersion: record.ObjectVersion,
+		Values:        values,
+		CreatedAt:     record.CreatedAt,
+		UpdatedAt:     record.UpdatedAt,
 	}
 }

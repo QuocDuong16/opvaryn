@@ -2,17 +2,23 @@ package service
 
 import (
 	"context"
+	"errors"
 	"strings"
 	"testing"
 
+	"github.com/google/uuid"
+
 	"github.com/QuocDuong16/opvaryn/api/internal/domain"
+	"github.com/QuocDuong16/opvaryn/api/internal/store"
 )
 
 // fakeStore records what the service asked the store to persist.
 type fakeStore struct {
-	created domain.BusinessObject
-	object  domain.BusinessObject
-	err     error
+	created  domain.BusinessObject
+	object   domain.BusinessObject
+	updated  domain.BusinessObject
+	versions []domain.BusinessObjectVersion
+	err      error
 }
 
 func (f *fakeStore) ListBusinessObjects(context.Context) ([]domain.BusinessObject, error) {
@@ -26,12 +32,33 @@ func (f *fakeStore) GetBusinessObjectByKey(context.Context, string) (domain.Busi
 	return f.object, nil
 }
 
+func (f *fakeStore) ListBusinessObjectVersions(context.Context, uuid.UUID) ([]domain.BusinessObjectVersion, error) {
+	if f.err != nil {
+		return nil, f.err
+	}
+	return f.versions, nil
+}
+
 func (f *fakeStore) CreateBusinessObject(_ context.Context, object domain.BusinessObject) (domain.BusinessObject, error) {
 	if f.err != nil {
 		return domain.BusinessObject{}, f.err
 	}
 	f.created = object
 	return object, nil
+}
+
+func (f *fakeStore) UpdateBusinessObject(
+	_ context.Context,
+	key string,
+	name string,
+	description string,
+	fields []domain.FieldDefinition,
+) (domain.BusinessObject, error) {
+	if f.err != nil {
+		return domain.BusinessObject{}, f.err
+	}
+	f.updated = domain.BusinessObject{Key: key, Name: name, Description: description, Fields: fields}
+	return f.updated, nil
 }
 
 func validInput() NewBusinessObjectInput {
@@ -187,6 +214,124 @@ func TestCreateNormalizesAndPersists(t *testing.T) {
 	}
 	if st.created.Key != created.Key {
 		t.Errorf("store did not receive the object: %+v", st.created)
+	}
+}
+
+func TestUpdateRejectsInvalidInput(t *testing.T) {
+	t.Parallel()
+
+	tests := []struct {
+		name        string
+		mutate      func(*UpdateBusinessObjectInput)
+		wantProblem string
+	}{
+		{
+			name:        "name must not be blank",
+			mutate:      func(in *UpdateBusinessObjectInput) { in.Name = "   " },
+			wantProblem: "name: must not be empty",
+		},
+		{
+			name: "unknown field type is rejected",
+			mutate: func(in *UpdateBusinessObjectInput) {
+				in.Fields[0].Type = domain.FieldType("signature")
+			},
+			wantProblem: "is not a supported field type",
+		},
+		{
+			name: "select without options is rejected",
+			mutate: func(in *UpdateBusinessObjectInput) {
+				in.Fields[0].Type = domain.FieldTypeSelect
+			},
+			wantProblem: "select fields must define at least one option",
+		},
+	}
+
+	for _, test := range tests {
+		t.Run(test.name, func(t *testing.T) {
+			t.Parallel()
+
+			input := UpdateBusinessObjectInput{
+				Name: "Đề nghị mua hàng v2",
+				Fields: []domain.FieldDefinition{
+					{Key: "amount", Label: "Số tiền", Type: domain.FieldTypeNumber},
+				},
+			}
+			test.mutate(&input)
+
+			st := &fakeStore{}
+			_, err := NewBusinessObjects(st).Update(context.Background(), "purchase_request", input)
+
+			var validation *ValidationError
+			if !asValidationError(err, &validation) {
+				t.Fatalf("expected ValidationError, got %v", err)
+			}
+			if !strings.Contains(validation.Error(), test.wantProblem) {
+				t.Fatalf("expected problem containing %q, got %q", test.wantProblem, validation.Error())
+			}
+			if st.updated.Key != "" {
+				t.Fatalf("invalid input must not reach the store, but %q was published", st.updated.Key)
+			}
+		})
+	}
+}
+
+func TestUpdateNormalizesAndPublishes(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStore{}
+	updated, err := NewBusinessObjects(st).Update(context.Background(), "purchase_request", UpdateBusinessObjectInput{
+		Name:        "  Đề nghị mua hàng (v2)  ",
+		Description: "  thêm ngưỡng duyệt  ",
+		Fields: []domain.FieldDefinition{
+			{Key: "amount", Label: "  Số tiền  ", Type: domain.FieldTypeNumber},
+		},
+	})
+	if err != nil {
+		t.Fatalf("Update returned error: %v", err)
+	}
+
+	if updated.Name != "Đề nghị mua hàng (v2)" || updated.Description != "thêm ngưỡng duyệt" {
+		t.Errorf("metadata not trimmed: %+v", updated)
+	}
+	if updated.Fields[0].Label != "Số tiền" {
+		t.Errorf("field label not trimmed: %q", updated.Fields[0].Label)
+	}
+	if st.updated.Key != "purchase_request" {
+		t.Errorf("store did not receive the key: %+v", st.updated)
+	}
+}
+
+func TestUpdateReportsMissingObject(t *testing.T) {
+	t.Parallel()
+
+	st := &fakeStore{err: store.ErrNotFound}
+	_, err := NewBusinessObjects(st).Update(context.Background(), "unknown", UpdateBusinessObjectInput{
+		Name: "Không tồn tại",
+	})
+
+	if !errors.Is(err, store.ErrNotFound) {
+		t.Fatalf("expected the store's ErrNotFound to stay in the chain, got %v", err)
+	}
+}
+
+func TestListVersionsLooksUpTheObjectFirst(t *testing.T) {
+	t.Parallel()
+
+	object := domain.BusinessObject{ID: uuid.New(), Key: "purchase_request"}
+	st := &fakeStore{
+		object: object,
+		versions: []domain.BusinessObjectVersion{
+			{Version: 2, PublishedBy: "system"},
+			{Version: 1, PublishedBy: "system"},
+		},
+	}
+
+	versions, err := NewBusinessObjects(st).ListVersions(context.Background(), object.Key)
+	if err != nil {
+		t.Fatalf("ListVersions returned error: %v", err)
+	}
+	if len(versions) != 2 || versions[0].Version != 2 {
+		t.Fatalf("versions are not newest first: %+v", versions)
 	}
 }
 

@@ -38,7 +38,15 @@ func (e *ValidationError) Error() string { return strings.Join(e.Problems, "; ")
 type businessObjectStore interface {
 	ListBusinessObjects(ctx context.Context) ([]domain.BusinessObject, error)
 	GetBusinessObjectByKey(ctx context.Context, key string) (domain.BusinessObject, error)
+	ListBusinessObjectVersions(ctx context.Context, objectID uuid.UUID) ([]domain.BusinessObjectVersion, error)
 	CreateBusinessObject(ctx context.Context, object domain.BusinessObject) (domain.BusinessObject, error)
+	UpdateBusinessObject(
+		ctx context.Context,
+		key string,
+		name string,
+		description string,
+		fields []domain.FieldDefinition,
+	) (domain.BusinessObject, error)
 }
 
 // BusinessObjects creates and lists business object definitions.
@@ -59,6 +67,14 @@ type NewBusinessObjectInput struct {
 	Fields      []domain.FieldDefinition
 }
 
+// UpdateBusinessObjectInput is the request to publish the next version of a
+// definition. The key is not part of it: keys never change.
+type UpdateBusinessObjectInput struct {
+	Name        string
+	Description string
+	Fields      []domain.FieldDefinition
+}
+
 // List returns every business object definition ordered by key.
 func (s *BusinessObjects) List(ctx context.Context) ([]domain.BusinessObject, error) {
 	return s.store.ListBusinessObjects(ctx)
@@ -74,7 +90,8 @@ func (s *BusinessObjects) Get(ctx context.Context, key string) (domain.BusinessO
 	return object, nil
 }
 
-// Create validates the input and stores a new business object definition.
+// Create validates the input and stores a new business object definition together
+// with its first published version.
 func (s *BusinessObjects) Create(ctx context.Context, in NewBusinessObjectInput) (domain.BusinessObject, error) {
 	if problems := validateNewBusinessObject(in); len(problems) > 0 {
 		return domain.BusinessObject{}, &ValidationError{Problems: problems}
@@ -90,23 +107,62 @@ func (s *BusinessObjects) Create(ctx context.Context, in NewBusinessObjectInput)
 	return s.store.CreateBusinessObject(ctx, object)
 }
 
+// Update validates the input and publishes the next version of the definition.
+// Records created under earlier versions keep their schema; that is the point of
+// versioning (playbook invariant 1), so an edit may freely add, rename or remove
+// fields without rewriting history.
+func (s *BusinessObjects) Update(ctx context.Context, key string, in UpdateBusinessObjectInput) (domain.BusinessObject, error) {
+	if problems := validateDefinition(in.Name, in.Description, in.Fields); len(problems) > 0 {
+		return domain.BusinessObject{}, &ValidationError{Problems: problems}
+	}
+
+	updated, err := s.store.UpdateBusinessObject(
+		ctx,
+		key,
+		strings.TrimSpace(in.Name),
+		strings.TrimSpace(in.Description),
+		normalizeFields(in.Fields),
+	)
+	if err != nil {
+		return domain.BusinessObject{}, fmt.Errorf("update business object %q: %w", key, err)
+	}
+	return updated, nil
+}
+
+// ListVersions returns the published snapshots of one definition, newest first.
+func (s *BusinessObjects) ListVersions(ctx context.Context, key string) ([]domain.BusinessObjectVersion, error) {
+	object, err := s.Get(ctx, key)
+	if err != nil {
+		return nil, err
+	}
+	return s.store.ListBusinessObjectVersions(ctx, object.ID)
+}
+
 func validateNewBusinessObject(in NewBusinessObjectInput) []string {
+	if !KeyPattern.MatchString(in.Key) {
+		return append([]string{
+			fmt.Sprintf("key: must match %s (lowercase snake case, 2-64 characters)", KeyPattern),
+		}, validateDefinition(in.Name, in.Description, in.Fields)...)
+	}
+	return validateDefinition(in.Name, in.Description, in.Fields)
+}
+
+// validateDefinition checks the parts a definition edit may change; create and
+// update share it so both paths enforce exactly the same rules.
+func validateDefinition(name string, description string, fields []domain.FieldDefinition) []string {
 	problems := make([]string, 0, 4)
 
-	if !KeyPattern.MatchString(in.Key) {
-		problems = append(problems,
-			fmt.Sprintf("key: must match %s (lowercase snake case, 2-64 characters)", KeyPattern))
-	}
-	name := strings.TrimSpace(in.Name)
-	if name == "" {
+	trimmed := strings.TrimSpace(name)
+	switch {
+	case trimmed == "":
 		problems = append(problems, "name: must not be empty")
-	} else if len(name) > maxNameLength {
+	case len(trimmed) > maxNameLength:
 		problems = append(problems, fmt.Sprintf("name: must be at most %d characters", maxNameLength))
 	}
-	if len(in.Description) > maxDescLength {
+	if len(description) > maxDescLength {
 		problems = append(problems, fmt.Sprintf("description: must be at most %d characters", maxDescLength))
 	}
-	problems = append(problems, validateFields(in.Fields)...)
+	problems = append(problems, validateFields(fields)...)
 
 	return problems
 }

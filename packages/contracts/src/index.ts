@@ -10,6 +10,10 @@ export type FieldType = components['schemas']['FieldType'];
 export type FieldOption = components['schemas']['FieldOption'];
 /** Request body for creating a business object definition. */
 export type CreateBusinessObjectRequest = components['schemas']['CreateBusinessObjectRequest'];
+/** Request body for publishing the next version of a definition. */
+export type UpdateBusinessObjectRequest = components['schemas']['UpdateBusinessObjectRequest'];
+/** One immutable published snapshot of a definition. */
+export type BusinessObjectVersion = components['schemas']['BusinessObjectVersion'];
 /** One stored record of a business object. */
 export type ObjectRecord = components['schemas']['ObjectRecord'];
 /** Request body for creating a business object record. */
@@ -27,6 +31,8 @@ export interface ApiClient {
   listBusinessObjects(): Promise<BusinessObject[]>;
   getBusinessObject(key: string): Promise<BusinessObject>;
   createBusinessObject(input: CreateBusinessObjectRequest): Promise<BusinessObject>;
+  updateBusinessObject(key: string, input: UpdateBusinessObjectRequest): Promise<BusinessObject>;
+  listBusinessObjectVersions(key: string): Promise<BusinessObjectVersion[]>;
   listObjectRecords(key: string): Promise<ObjectRecord[]>;
   createObjectRecord(key: string, input: CreateObjectRecordRequest): Promise<ObjectRecord>;
 }
@@ -45,7 +51,7 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST';
+  method?: 'GET' | 'POST' | 'PUT';
   body?: unknown;
 }
 
@@ -105,6 +111,19 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
 
     createBusinessObject: (input) =>
       request<BusinessObject>('/api/v1/business-objects', { method: 'POST', body: input }),
+
+    updateBusinessObject: (key, input) =>
+      request<BusinessObject>(`/api/v1/business-objects/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        body: input,
+      }),
+
+    async listBusinessObjectVersions(key) {
+      const payload = await request<{ data: BusinessObjectVersion[] }>(
+        `/api/v1/business-objects/${encodeURIComponent(key)}/versions`,
+      );
+      return payload.data;
+    },
 
     async listObjectRecords(key) {
       const payload = await request<{ data: ObjectRecord[] }>(

@@ -137,6 +137,63 @@ status="$(request POST /api/v1/business-objects/smoke_missing_key/records '{"val
 echo "smoke: GET /api/v1/business-objects/{key}/records (list contains the created record)"
 [[ "$(request GET "/api/v1/business-objects/$object_key/records")" == "200" ]] || fail "listing records did not return 200"
 grep -q '"amount":1500000' "$body_file" || fail "the created record is missing from the list"
+grep -q '"objectVersion":1' "$body_file" || fail "a record created before any edit should be bound to version 1"
+
+echo "smoke: PUT /api/v1/business-objects/{key} (publishes version 2)"
+update_body="$(printf '{"name":"Smoke test object (v2)","description":"published by scripts/smoke-api.sh","fields":[{"key":"amount","label":"Số tiền (VND)","type":"number","required":true},{"key":"note","label":"Ghi chú","type":"text"}]}')"
+status="$(request PUT "/api/v1/business-objects/$object_key" "$update_body")"
+[[ "$status" == "200" ]] || fail "updating a business object returned $status, expected 200"
+grep -q '"version":2' "$body_file" || fail "the update did not publish version 2"
+grep -q '"key":"note"' "$body_file" || fail "the new version does not carry the new schema"
+
+echo "smoke: PUT (invalid definition -> 400, unknown key -> 404)"
+status="$(request PUT "/api/v1/business-objects/$object_key" '{"name":"","fields":[{"key":"bad key","label":"x","type":"text"}]}')"
+[[ "$status" == "400" ]] || fail "invalid definition update returned $status, expected 400"
+grep -q '"code":"invalid_request"' "$body_file" || fail "invalid update did not return the invalid_request error code"
+status="$(request PUT /api/v1/business-objects/smoke_missing_key '{"name":"Không tồn tại"}')"
+[[ "$status" == "404" ]] || fail "updating an unknown object returned $status, expected 404"
+grep -q '"code":"not_found"' "$body_file" || fail "unknown object update did not return the not_found error code"
+
+echo "smoke: POST records (after the edit -> binds to version 2)"
+status="$(request POST "/api/v1/business-objects/$object_key/records" '{"values":{"amount":5000,"note":"ghi chú v2"}}')"
+[[ "$status" == "201" ]] || fail "creating a record after the update returned $status, expected 201"
+grep -q '"objectVersion":2' "$body_file" || fail "a new record should bind to the newest version"
+
+echo "smoke: GET /api/v1/business-objects/{key}/versions (newest first, history intact)"
+status="$(request GET "/api/v1/business-objects/$object_key/versions")"
+[[ "$status" == "200" ]] || fail "listing definition versions returned $status, expected 200"
+python3 - "$body_file" <<'PY' || fail "definition versions are not correctly ordered or incomplete"
+import json, sys
+
+versions = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+numbers = [version["version"] for version in versions]
+if numbers != sorted(numbers, reverse=True) or numbers != [2, 1]:
+    sys.exit(f"expected versions [2, 1], got {numbers}")
+if any(version["publishedBy"] != "system" for version in versions):
+    sys.exit("publishing should be attributed to system until identity exists")
+newest = [field["key"] for field in versions[0]["fields"]]
+oldest = [field["key"] for field in versions[-1]["fields"]]
+if newest != ["amount", "note"] or oldest != ["amount", "priority"]:
+    sys.exit(f"version schemas are wrong: newest {newest}, oldest {oldest}")
+print("smoke: version history verified")
+PY
+
+echo "smoke: records keep the definition version they were created under"
+status="$(request GET "/api/v1/business-objects/$object_key/records")"
+[[ "$status" == "200" ]] || fail "listing records after the edit returned $status, expected 200"
+python3 - "$body_file" <<'PY' || fail "records are not bound to their own definition version"
+import json, sys
+
+records = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+bound = sorted(record["objectVersion"] for record in records)
+if bound != [1, 2]:
+    sys.exit(f"expected one record on version 1 and one on version 2, got {bound}")
+
+old = next(record for record in records if record["objectVersion"] == 1)
+if set(old["values"]) != {"amount", "priority"}:
+    sys.exit(f"the version 1 record lost its original values: {sorted(old['values'])}")
+print("smoke: record version binding verified")
+PY
 
 echo "smoke: GET /api/v1/does-not-exist (unknown route -> 404 envelope)"
 status="$(request GET /api/v1/does-not-exist)"

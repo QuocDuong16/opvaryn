@@ -80,18 +80,46 @@ func (e MetaStage) Valid() bool {
 
 // BusinessObject defines model for BusinessObject.
 type BusinessObject struct {
-	CreatedAt   time.Time          `json:"createdAt"`
-	Description *string            `json:"description,omitempty"`
-	Fields      []FieldDefinition  `json:"fields"`
-	Id          openapi_types.UUID `json:"id"`
-	Key         string             `json:"key"`
-	Name        string             `json:"name"`
-	UpdatedAt   time.Time          `json:"updatedAt"`
+	CreatedAt   time.Time `json:"createdAt"`
+	Description *string   `json:"description,omitempty"`
+
+	// Fields Schema of the newest published version.
+	Fields    []FieldDefinition  `json:"fields"`
+	Id        openapi_types.UUID `json:"id"`
+	Key       string             `json:"key"`
+	Name      string             `json:"name"`
+	UpdatedAt time.Time          `json:"updatedAt"`
+
+	// Version Newest published version number; records bind to the version they were created under.
+	//
+	// Example: 2
+	Version int `json:"version"`
 }
 
 // BusinessObjectList defines model for BusinessObjectList.
 type BusinessObjectList struct {
 	Data []BusinessObject `json:"data"`
+}
+
+// BusinessObjectVersion defines model for BusinessObjectVersion.
+type BusinessObjectVersion struct {
+	Description *string            `json:"description,omitempty"`
+	Fields      []FieldDefinition  `json:"fields"`
+	Id          openapi_types.UUID `json:"id"`
+	Name        string             `json:"name"`
+	PublishedAt time.Time          `json:"publishedAt"`
+
+	// PublishedBy Actor that published the version; "system" until identity exists.
+	//
+	// Example: system
+	PublishedBy string `json:"publishedBy"`
+	Version     int    `json:"version"`
+}
+
+// BusinessObjectVersionList defines model for BusinessObjectVersionList.
+type BusinessObjectVersionList struct {
+	// Data Published versions, newest first.
+	Data []BusinessObjectVersion `json:"data"`
 }
 
 // CreateBusinessObjectRequest defines model for CreateBusinessObjectRequest.
@@ -180,8 +208,13 @@ type ObjectRecord struct {
 	Id        openapi_types.UUID `json:"id"`
 
 	// ObjectKey Key of the business object this record belongs to.
-	ObjectKey string    `json:"objectKey"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	ObjectKey string `json:"objectKey"`
+
+	// ObjectVersion Definition version the record was created under; its values are read with that schema.
+	//
+	// Example: 1
+	ObjectVersion int       `json:"objectVersion"`
+	UpdatedAt     time.Time `json:"updatedAt"`
 
 	// Values Field key → value map. Values are validated against the field definitions.
 	Values map[string]interface{} `json:"values"`
@@ -190,6 +223,17 @@ type ObjectRecord struct {
 // ObjectRecordList defines model for ObjectRecordList.
 type ObjectRecordList struct {
 	Data []ObjectRecord `json:"data"`
+}
+
+// UpdateBusinessObjectRequest defines model for UpdateBusinessObjectRequest.
+type UpdateBusinessObjectRequest struct {
+	Description *string `json:"description,omitempty"`
+
+	// Fields Full schema of the new version. Omitted means the version keeps no fields.
+	Fields *[]FieldDefinition `json:"fields,omitempty"`
+
+	// Name Example: Đề nghị mua hàng
+	Name string `json:"name"`
 }
 
 // ObjectKey defines model for ObjectKey.
@@ -209,6 +253,9 @@ type ServiceUnavailable = ErrorResponse
 
 // CreateBusinessObjectJSONRequestBody defines body for CreateBusinessObject for application/json ContentType.
 type CreateBusinessObjectJSONRequestBody = CreateBusinessObjectRequest
+
+// UpdateBusinessObjectJSONRequestBody defines body for UpdateBusinessObject for application/json ContentType.
+type UpdateBusinessObjectJSONRequestBody = UpdateBusinessObjectRequest
 
 // CreateObjectRecordJSONRequestBody defines body for CreateObjectRecord for application/json ContentType.
 type CreateObjectRecordJSONRequestBody = CreateObjectRecordRequest

@@ -28,7 +28,9 @@ type recordStore interface {
 
 // ObjectRecords stores and lists records of business object definitions. Every
 // write is validated against the addressed definition, so a record can never hold
-// a key or a value shape the definition does not declare.
+// a key or a value shape the definition does not declare; and every record is
+// bound to the definition version it was created under, so later edits cannot
+// change its meaning.
 type ObjectRecords struct {
 	store recordStore
 }
@@ -67,17 +69,22 @@ func (s *ObjectRecords) Create(ctx context.Context, objectKey string, values map
 	}
 
 	record := domain.ObjectRecord{
-		ID:        uuid.New(),
-		ObjectID:  object.ID,
-		ObjectKey: object.Key,
-		Values:    normalizeRecordValues(object, values),
+		ID:              uuid.New(),
+		ObjectID:        object.ID,
+		ObjectKey:       object.Key,
+		ObjectVersionID: object.VersionID,
+		ObjectVersion:   object.Version,
+		Values:          normalizeRecordValues(object, values),
 	}
 
 	created, err := s.store.CreateObjectRecord(ctx, record)
 	if err != nil {
 		return domain.ObjectRecord{}, err
 	}
+	// The insert returns the stored row; the version number is already known here
+	// because the definition was resolved above.
 	created.ObjectKey = object.Key
+	created.ObjectVersion = object.Version
 	return created, nil
 }
 

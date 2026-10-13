@@ -6,18 +6,35 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
 	"github.com/jackc/pgx/v5/pgconn"
 
 	"github.com/QuocDuong16/opvaryn/api/internal/domain"
 )
 
-const businessObjectColumns = `id, key, name, description, fields, created_at, updated_at`
+// businessObjectSelect reads one definition together with its newest published
+// version. The version table is the single source of truth for the schema, so the
+// current definition is always the latest snapshot — never a second copy.
+const businessObjectSelect = `
+	SELECT o.id, o.key, o.name, o.description,
+	       v.id, v.version, v.fields,
+	       o.created_at, o.updated_at
+	  FROM business_objects o
+	  JOIN LATERAL (
+	       SELECT id, version, fields
+	         FROM business_object_versions
+	        WHERE object_id = o.id
+	        ORDER BY version DESC
+	        LIMIT 1
+	  ) v ON true`
+
+const businessObjectVersionColumns = `
+	id, object_id, version, name, description, fields, published_at, published_by`
 
 // ListBusinessObjects returns every business object definition ordered by key.
 func (s *Store) ListBusinessObjects(ctx context.Context) ([]domain.BusinessObject, error) {
-	rows, err := s.pool.Query(ctx,
-		`SELECT `+businessObjectColumns+` FROM business_objects ORDER BY key`)
+	rows, err := s.pool.Query(ctx, businessObjectSelect+` ORDER BY o.key`)
 	if err != nil {
 		return nil, classify(fmt.Errorf("query business objects: %w", err))
 	}
@@ -40,8 +57,7 @@ func (s *Store) ListBusinessObjects(ctx context.Context) ([]domain.BusinessObjec
 // GetBusinessObjectByKey returns one definition. It returns ErrNotFound when no
 // definition uses the key.
 func (s *Store) GetBusinessObjectByKey(ctx context.Context, key string) (domain.BusinessObject, error) {
-	row := s.pool.QueryRow(ctx,
-		`SELECT `+businessObjectColumns+` FROM business_objects WHERE key = $1`, key)
+	row := s.pool.QueryRow(ctx, businessObjectSelect+` WHERE o.key = $1`, key)
 
 	object, err := scanBusinessObject(row)
 	if err != nil {
@@ -53,29 +69,144 @@ func (s *Store) GetBusinessObjectByKey(ctx context.Context, key string) (domain.
 	return object, nil
 }
 
-// CreateBusinessObject inserts a definition and returns the stored row.
-// It returns ErrConflict when the key already exists.
-func (s *Store) CreateBusinessObject(ctx context.Context, object domain.BusinessObject) (domain.BusinessObject, error) {
-	fields, err := json.Marshal(object.Fields)
+// ListBusinessObjectVersions returns the published snapshots of one definition,
+// newest first.
+func (s *Store) ListBusinessObjectVersions(ctx context.Context, objectID uuid.UUID) ([]domain.BusinessObjectVersion, error) {
+	rows, err := s.pool.Query(ctx, `
+		SELECT `+businessObjectVersionColumns+`
+		  FROM business_object_versions
+		 WHERE object_id = $1
+		 ORDER BY version DESC`, objectID)
 	if err != nil {
-		return domain.BusinessObject{}, fmt.Errorf("encode fields: %w", err)
+		return nil, classify(fmt.Errorf("query definition versions: %w", err))
 	}
+	defer rows.Close()
 
-	row := s.pool.QueryRow(ctx, `
-		INSERT INTO business_objects (id, key, name, description, fields)
-		VALUES ($1, $2, $3, $4, $5)
-		RETURNING `+businessObjectColumns,
-		object.ID, object.Key, object.Name, object.Description, fields)
-
-	created, err := scanBusinessObject(row)
-	if err != nil {
-		var pgErr *pgconn.PgError
-		if errors.As(err, &pgErr) && pgErr.Code == "23505" {
-			return domain.BusinessObject{}, fmt.Errorf("%w: business object key %q already exists", ErrConflict, object.Key)
+	versions := make([]domain.BusinessObjectVersion, 0)
+	for rows.Next() {
+		version, err := scanBusinessObjectVersion(rows)
+		if err != nil {
+			return nil, classify(err)
 		}
+		versions = append(versions, version)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, classify(fmt.Errorf("iterate definition versions: %w", err))
+	}
+	return versions, nil
+}
+
+// CreateBusinessObject inserts a definition and publishes its first version in one
+// transaction. It returns ErrConflict when the key already exists.
+func (s *Store) CreateBusinessObject(ctx context.Context, object domain.BusinessObject) (domain.BusinessObject, error) {
+	created := object
+
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		err := tx.QueryRow(ctx, `
+			INSERT INTO business_objects (id, key, name, description)
+			VALUES ($1, $2, $3, $4)
+			RETURNING created_at, updated_at`,
+			object.ID, object.Key, object.Name, object.Description,
+		).Scan(&created.CreatedAt, &created.UpdatedAt)
+		if err != nil {
+			var pgErr *pgconn.PgError
+			if errors.As(err, &pgErr) && pgErr.Code == "23505" {
+				return fmt.Errorf("%w: business object key %q already exists", ErrConflict, object.Key)
+			}
+			return fmt.Errorf("insert business object: %w", err)
+		}
+
+		versionID, err := insertDefinitionVersion(ctx, tx, object, 1)
+		if err != nil {
+			return err
+		}
+		created.Version = 1
+		created.VersionID = versionID
+		return nil
+	})
+	if err != nil {
 		return domain.BusinessObject{}, classify(err)
 	}
 	return created, nil
+}
+
+// UpdateBusinessObject publishes the next version of a definition and moves the
+// object row to it, in one transaction. Published versions themselves are never
+// modified. It returns ErrNotFound when the key does not exist.
+func (s *Store) UpdateBusinessObject(
+	ctx context.Context,
+	key string,
+	name string,
+	description string,
+	fields []domain.FieldDefinition,
+) (domain.BusinessObject, error) {
+	updated := domain.BusinessObject{Key: key, Name: name, Description: description, Fields: fields}
+
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		// Lock the row so two concurrent publishes cannot pick the same version
+		// number: the second one waits here and then sees the new maximum.
+		var objectID uuid.UUID
+		err := tx.QueryRow(ctx,
+			`SELECT id FROM business_objects WHERE key = $1 FOR UPDATE`, key).Scan(&objectID)
+		if err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return fmt.Errorf("%w: business object %q", ErrNotFound, key)
+			}
+			return fmt.Errorf("lock business object: %w", err)
+		}
+
+		var next int
+		if err := tx.QueryRow(ctx, `
+			SELECT COALESCE(MAX(version), 0) + 1
+			  FROM business_object_versions
+			 WHERE object_id = $1`, objectID).Scan(&next); err != nil {
+			return fmt.Errorf("next definition version: %w", err)
+		}
+
+		current := domain.BusinessObject{ID: objectID, Key: key, Name: name, Fields: fields}
+		versionID, err := insertDefinitionVersion(ctx, tx, current, next)
+		if err != nil {
+			return err
+		}
+
+		if err := tx.QueryRow(ctx, `
+			UPDATE business_objects
+			   SET name = $2, description = $3, updated_at = now()
+			 WHERE id = $1
+			RETURNING created_at, updated_at`,
+			objectID, name, description,
+		).Scan(&updated.CreatedAt, &updated.UpdatedAt); err != nil {
+			return fmt.Errorf("update business object: %w", err)
+		}
+
+		updated.ID = objectID
+		updated.Version = next
+		updated.VersionID = versionID
+		return nil
+	})
+	if err != nil {
+		return domain.BusinessObject{}, classify(err)
+	}
+	return updated, nil
+}
+
+// insertDefinitionVersion writes one immutable snapshot inside the caller's
+// transaction and returns its id.
+func insertDefinitionVersion(ctx context.Context, tx pgx.Tx, object domain.BusinessObject, version int) (uuid.UUID, error) {
+	fields, err := json.Marshal(object.Fields)
+	if err != nil {
+		return uuid.Nil, fmt.Errorf("encode fields: %w", err)
+	}
+
+	versionID := uuid.New()
+	if _, err := tx.Exec(ctx, `
+		INSERT INTO business_object_versions
+		       (id, object_id, version, name, description, fields)
+		VALUES ($1, $2, $3, $4, $5, $6)`,
+		versionID, object.ID, version, object.Name, object.Description, fields); err != nil {
+		return uuid.Nil, fmt.Errorf("insert definition version: %w", err)
+	}
+	return versionID, nil
 }
 
 // rowScanner is satisfied by both pgx.Row and pgx.Rows.
@@ -93,6 +224,8 @@ func scanBusinessObject(row rowScanner) (domain.BusinessObject, error) {
 		&object.Key,
 		&object.Name,
 		&object.Description,
+		&object.VersionID,
+		&object.Version,
 		&fields,
 		&object.CreatedAt,
 		&object.UpdatedAt,
@@ -104,4 +237,28 @@ func scanBusinessObject(row rowScanner) (domain.BusinessObject, error) {
 		return domain.BusinessObject{}, fmt.Errorf("decode fields: %w", err)
 	}
 	return object, nil
+}
+
+func scanBusinessObjectVersion(row rowScanner) (domain.BusinessObjectVersion, error) {
+	var (
+		version domain.BusinessObjectVersion
+		fields  []byte
+	)
+	err := row.Scan(
+		&version.ID,
+		&version.ObjectID,
+		&version.Version,
+		&version.Name,
+		&version.Description,
+		&fields,
+		&version.PublishedAt,
+		&version.PublishedBy,
+	)
+	if err != nil {
+		return domain.BusinessObjectVersion{}, fmt.Errorf("scan definition version: %w", err)
+	}
+	if err := json.Unmarshal(fields, &version.Fields); err != nil {
+		return domain.BusinessObjectVersion{}, fmt.Errorf("decode version fields: %w", err)
+	}
+	return version, nil
 }

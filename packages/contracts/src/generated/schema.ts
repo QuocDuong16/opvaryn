@@ -98,9 +98,36 @@ export interface paths {
         };
         /**
          * Get one business object definition
-         * @description Returns the definition stored under the given key.
+         * @description Returns the definition stored under the given key: its current metadata and the
+         *     newest published version of its schema (`version`).
          */
         get: operations["getBusinessObject"];
+        /**
+         * Publish the next version of a business object definition
+         * @description Updates the definition metadata and publishes the next immutable version of its
+         *     schema. Earlier versions are never modified: records created under them keep their
+         *     schema, so an edit may add, rename or remove fields without rewriting history.
+         */
+        put: operations["updateBusinessObject"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/business-objects/{key}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the published versions of a definition
+         * @description Returns every published snapshot, newest first.
+         */
+        get: operations["listBusinessObjectVersions"];
         put?: never;
         post?: never;
         delete?: never;
@@ -193,7 +220,13 @@ export interface components {
             key: string;
             name: string;
             description?: string;
+            /** @description Schema of the newest published version. */
             fields: components["schemas"]["FieldDefinition"][];
+            /**
+             * @description Newest published version number; records bind to the version they were created under.
+             * @example 2
+             */
+            version: number;
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -215,6 +248,11 @@ export interface components {
             id: string;
             /** @description Key of the business object this record belongs to. */
             objectKey: string;
+            /**
+             * @description Definition version the record was created under; its values are read with that schema.
+             * @example 1
+             */
+            objectVersion: number;
             /** @description Field key → value map. Values are validated against the field definitions. */
             values: {
                 [key: string]: unknown;
@@ -235,6 +273,32 @@ export interface components {
             values: {
                 [key: string]: unknown;
             };
+        };
+        UpdateBusinessObjectRequest: {
+            /** @example Đề nghị mua hàng */
+            name: string;
+            description?: string;
+            /** @description Full schema of the new version. Omitted means the version keeps no fields. */
+            fields?: components["schemas"]["FieldDefinition"][];
+        };
+        BusinessObjectVersion: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            name: string;
+            description?: string;
+            fields: components["schemas"]["FieldDefinition"][];
+            /** Format: date-time */
+            publishedAt: string;
+            /**
+             * @description Actor that published the version; "system" until identity exists.
+             * @example system
+             */
+            publishedBy: string;
+        };
+        BusinessObjectVersionList: {
+            /** @description Published versions, newest first. */
+            data: components["schemas"]["BusinessObjectVersion"][];
         };
     };
     responses: {
@@ -420,6 +484,61 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["BusinessObject"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    updateBusinessObject: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateBusinessObjectRequest"];
+            };
+        };
+        responses: {
+            /** @description The definition with its newly published version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessObject"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listBusinessObjectVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Published definition versions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["BusinessObjectVersionList"];
                 };
             };
             404: components["responses"]["NotFound"];

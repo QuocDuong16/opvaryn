@@ -119,7 +119,9 @@ paths:
       operationId: getBusinessObject
       tags: [business-objects]
       summary: Get one business object definition
-      description: Returns the definition stored under the given key.
+      description: |
+        Returns the definition stored under the given key: its current metadata and the
+        newest published version of its schema (`version`).
       parameters:
         - $ref: '#/components/parameters/ObjectKey'
       responses:
@@ -129,6 +131,54 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BusinessObject'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    put:
+      operationId: updateBusinessObject
+      tags: [business-objects]
+      summary: Publish the next version of a business object definition
+      description: |
+        Updates the definition metadata and publishes the next immutable version of its
+        schema. Earlier versions are never modified: records created under them keep their
+        schema, so an edit may add, rename or remove fields without rewriting history.
+      parameters:
+        - $ref: '#/components/parameters/ObjectKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateBusinessObjectRequest'
+      responses:
+        '200':
+          description: The definition with its newly published version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessObject'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/business-objects/{key}/versions:
+    get:
+      operationId: listBusinessObjectVersions
+      tags: [business-objects]
+      summary: List the published versions of a definition
+      description: Returns every published snapshot, newest first.
+      parameters:
+        - $ref: '#/components/parameters/ObjectKey'
+      responses:
+        '200':
+          description: Published definition versions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessObjectVersionList'
         '404':
           $ref: '#/components/responses/NotFound'
         '503':
@@ -286,7 +336,7 @@ components:
             $ref: '#/components/schemas/FieldOption'
     BusinessObject:
       type: object
-      required: [id, key, name, fields, createdAt, updatedAt]
+      required: [id, key, name, fields, version, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -299,8 +349,14 @@ components:
           type: string
         fields:
           type: array
+          description: Schema of the newest published version.
           items:
             $ref: '#/components/schemas/FieldDefinition'
+        version:
+          type: integer
+          minimum: 1
+          description: Newest published version number; records bind to the version they were created under.
+          example: 2
         createdAt:
           type: string
           format: date-time
@@ -337,7 +393,7 @@ components:
             $ref: '#/components/schemas/FieldDefinition'
     ObjectRecord:
       type: object
-      required: [id, objectKey, values, createdAt, updatedAt]
+      required: [id, objectKey, objectVersion, values, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -345,6 +401,11 @@ components:
         objectKey:
           type: string
           description: Key of the business object this record belongs to.
+        objectVersion:
+          type: integer
+          minimum: 1
+          description: Definition version the record was created under; its values are read with that schema.
+          example: 1
         values:
           type: object
           additionalProperties: true
@@ -373,3 +434,54 @@ components:
           description: |
             Field key → value map. Every key must exist on the object; required fields
             must be present and every value must match the declared field type.
+    UpdateBusinessObjectRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: Đề nghị mua hàng
+        description:
+          type: string
+          maxLength: 500
+        fields:
+          type: array
+          description: Full schema of the new version. Omitted means the version keeps no fields.
+          items:
+            $ref: '#/components/schemas/FieldDefinition'
+    BusinessObjectVersion:
+      type: object
+      required: [id, version, name, fields, publishedAt, publishedBy]
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+        description:
+          type: string
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldDefinition'
+        publishedAt:
+          type: string
+          format: date-time
+        publishedBy:
+          type: string
+          description: Actor that published the version; "system" until identity exists.
+          example: system
+    BusinessObjectVersionList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          description: Published versions, newest first.
+          items:
+            $ref: '#/components/schemas/BusinessObjectVersion'

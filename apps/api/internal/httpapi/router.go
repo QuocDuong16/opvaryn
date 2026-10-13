@@ -32,7 +32,7 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 	router.Use(middleware.Recoverer)
 	router.Use(cors.Handler(cors.Options{
 		AllowedOrigins:   cfg.AllowedOrigins,
-		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodOptions},
+		AllowedMethods:   []string{http.MethodGet, http.MethodPost, http.MethodPut, http.MethodOptions},
 		AllowedHeaders:   []string{"Accept", "Authorization", "Content-Type", "X-Request-ID"},
 		ExposedHeaders:   []string{"X-Request-ID"},
 		AllowCredentials: false,
@@ -49,6 +49,8 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 			r.Post("/", handleCreateBusinessObject(services.BusinessObjects, log))
 			r.Route("/{key}", func(r chi.Router) {
 				r.Get("/", handleGetBusinessObject(services.BusinessObjects, log))
+				r.Put("/", handleUpdateBusinessObject(services.BusinessObjects, log))
+				r.Get("/versions", handleListBusinessObjectVersions(services.BusinessObjects, log))
 				r.Get("/records", handleListObjectRecords(services.ObjectRecords, log))
 				r.Post("/records", handleCreateObjectRecord(services.ObjectRecords, log))
 			})
