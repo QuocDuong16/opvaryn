@@ -31,3 +31,18 @@
   weekly — it does NOT cover the mise pins (go, node, pnpm, Go tools) or image digests, which are
   updated by hand. Never add `renovate.json` or `.forgejo/`: sibling-repo tooling that does not
   apply here.
+- Update policy in `.github/dependabot.yml`: `version-update:semver-major` is ignored for gomod,
+  npm and docker-compose — majors are deliberate decisions, not notifications (`update-types` only
+  affects version updates, so Dependabot alerts and security updates still fire). GitHub Actions
+  stays fully automated because action majors must move when a runtime is retired. A major PR that
+  appears anyway means this policy was edited — check before "fixing" the config; Dependabot
+  auto-closes its own PRs when a new ignore rule applies.
+- Known accepted risk: Dependabot alert (high) on `braces@3.0.3`, reachable only through the dev
+  chain `eslint-config-next → @next/eslint-plugin-next → fast-glob → micromatch → braces`. It is
+  not in the production dependency tree and 3.0.3 is the latest published version, so no patched
+  release exists to upgrade to. Leave it accepted and re-check when braces ships a fix; do not
+  "resolve" it by downgrading or dropping `eslint-config-next`.
+- Typescript 7 (native compiler) is currently incompatible with the toolchain:
+  `openapi-typescript@7.13.0` crashes with `createKeywordTypeNode` undefined, breaking
+  `make contract-check`. Do not accept a TS 7 bump until openapi-typescript and the
+  Next.js/ESLint stack support it.

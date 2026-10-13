@@ -26,3 +26,15 @@
   new durable decisions get an ADR (`mem:conventions`).
 - Do not leave dev servers or background processes running; verify ports are free
   (`mem:suggested_commands`).
+
+## GitHub-side gate (not in the repo, easy to forget)
+
+- `main` is protected by the ruleset `main protection` (Settings → Rules): pull request required,
+  linear history, no force push, no deletion, and four required status checks matched by exact job
+  name — `Quality gate (lint, types, tests, build)`, `API integration (PostgreSQL + smoke test)`,
+  `Analyze (go)`, `Analyze (javascript-typescript)`.
+  Renaming a CI or CodeQL job therefore blocks PRs with "Expected — waiting for status to be
+  reported" until the ruleset is updated: change job names and the ruleset in the same effort.
+- The repository admin role is an always-bypass actor, so the owner can still push directly to
+  `main` and merge without waiting; non-admin collaborators and fork PRs cannot.
+- Merge commits are disabled repo-wide (squash or rebase only) to match the linear-history rule.
