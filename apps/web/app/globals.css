@@ -1,0 +1,85 @@
+@import 'tailwindcss';
+
+/*
+ * OPVARYN token architecture (two layers):
+ *   1. Raw semantic variables, redefined per theme via [data-theme].
+ *   2. @theme inline mapping, so utilities inline var() and theme switches
+ *      apply at runtime without a rebuild.
+ * Never hard-code hex values in components; add a token here instead.
+ */
+:root,
+[data-theme='dark'] {
+  --surface: #0b0e14;
+  --surface-raised: #11141b;
+  --surface-overlay: #171b24;
+  --on-surface: #f2f4f8;
+  --on-surface-muted: #98a2b8;
+  --border: #1d2330;
+  --border-strong: #2c3547;
+  --accent: #7c6cf5;
+  --accent-strong: #9c8ffa;
+  --on-accent: #0b0e14;
+  --success: #34d399;
+  --warning: #fbbf24;
+  --danger: #f87171;
+  --focus-ring: #7c6cf5;
+}
+
+[data-theme='light'] {
+  --surface: #f7f7f9;
+  --surface-raised: #ffffff;
+  --surface-overlay: #ffffff;
+  --on-surface: #09090b;
+  --on-surface-muted: #5c6470;
+  --border: #e4e4e7;
+  --border-strong: #cfd2d8;
+  --accent: #5b4bd6;
+  --accent-strong: #4a3cc0;
+  --on-accent: #ffffff;
+  --success: #047857;
+  --warning: #a16207;
+  --danger: #b91c1c;
+  --focus-ring: #5b4bd6;
+}
+
+@theme inline {
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-surface-overlay: var(--surface-overlay);
+  --color-on-surface: var(--on-surface);
+  --color-on-surface-muted: var(--on-surface-muted);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-accent: var(--accent);
+  --color-accent-strong: var(--accent-strong);
+  --color-on-accent: var(--on-accent);
+  --color-success: var(--success);
+  --color-warning: var(--warning);
+  --color-danger: var(--danger);
+
+  --font-sans: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+@layer base {
+  html {
+    color-scheme: dark;
+  }
+
+  html[data-theme='light'] {
+    color-scheme: light;
+  }
+
+  body {
+    background-color: var(--surface);
+    color: var(--on-surface);
+  }
+
+  ::selection {
+    background-color: color-mix(in srgb, var(--accent) 35%, transparent);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+}
