@@ -15,6 +15,11 @@ Working agreement for agents and contributors in this repository.
 - Product and technical decisions still open are tracked in
   `operations-playbook/decisions.html` (D01–D10). Do not silently pick a direction that
   contradicts an open decision; ask instead.
+- Demo surfaces and their status are fixed by ADR 0002 and ADR 0003: business object
+  definitions and records are `live`; form entry is generated from the schema and validated
+  by the Go service; workflow, task inbox, analytics and kanban/connector panels are
+  `mock` fixtures with no runtime; conditional visibility, calculated fields and escalation
+  are `concept`.
 
 ## Working agreement
 
@@ -25,7 +30,8 @@ Working agreement for agents and contributors in this repository.
 - Add tests for important business and security behavior, including rejected input.
 - Backend checks: `make api-check`. Frontend checks: `make web-check`. Full gate:
   `make quality-check`. End-to-end behaviour: `make smoke-api` (needs Postgres running and
-  migrations applied). Report checks that were not run or failed.
+  migrations applied). Demo dataset: `make seed-demo`. Report checks that were not run or
+  failed.
 
 ## Architecture boundaries
 
@@ -37,10 +43,13 @@ Working agreement for agents and contributors in this repository.
   (`packages/contracts/src/generated/schema.ts`) are committed; regenerate with
   `make contract-generate`, never edit them by hand.
 - The backend owns validation, permissions and business rules. Frontend checks are for
-  display and navigation only.
+  display and navigation only. Record values are validated against the object's field
+  definitions in `internal/service` before they are stored; the web form never decides
+  whether input is valid.
 - Workflow runtime is stubbed until the process execution contract is decided
   (see `operations-playbook/architecture.html` section 04). Do not implement approval or
-  state-machine behavior beyond explicit demo scope.
+  state-machine behavior beyond explicit demo scope, and do not add process, task or event
+  tables ahead of those decisions (ADR 0002, ADR 0003).
 
 ## Backend and security
 
@@ -53,6 +62,9 @@ Working agreement for agents and contributors in this repository.
 
 - Storage is PostgreSQL. Dynamic payloads are JSONB, but every field that is filtered,
   joined or measured gets a typed projection or read model.
+- `business_object_records.values` is the JSONB payload of one record, keyed by field key and
+  validated in the service against the object's definition before insert. Editing a schema
+  after records exist (and migrating those values) is not part of the demo.
 - Every schema change is a new deterministic migration in `apps/api/sql/migrations/`.
   Never edit a migration that has been applied anywhere.
 - A published process definition version is immutable; instances keep the version they
@@ -67,7 +79,15 @@ Working agreement for agents and contributors in this repository.
 - Follow the design tokens in `apps/web/app/globals.css` (two-layer: raw CSS variables →
   `@theme inline` mapping). Never hard-code hex colors in components.
 - Every screen that shows simulated behavior must render a status badge from
-  `components/ui/status-badge.tsx` with `live`, `mock`, or `concept`.
+  `components/ui/status-badge.tsx` with `live`, `mock`, or `concept`. When a screen mixes
+  live data with simulated parts, label each part (the Application showcase labels views,
+  not the whole page).
+- Demo fixtures for simulated surfaces live beside their components
+  (`components/workflows/demo-definitions.ts`, `components/tasks/demo-tasks.ts`,
+  `components/analytics/demo-metrics.ts`). Keep them typed, keep their state transitions in
+  pure modules that are unit-tested, and never let a fixture pretend to be server data.
+- Screens that generate UI from a business object schema (record form, record table, mini-app
+  views) must render from the definition, not from hard-coded field lists.
 
 ## Docker and operations
 

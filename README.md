@@ -12,15 +12,21 @@ trong playbook; [docs/README.md](docs/README.md) giải thích quan hệ giữa 
 
 ## Trạng thái hiện tại
 
-Khung demo đã chạy được end-to-end:
+Các màn hình theo kế hoạch 8 tuần của bản demo đã dựng xong, mỗi màn hình gắn nhãn trạng thái:
 
-- **Live**: Business Objects — tạo và liệt kê định nghĩa dữ liệu qua API Go, lưu trong
-  PostgreSQL. Overview đọc trạng thái API/database thật.
-- **Mock**: Forms, Workflows, Tasks, Analytics — màn hình khung, chưa có hành vi thật.
-- **Concept**: Applications (Application Builder thuộc V2).
+- **Live**: Business Objects và bản ghi — khai schema, tạo định nghĩa, nhập bản ghi bằng form sinh
+  từ schema; dữ liệu đi qua API Go và lưu trong PostgreSQL. Form Builder preview dùng đúng
+  component nhập liệu đó. Overview đọc trạng thái API/database thật. Application showcase đọc
+  danh sách và chi tiết từ bản ghi thật.
+- **Mock**: Workflows (sơ đồ quy trình đọc từ fixture), Tasks (inbox duyệt/trả về/từ chối đổi state
+  trong trình duyệt), Analytics (metric catalog trên số liệu fixture), kanban và connector trong
+  Application showcase.
+- **Concept**: điều kiện hiển thị và calculated field của Form Builder, escalation, template
+  library — các phần phụ thuộc quyết định còn mở.
 
-Mọi màn hình đều gắn nhãn `live` / `mock` / `concept` theo ADR 0002; workflow runtime chưa được
-viết vì Process Execution Contract (D05/D08 trong playbook) chưa chốt.
+Workflow runtime chưa được viết vì Process Execution Contract (D05/D08 trong playbook) chưa chốt;
+chi tiết phạm vi nằm ở [ADR 0002](docs/adr/0002-demo-scope-and-labels.md) và
+[ADR 0003](docs/adr/0003-demo-data-slice-and-mock-surfaces.md).
 
 ## Bắt đầu nhanh
 
@@ -34,11 +40,12 @@ cp .env.example .env         # cổng 21xxx, không đụng project khác trên 
 make docker-up               # PostgreSQL 18 (localhost:21532)
 cd apps/api && go run ./cmd/migrate && cd ../..
 
+make seed-demo              # tuỳ chọn: nạp 2 business object mẫu + bản ghi demo qua API
 make dev                     # API :21501 + web :21500
 ```
 
-Mở http://localhost:21500. Trang Objects cho phép tạo business object thật (ví dụ
-`purchase_request`); Overview hiển thị trạng thái API và database đang đọc trực tiếp.
+Mở http://localhost:21500 và đi theo Walkthrough ở trang Tổng quan. Trang Objects cho phép tạo
+business object thật với field schema; mở một object để nhập bản ghi bằng form sinh từ schema.
 
 Các target thường dùng:
 
@@ -50,7 +57,8 @@ Các target thường dùng:
 | `make web-check` | Lint, format, typecheck, test, build cho web |
 | `make quality-check` | Toàn bộ gate phía trên + kiểm tra docs |
 | `make contract-generate` | Sinh types Go/TypeScript từ OpenAPI |
-| `make smoke-api` | Build API, chạy thử lát cắt business object trên PostgreSQL thật |
+| `make smoke-api` | Build API, chạy thử lát cắt business object + bản ghi trên PostgreSQL thật |
+| `make seed-demo` | Nạp business object và bản ghi mẫu qua API (idempotent) |
 | `make docker-up` / `make docker-down` | Bật/tắt PostgreSQL local |
 | `make actions-lint` | Lint workflow GitHub Actions bằng actionlint |
 
