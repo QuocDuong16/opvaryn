@@ -1,0 +1,19 @@
+{
+  "name": "@opvaryn/contracts",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Generated OPVARYN API contract types and a typed client",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "api:generate": "openapi-typescript ../../apps/api/openapi/openapi.yaml -o src/generated/schema.ts",
+    "api:check": "openapi-typescript ../../apps/api/openapi/openapi.yaml --check -o src/generated/schema.ts",
+    "typecheck": "tsc --noEmit"
+  },
+  "devDependencies": {
+    "openapi-typescript": "^7.13.0",
+    "typescript": "^6.0.3"
+  }
+}
