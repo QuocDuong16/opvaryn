@@ -1,0 +1,15 @@
+packages:
+  - 'apps/web'
+  - 'packages/*'
+
+# Native/tooling packages whose install scripts are approved to run.
+# Mirrors the sibling projects' convention: only this allowlist may execute
+# build scripts, everything else stays blocked.
+onlyBuiltDependencies:
+  - '@swc/core'
+  - sharp
+  - unrs-resolver
+allowBuilds:
+  '@swc/core': true
+  sharp: true
+  unrs-resolver: true

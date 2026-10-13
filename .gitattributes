@@ -1,0 +1,17 @@
+# Normalize text files to LF in the repository and in working trees.
+* text=auto eol=lf
+
+# Never normalize binary assets.
+*.png binary
+*.jpg binary
+*.jpeg binary
+*.gif binary
+*.ico binary
+*.woff binary
+*.woff2 binary
+
+# Generated files and lockfiles: collapse in diffs and exclude from language stats.
+apps/api/internal/api/v1/types.gen.go     linguist-generated=true
+packages/contracts/src/generated/schema.ts linguist-generated=true
+pnpm-lock.yaml                             linguist-generated=true
+mise.lock                                  linguist-generated=true

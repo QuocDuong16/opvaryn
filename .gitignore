@@ -1,0 +1,21 @@
+.env
+node_modules/
+.next/
+out/
+dist/
+coverage/
+.turbo/
+*.log
+.DS_Store
+*.tmp
+*.tsbuildinfo
+
+# Go build output
+/apps/api/bin/
+/apps/api/server
+/apps/api/migrate
+
+# Local tool state
+.zcode/
+.vscode/
+.idea/

@@ -1,0 +1,44 @@
+# Local infrastructure for OPVARYN development: PostgreSQL only.
+#
+# Application processes run on the host through `make dev` while the product is
+# a demo. Container images and deployment topology arrive with the deployment
+# work, which is an open decision (playbook D10).
+name: opvaryn
+
+x-logging: &logging
+  driver: json-file
+  options:
+    max-size: '10m'
+    max-file: '3'
+
+services:
+  postgres:
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-opvaryn}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-opvaryn}
+      POSTGRES_DB: ${POSTGRES_DB:-opvaryn}
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+    ports:
+      # Bound to the documented 21xxx range so it cannot collide with other
+      # local projects (see .env.example).
+      - '${POSTGRES_PORT:-21532}:5432'
+    volumes:
+      # PostgreSQL 18 images use a version-aware data layout: mount the parent
+      # directory, not /var/lib/postgresql/data.
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER:-opvaryn} -d $${POSTGRES_DB:-opvaryn}']
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    logging: *logging
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 1g
+
+volumes:
+  postgres_data:

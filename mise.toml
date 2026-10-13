@@ -1,0 +1,20 @@
+# Toolchain pins for the OPVARYN monorepo. Keep Go, Node and pnpm in sync
+# across local development and CI. mise.lock records the resolved artifacts.
+[settings]
+lockfile = true
+
+[tool_alias]
+# The aqua registry excludes macOS x64 despite pnpm publishing that artifact.
+pnpm = "github:pnpm/pnpm"
+
+[tools]
+go = "1.27.2"
+node = "26.9.0"
+pnpm = "12.12.0"
+
+"go:golang.org/x/tools/gopls" = "0.23.0"
+"go:golang.org/x/vuln/cmd/govulncheck" = "1.8.0"
+"go:github.com/securego/gosec/v2/cmd/gosec" = "2.29.1-0.20261009120814-7b1b5cebe007"
+
+golangci-lint = "2.14.0"
+actionlint = "1.7.12"
