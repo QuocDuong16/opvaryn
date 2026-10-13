@@ -36,7 +36,7 @@ export default async function ApplicationsPage() {
       <PageHeader
         eyebrow="07 / Application builder"
         title="Applications"
-        lead="Cùng một business object, nhiều dạng xem: danh sách, chi tiết, kanban và panel tích hợp — thứ mà Application Builder (V2) sẽ cho admin tự cấu hình. Danh sách và chi tiết ở đây đọc dữ liệu thật; kanban và connector được gắn nhãn mô phỏng."
+        lead="Cùng một business object, nhiều dạng xem: danh sách, chi tiết, kanban, cấu hình quản trị và panel tích hợp — thứ mà Application Builder (V2) sẽ cho admin tự cấu hình. Danh sách và chi tiết đọc dữ liệu thật; kanban, cấu hình và connector là mô phỏng hoặc concept, mỗi view gắn nhãn riêng."
         aside={<StatusBadge kind={error ? 'mock' : 'live'} />}
       />
 

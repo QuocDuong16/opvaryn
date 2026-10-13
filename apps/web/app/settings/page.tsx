@@ -31,7 +31,7 @@ export default function SettingsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="08 / Settings"
+        eyebrow="09 / Settings"
         title="Cài đặt"
         lead="Cấu hình theo tổ chức (identity, phân quyền, môi trường) chưa thuộc phạm vi demo. Trang này ghi lại cấu hình kỹ thuật đang có để dev và người trình diễn đối chiếu."
         aside={<StatusBadge kind="live" />}
@@ -91,9 +91,17 @@ export default function SettingsPage() {
               </dd>
             </div>
             <div>
+              <dt className="font-mono text-xs text-accent-strong">make smoke-demo-flows</dt>
+              <dd className="mt-0.5 text-xs text-on-surface-muted">
+                Build cả API và web, replay form của các luồng demo (nhập bản ghi, tạo object, lưu
+                bố cục) rồi kiểm chứng dữ liệu đã lưu. Dừng dev server trước khi chạy.
+              </dd>
+            </div>
+            <div>
               <dt className="font-mono text-xs text-accent-strong">make docker-clean</dt>
               <dd className="mt-0.5 text-xs text-on-surface-muted">
-                Xoá volume Postgres — toàn bộ business object và bản ghi sẽ mất.
+                Xoá volume Postgres — toàn bộ business object và bản ghi sẽ mất, kể cả object do các
+                lần chạy smoke test tạo ra.
               </dd>
             </div>
           </dl>

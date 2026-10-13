@@ -1,7 +1,27 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useActionState, useState, type DragEvent } from 'react';
+import { useFormStatus } from 'react-dom';
 
+import { saveDashboardAction } from '@/app/analytics/actions';
+import {
+  addWidget,
+  CHART_KIND_LABELS,
+  DIMENSION_LABELS,
+  defaultWidgets,
+  MAX_WIDGETS,
+  moveWidget,
+  removeWidget,
+  reorderWidget,
+  resizeWidget,
+  serializeWidgets,
+  updateWidget,
+  WIDGET_KIND_LABELS,
+  type ChartKind,
+  type DashboardWidget,
+  type WidgetKind,
+} from '@/components/analytics/dashboard-layout';
+import { INITIAL_SAVE_DASHBOARD_STATE } from '@/components/analytics/dashboard-state';
 import {
   deltaBetween,
   formatMetricValue,
@@ -11,204 +31,394 @@ import {
   type MetricDefinition,
   type MetricPoint,
 } from '@/components/analytics/demo-metrics';
+import { StatusBadge } from '@/components/ui/status-badge';
 import { cn } from '@/lib/utils';
 
-type ChartKind = 'line' | 'bar';
+const CONTROL_BUTTON =
+  'rounded-md border border-border px-2 py-1 text-xs font-medium transition-colors hover:bg-surface-overlay disabled:opacity-40 disabled:hover:bg-transparent';
 
-const DIMENSION_LABELS: Record<Dimension, string> = {
-  monthly: 'Theo tháng (6 kỳ gần nhất)',
-  process: 'Theo quy trình (tháng này)',
-};
+const SELECT_CLASS =
+  'mt-1 w-full rounded-lg border border-border bg-surface px-2.5 py-1.5 text-sm ' +
+  'text-on-surface focus:border-accent-strong focus:outline-none';
+
+const WIDGET_KINDS: readonly WidgetKind[] = ['kpi', 'chart', 'table'];
 
 /**
- * DashboardStudio is the Analytics Studio demo: pick a metric, a dimension and a
- * chart kind, then read the result. It computes from fixtures only — a real
- * dashboard needs typed read models from process events, which arrive with the
- * runtime — so the save-layout action is deliberately disabled.
+ * DashboardStudio is the Analytics Studio: a grid of widgets the viewer arranges.
+ *
+ * Two different things are on this screen and they are labeled separately: the
+ * numbers come from fixtures (`mock` — a real dashboard needs typed read models),
+ * while the layout itself is real and saved in a browser cookie through a server
+ * action (`live`).
  */
-export function DashboardStudio() {
-  const [metricId, setMetricId] = useState(METRIC_CATALOG[0]?.id ?? '');
-  const [dimension, setDimension] = useState<Dimension>('monthly');
-  const [chartKind, setChartKind] = useState<ChartKind>('line');
+export function DashboardStudio({ initialWidgets }: { initialWidgets: DashboardWidget[] }) {
+  const [widgets, setWidgets] = useState<DashboardWidget[]>(initialWidgets);
+  const [newMetricId, setNewMetricId] = useState(METRIC_CATALOG[0]?.id ?? '');
+  const [notice, setNotice] = useState<string | null>(null);
+  const [draggedIndex, setDraggedIndex] = useState<number | null>(null);
+  const [saveState, saveAction] = useActionState(saveDashboardAction, INITIAL_SAVE_DASHBOARD_STATE);
 
-  const metric = METRIC_CATALOG.find((item) => item.id === metricId) ?? METRIC_CATALOG[0];
-
-  const series = useMemo(() => (metric ? seriesFor(metric, dimension) : []), [metric, dimension]);
-
-  if (!metric) {
-    return null;
+  function handleAdd() {
+    const result = addWidget(widgets, newMetricId, 'chart');
+    if (!result.added) {
+      setNotice(`Dashboard đã đủ ${MAX_WIDGETS} widget hoặc metric không hợp lệ.`);
+      return;
+    }
+    setWidgets(result.widgets);
+    setNotice(null);
   }
 
-  // The month-over-month delta only makes sense for the monthly dimension; the
-  // process dimension has groups, not a previous period.
-  const delta = dimension === 'monthly' ? deltaBetween(metric, series) : null;
-  const current = series[series.length - 1]?.value ?? 0;
-  const volumeMetric = METRIC_CATALOG.find((item) => item.id === 'instances');
+  function handleDrop(event: DragEvent<HTMLLIElement>, index: number) {
+    event.preventDefault();
+    if (draggedIndex === null || draggedIndex === index) {
+      setDraggedIndex(null);
+      return;
+    }
+    setWidgets((current) => reorderWidget(current, draggedIndex, index));
+    setDraggedIndex(null);
+  }
 
   return (
-    <div className="space-y-6">
-      <div className="flex flex-wrap items-center gap-2">
-        {METRIC_CATALOG.map((item) => (
-          <button
-            key={item.id}
-            type="button"
-            onClick={() => setMetricId(item.id)}
-            aria-pressed={item.id === metric.id}
-            className={cn(
-              'rounded-full border px-3 py-1 text-xs font-medium transition-colors',
-              item.id === metric.id
-                ? 'border-accent-strong/50 bg-accent/10 text-on-surface'
-                : 'border-border text-on-surface-muted hover:bg-surface-overlay hover:text-on-surface',
-            )}
-          >
-            {item.label}
+    <div className="space-y-5">
+      <div className="flex flex-wrap items-end justify-between gap-3 rounded-xl border border-border bg-surface-raised p-4">
+        <div className="flex flex-wrap items-end gap-2">
+          <label className="text-xs font-medium tracking-wide text-on-surface-muted uppercase">
+            Thêm widget
+            <select
+              value={newMetricId}
+              onChange={(event) => setNewMetricId(event.target.value)}
+              className={SELECT_CLASS}
+            >
+              {METRIC_CATALOG.map((metric) => (
+                <option key={metric.id} value={metric.id}>
+                  {metric.label}
+                </option>
+              ))}
+            </select>
+          </label>
+          <button type="button" onClick={handleAdd} className={cn(CONTROL_BUTTON, 'px-3 py-2')}>
+            + Thêm
           </button>
-        ))}
-      </div>
-
-      <div className="grid gap-4 lg:grid-cols-[1fr_1fr_auto]">
-        <label className="text-xs font-medium tracking-wide text-on-surface-muted uppercase">
-          Dimension
-          <select
-            value={dimension}
-            onChange={(event) => setDimension(event.target.value as Dimension)}
-            className="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-on-surface normal-case focus:border-accent-strong focus:outline-none"
-          >
-            {(Object.keys(DIMENSION_LABELS) as Dimension[]).map((value) => (
-              <option key={value} value={value}>
-                {DIMENSION_LABELS[value]}
-              </option>
-            ))}
-          </select>
-        </label>
-
-        <label className="text-xs font-medium tracking-wide text-on-surface-muted uppercase">
-          Chart
-          <select
-            value={chartKind}
-            onChange={(event) => setChartKind(event.target.value as ChartKind)}
-            className="mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm text-on-surface normal-case focus:border-accent-strong focus:outline-none"
-          >
-            <option value="line">Line</option>
-            <option value="bar">Bar</option>
-          </select>
-        </label>
-
-        <div className="flex items-end">
           <button
             type="button"
-            disabled
-            title="Lưu bố cục thuộc MVP: cần read model có kiểu và quyền theo dataset."
-            className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-on-surface-muted opacity-60"
+            onClick={() => {
+              setWidgets(defaultWidgets());
+              setNotice(null);
+            }}
+            className={cn(CONTROL_BUTTON, 'px-3 py-2')}
           >
-            Lưu dashboard (MVP)
+            Bố cục mặc định
           </button>
         </div>
-      </div>
 
-      <div className="grid gap-4 sm:grid-cols-3">
-        <KpiCard
-          label={metric.label}
-          value={formatMetricValue(metric, current)}
-          note={delta ? delta.label : '—'}
-          tone={delta ? (delta.improvement ? 'good' : 'bad') : 'neutral'}
-        />
-        <KpiCard
-          label="Instance tháng này"
-          value={
-            volumeMetric
-              ? formatMetricValue(volumeMetric, volumeMetric.monthly.at(-1)?.value ?? 0)
-              : '—'
-          }
-          note="Mẫu số dùng cho mọi tỷ lệ phía trên"
-        />
-        <KpiCard
-          label="Dataset"
-          value="mô phỏng"
-          note="Chưa nối read model — số liệu trong trang này là fixture"
-          tone="neutral"
-        />
-      </div>
-
-      <div className="rounded-xl border border-border bg-surface-raised p-5">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <h3 className="text-base font-semibold tracking-tight">{metric.label}</h3>
-            <p className="mt-1 max-w-2xl text-xs leading-relaxed text-on-surface-muted">
-              {metric.description}
-            </p>
-          </div>
-          <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-on-surface-muted">
-            {DIMENSION_LABELS[dimension]}
+        <div className="flex flex-wrap items-center gap-3">
+          <span className="flex items-center gap-2 text-xs text-on-surface-muted">
+            Số liệu <StatusBadge kind="mock" />
           </span>
-        </div>
+          <span className="flex items-center gap-2 text-xs text-on-surface-muted">
+            Bố cục lưu thật <StatusBadge kind="live" />
+          </span>
 
-        <div className="mt-4">
-          <MetricChart metric={metric} series={series} kind={chartKind} />
+          <form action={saveAction} className="flex items-center gap-2">
+            <input type="hidden" name="layout" value={serializeWidgets(widgets)} />
+            <SaveButton />
+          </form>
         </div>
       </div>
 
-      <div className="overflow-x-auto rounded-xl border border-border">
-        <table className="w-full text-sm">
-          <thead className="bg-surface-raised text-left text-xs tracking-wide text-on-surface-muted uppercase">
-            <tr>
-              <th scope="col" className="px-4 py-3 font-medium">
-                Kỳ / nhóm
-              </th>
-              <th scope="col" className="px-4 py-3 font-medium">
-                Giá trị
-              </th>
-              <th scope="col" className="px-4 py-3 font-medium">
-                So với kỳ trước
-              </th>
-            </tr>
-          </thead>
-          <tbody className="divide-y divide-border bg-surface-raised/40">
-            {series.map((point, index) => {
-              const previous = index > 0 ? series[index - 1].value : null;
-              return (
-                <tr key={point.label}>
-                  <td className="px-4 py-2.5">{point.label}</td>
-                  <td className="px-4 py-2.5 font-mono text-xs">
-                    {formatMetricValue(metric, point.value)}
-                  </td>
-                  <td className="px-4 py-2.5 font-mono text-xs text-on-surface-muted">
-                    {previous === null
-                      ? '—'
-                      : `${point.value >= previous ? '+' : '−'}${formatMetricValue(
-                          metric,
-                          Math.abs(point.value - previous),
-                        )}`}
-                  </td>
-                </tr>
-              );
-            })}
-          </tbody>
-        </table>
-      </div>
+      {notice ? (
+        <p
+          role="status"
+          className="rounded-lg border border-warning/40 px-3 py-2 text-sm text-warning"
+        >
+          {notice}
+        </p>
+      ) : null}
+
+      {saveState.status !== 'idle' && saveState.message ? (
+        <p
+          role={saveState.status === 'error' ? 'alert' : 'status'}
+          className={cn(
+            'rounded-lg border px-3 py-2 text-sm',
+            saveState.status === 'error'
+              ? 'border-danger/40 text-danger'
+              : 'border-success/40 text-success',
+          )}
+        >
+          {saveState.message}
+        </p>
+      ) : null}
+
+      <ul className="grid gap-4 lg:grid-cols-2">
+        {widgets.map((widget, index) => {
+          const metric = METRIC_CATALOG.find((item) => item.id === widget.metricId);
+          if (!metric) {
+            return null;
+          }
+          const series = seriesFor(metric, widget.dimension);
+
+          return (
+            <li
+              key={widget.id}
+              draggable
+              onDragStart={() => setDraggedIndex(index)}
+              onDragEnd={() => setDraggedIndex(null)}
+              onDragOver={(event) => event.preventDefault()}
+              onDrop={(event) => handleDrop(event, index)}
+              className={cn(
+                'rounded-xl border border-border bg-surface-raised p-4',
+                widget.span === 2 && 'lg:col-span-2',
+                draggedIndex === index && 'opacity-60',
+              )}
+            >
+              <div className="flex flex-wrap items-start justify-between gap-2">
+                <div className="flex min-w-0 items-start gap-2">
+                  <span
+                    aria-hidden
+                    title="Kéo để đổi vị trí"
+                    className="cursor-grab pt-0.5 text-on-surface-muted select-none"
+                  >
+                    ⠿
+                  </span>
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{metric.label}</p>
+                    <p className="text-[11px] text-on-surface-muted">
+                      {WIDGET_KIND_LABELS[widget.kind]} · {DIMENSION_LABELS[widget.dimension]}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="flex items-center gap-1">
+                  <button
+                    type="button"
+                    onClick={() => setWidgets(moveWidget(widgets, widget.id, -1))}
+                    disabled={index === 0}
+                    aria-label={`Chuyển ${metric.label} lên trước`}
+                    className={CONTROL_BUTTON}
+                  >
+                    ↑
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWidgets(moveWidget(widgets, widget.id, 1))}
+                    disabled={index === widgets.length - 1}
+                    aria-label={`Chuyển ${metric.label} xuống sau`}
+                    className={CONTROL_BUTTON}
+                  >
+                    ↓
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWidgets(resizeWidget(widgets, widget.id))}
+                    aria-label={`Đổi độ rộng ${metric.label}`}
+                    className={CONTROL_BUTTON}
+                  >
+                    {widget.span === 2 ? '1 cột' : '2 cột'}
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setWidgets(removeWidget(widgets, widget.id))}
+                    disabled={widgets.length === 1}
+                    title={widgets.length === 1 ? 'Dashboard cần ít nhất một widget' : undefined}
+                    aria-label={`Xoá ${metric.label}`}
+                    className={cn(CONTROL_BUTTON, 'text-danger')}
+                  >
+                    ✕
+                  </button>
+                </div>
+              </div>
+
+              <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <label className="text-[11px] tracking-wide text-on-surface-muted uppercase">
+                  Hiển thị
+                  <select
+                    value={widget.kind}
+                    onChange={(event) =>
+                      setWidgets(
+                        updateWidget(widgets, widget.id, {
+                          kind: event.target.value as WidgetKind,
+                        }),
+                      )
+                    }
+                    className={SELECT_CLASS}
+                  >
+                    {WIDGET_KINDS.map((kind) => (
+                      <option key={kind} value={kind}>
+                        {WIDGET_KIND_LABELS[kind]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="text-[11px] tracking-wide text-on-surface-muted uppercase">
+                  Metric
+                  <select
+                    value={widget.metricId}
+                    onChange={(event) =>
+                      setWidgets(updateWidget(widgets, widget.id, { metricId: event.target.value }))
+                    }
+                    className={SELECT_CLASS}
+                  >
+                    {METRIC_CATALOG.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.label}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                <label className="text-[11px] tracking-wide text-on-surface-muted uppercase">
+                  Dimension
+                  <select
+                    value={widget.dimension}
+                    onChange={(event) =>
+                      setWidgets(
+                        updateWidget(widgets, widget.id, {
+                          dimension: event.target.value as Dimension,
+                        }),
+                      )
+                    }
+                    className={SELECT_CLASS}
+                  >
+                    {(Object.keys(DIMENSION_LABELS) as Dimension[]).map((value) => (
+                      <option key={value} value={value}>
+                        {DIMENSION_LABELS[value]}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+
+                {widget.kind === 'chart' ? (
+                  <label className="text-[11px] tracking-wide text-on-surface-muted uppercase">
+                    Chart
+                    <select
+                      value={widget.chartKind}
+                      onChange={(event) =>
+                        setWidgets(
+                          updateWidget(widgets, widget.id, {
+                            chartKind: event.target.value as ChartKind,
+                          }),
+                        )
+                      }
+                      className={SELECT_CLASS}
+                    >
+                      {(Object.keys(CHART_KIND_LABELS) as ChartKind[]).map((value) => (
+                        <option key={value} value={value}>
+                          {CHART_KIND_LABELS[value]}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                ) : null}
+              </div>
+
+              <div className="mt-4">
+                {widget.kind === 'kpi' ? (
+                  <KpiBody metric={metric} dimension={widget.dimension} />
+                ) : widget.kind === 'chart' ? (
+                  <MetricChart metric={metric} series={series} kind={widget.chartKind} />
+                ) : (
+                  <SeriesTable metric={metric} series={series} />
+                )}
+              </div>
+            </li>
+          );
+        })}
+      </ul>
+
+      <p className="text-xs leading-relaxed text-on-surface-muted">
+        Kéo thả widget để đổi thứ tự, dùng ↑ ↓ cho bàn phím, đổi độ rộng bằng nút 1 cột / 2 cột. Bố
+        cục được lưu bằng cookie của trình duyệt này; khi có identity (D09) nó sẽ chuyển sang lưu
+        theo người dùng trong database.
+      </p>
     </div>
   );
 }
 
-function KpiCard({
-  label,
-  value,
-  note,
-  tone = 'neutral',
-}: {
-  label: string;
-  value: string;
-  note: string;
-  tone?: 'good' | 'bad' | 'neutral';
-}) {
-  const toneClass =
-    tone === 'good' ? 'text-success' : tone === 'bad' ? 'text-warning' : 'text-on-surface-muted';
+function SaveButton() {
+  const { pending } = useFormStatus();
 
   return (
-    <div className="rounded-xl border border-border bg-surface-raised p-4">
-      <p className="text-xs tracking-wide text-on-surface-muted uppercase">{label}</p>
-      <p className="mt-1.5 text-xl font-semibold tracking-tight">{value}</p>
-      <p className={cn('mt-1 text-xs', toneClass)}>{note}</p>
+    <button
+      type="submit"
+      disabled={pending}
+      className="rounded-lg bg-accent px-3 py-2 text-xs font-medium text-on-accent transition-opacity hover:opacity-90 disabled:opacity-60"
+    >
+      {pending ? 'Đang lưu…' : 'Lưu bố cục'}
+    </button>
+  );
+}
+
+function KpiBody({ metric, dimension }: { metric: MetricDefinition; dimension: Dimension }) {
+  const series = seriesFor(metric, dimension);
+  const current = series[series.length - 1]?.value ?? 0;
+  const delta = dimension === 'monthly' ? deltaBetween(metric, series) : null;
+
+  return (
+    <div>
+      <p className="text-2xl font-semibold tracking-tight">{formatMetricValue(metric, current)}</p>
+      <p
+        className={cn(
+          'mt-1 text-xs',
+          delta === null
+            ? 'text-on-surface-muted'
+            : delta.improvement
+              ? 'text-success'
+              : 'text-warning',
+        )}
+      >
+        {delta ? delta.label : 'Không so sánh kỳ trước ở chế độ theo quy trình'}
+      </p>
+      <p className="mt-3 text-xs leading-relaxed text-on-surface-muted">{metric.description}</p>
+    </div>
+  );
+}
+
+function SeriesTable({
+  metric,
+  series,
+}: {
+  metric: MetricDefinition;
+  series: readonly MetricPoint[];
+}) {
+  return (
+    <div className="overflow-x-auto rounded-lg border border-border">
+      <table className="w-full text-sm">
+        <thead className="bg-surface text-left text-xs tracking-wide text-on-surface-muted uppercase">
+          <tr>
+            <th scope="col" className="px-3 py-2 font-medium">
+              Kỳ / nhóm
+            </th>
+            <th scope="col" className="px-3 py-2 font-medium">
+              Giá trị
+            </th>
+            <th scope="col" className="px-3 py-2 font-medium">
+              So với kỳ trước
+            </th>
+          </tr>
+        </thead>
+        <tbody className="divide-y divide-border">
+          {series.map((point, index) => {
+            const previous = index > 0 ? series[index - 1].value : null;
+            return (
+              <tr key={point.label}>
+                <td className="px-3 py-2">{point.label}</td>
+                <td className="px-3 py-2 font-mono text-xs">
+                  {formatMetricValue(metric, point.value)}
+                </td>
+                <td className="px-3 py-2 font-mono text-xs text-on-surface-muted">
+                  {previous === null
+                    ? '—'
+                    : `${point.value >= previous ? '+' : '−'}${formatMetricValue(
+                        metric,
+                        Math.abs(point.value - previous),
+                      )}`}
+                </td>
+              </tr>
+            );
+          })}
+        </tbody>
+      </table>
     </div>
   );
 }

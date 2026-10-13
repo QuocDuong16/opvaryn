@@ -64,13 +64,19 @@ const DEMO_TOUR: readonly {
     href: '/analytics',
     stage: 'mock',
     title: 'Analytics Studio',
-    body: 'Chọn metric, dimension và chart trên số liệu fixture; lưu bố cục thuộc MVP.',
+    body: 'Chọn metric, dimension và chart trên số liệu fixture; bố cục widget kéo thả và lưu được thật.',
   },
   {
     href: '/apps',
     stage: 'live',
     title: 'Application showcase',
-    body: 'Cùng một object dưới dạng list, detail, kanban và panel tích hợp — hai dạng xem đọc dữ liệu thật.',
+    body: 'Cùng một object dưới dạng list, detail, kanban, cấu hình quản trị và panel tích hợp — hai dạng xem đọc dữ liệu thật.',
+  },
+  {
+    href: '/roadmap',
+    stage: 'concept',
+    title: 'Roadmap tới MVP',
+    body: 'Bốn phase, điều kiện nghiệm thu MVP và các quyết định đang chặn tiến độ.',
   },
   {
     href: '/settings',

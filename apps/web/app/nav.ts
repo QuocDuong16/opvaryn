@@ -53,8 +53,14 @@ export const NAV_ITEMS: readonly NavItem[] = [
     description: 'Mini-app dựng từ business object',
   },
   {
-    href: '/settings',
+    href: '/roadmap',
     index: '08',
+    label: 'Roadmap',
+    description: 'Lộ trình MVP V1, V1.x, V2 và V3',
+  },
+  {
+    href: '/settings',
+    index: '09',
     label: 'Cài đặt',
     description: 'Cấu hình tổ chức và môi trường demo',
   },

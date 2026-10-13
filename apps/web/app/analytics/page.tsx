@@ -2,6 +2,7 @@ import { DashboardStudio } from '@/components/analytics/dashboard-studio';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { getDashboardWidgets } from '@/lib/dashboard';
 
 export const metadata = { title: 'Analytics' };
 
@@ -38,26 +39,30 @@ const METRIC_DEFINITIONS: readonly { metric: string; definition: string; note: s
   },
 ];
 
-export default function AnalyticsPage() {
+export default async function AnalyticsPage() {
+  // The layout is real user configuration stored in a cookie; only the metric
+  // values are fixtures. The two are labeled separately in the studio.
+  const widgets = await getDashboardWidgets();
+
   return (
     <>
       <PageHeader
         eyebrow="06 / Analytics studio"
         title="Analytics"
-        lead="Self-service dashboard với metric có cấu trúc: chọn metric, dimension và chart rồi đọc kết quả — không viết SQL, không vượt quyền dữ liệu. Bộ chọn dưới đây hoạt động thật, nhưng số liệu là fixture."
+        lead="Self-service dashboard với metric có cấu trúc: chọn metric, dimension và chart, sắp bố cục widget rồi lưu lại — không viết SQL, không vượt quyền dữ liệu. Bố cục được lưu thật; số liệu là fixture."
         aside={<StatusBadge kind="mock" />}
       />
 
       <Card className="mb-6 border-warning/40">
-        <CardTitle className="text-warning">Mô phỏng — số liệu không đến từ dữ liệu thật</CardTitle>
+        <CardTitle className="text-warning">Số liệu mô phỏng — bố cục dashboard thì thật</CardTitle>
         <CardDescription>
           Metric cần read model có kiểu, dựng từ event của process instance — thứ chưa tồn tại khi
-          runtime chưa được viết (D05/D08). Vì vậy trang này minh họa trải nghiệm chọn metric và
-          chart; nút lưu bố cục bị khoá cho tới MVP.
+          runtime chưa được viết (D05/D08), nên mọi con số ở đây là fixture. Phần bố cục thì đã hoạt
+          động: kéo thả, đổi độ rộng, thêm/xoá widget và lưu bằng cookie của trình duyệt này.
         </CardDescription>
       </Card>
 
-      <DashboardStudio />
+      <DashboardStudio initialWidgets={widgets} />
 
       <section className="mt-8">
         <h2 className="mb-3 text-lg font-semibold tracking-tight">

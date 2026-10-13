@@ -21,10 +21,28 @@ describe('navigation', () => {
     expect(new Set(hrefs).size).toBe(hrefs.length);
     expect(hrefs).toContain('/objects');
     expect(hrefs).toContain('/workflows');
+    expect(hrefs).toContain('/roadmap');
+  });
+
+  it('numbers the areas without gaps or repeats', () => {
+    const indices = NAV_ITEMS.map((item) => item.index);
+    expect(new Set(indices).size).toBe(indices.length);
+    expect(indices).toEqual(NAV_ITEMS.map((_, position) => String(position + 1).padStart(2, '0')));
+  });
+
+  it('states what each area does, for the sidebar tooltip and the tour', () => {
+    for (const item of NAV_ITEMS) {
+      expect(item.description.length).toBeGreaterThan(10);
+    }
   });
 
   it('resolves a nav item for a known path', () => {
     expect(navItemFor('/analytics')?.label).toBe('Analytics');
     expect(navItemFor('/unknown')).toBeUndefined();
+  });
+
+  it('resolves nested routes to their area', () => {
+    expect(navItemFor('/objects/asset')?.label).toBe('Business Objects');
+    expect(navItemFor('/objects/asset')?.href).toBe('/objects');
   });
 });

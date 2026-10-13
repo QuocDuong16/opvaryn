@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ReactNode } from 'react';
 import type { BusinessObject, ObjectRecord } from '@opvaryn/contracts';
 
 import { StatusBadge, type StatusKind } from '@/components/ui/status-badge';
@@ -12,12 +12,13 @@ export interface MiniAppData {
   records: readonly ObjectRecord[];
 }
 
-type ViewKind = 'list' | 'detail' | 'kanban' | 'integration';
+type ViewKind = 'list' | 'detail' | 'kanban' | 'config' | 'integration';
 
 const VIEWS: readonly { kind: ViewKind; label: string; stage: StatusKind }[] = [
   { kind: 'list', label: 'Danh sách', stage: 'live' },
   { kind: 'detail', label: 'Chi tiết', stage: 'live' },
   { kind: 'kanban', label: 'Kanban', stage: 'mock' },
+  { kind: 'config', label: 'Cấu hình', stage: 'concept' },
   { kind: 'integration', label: 'Tích hợp', stage: 'mock' },
 ];
 
@@ -45,8 +46,10 @@ const MOCK_CONNECTORS: readonly {
 
 /**
  * MiniApp is the Application Builder showcase: the same business object rendered
- * as a list, a detail view, a kanban board and an integration panel. List and
- * detail read live records; kanban grouping policy and connectors are simulated.
+ * as a list, a detail view, a kanban board, an administration preview and an
+ * integration panel. List and detail read live records; kanban grouping policy,
+ * the configuration preview and connectors are simulated, and each view carries
+ * its own status label.
  */
 export function MiniApp({ apps }: { apps: readonly MiniAppData[] }) {
   const [appKey, setAppKey] = useState(apps[0]?.object.key ?? '');
@@ -129,6 +132,8 @@ export function MiniApp({ apps }: { apps: readonly MiniAppData[] }) {
         <DetailView app={app} record={selectedRecord} />
       ) : view === 'kanban' ? (
         <KanbanView app={app} statusFieldKey={statusField?.key} />
+      ) : view === 'config' ? (
+        <ConfigView key={app.object.key} app={app} statusFieldKey={statusField?.key} />
       ) : (
         <IntegrationView />
       )}
@@ -331,5 +336,213 @@ function IntegrationView() {
         ))}
       </div>
     </div>
+  );
+}
+
+const CONFIG_ROLES: readonly {
+  role: string;
+  canView: boolean;
+  canCreate: boolean;
+  canApprove: boolean;
+}[] = [
+  { role: 'Nhân viên', canView: true, canCreate: true, canApprove: false },
+  { role: 'Trưởng bộ phận', canView: true, canCreate: true, canApprove: true },
+  { role: 'Kế toán', canView: true, canCreate: false, canApprove: true },
+  { role: 'Giám đốc', canView: true, canCreate: false, canApprove: true },
+];
+
+const CONFIG_ACTIONS: readonly string[] = ['Duyệt', 'Trả về chỉnh sửa', 'Từ chối'];
+
+/**
+ * ConfigView is the administration preview of the Application Builder: the knobs
+ * an administrator would turn to shape a mini-app. Nothing here is stored and
+ * every control is disabled on purpose — configuring views, actions and
+ * permissions is V2 scope, and pretending the toggles work would be a mock
+ * presented as a feature.
+ */
+function ConfigView({ app, statusFieldKey }: { app: MiniAppData; statusFieldKey?: string }) {
+  const statusField = app.object.fields.find((field) => field.key === statusFieldKey);
+  const listColumns = app.object.fields.filter((field) => field.type !== 'file').slice(0, 3);
+
+  const views: readonly { name: string; enabled: boolean; note: string }[] = [
+    { name: 'List', enabled: true, note: 'Cột lấy từ field schema, xem panel bên dưới.' },
+    { name: 'Detail', enabled: true, note: 'Hiển thị mọi field của bản ghi kèm metadata.' },
+    {
+      name: 'Form',
+      enabled: app.object.fields.length > 0,
+      note: 'Sinh từ schema; validate ở server trước khi lưu.',
+    },
+    {
+      name: 'Kanban',
+      enabled: Boolean(statusField),
+      note: statusField
+        ? `Gom cột theo field ${statusField.key}.`
+        : 'Cần một field kiểu select làm trạng thái.',
+    },
+  ];
+
+  return (
+    <div className="space-y-4">
+      <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-dashed border-border-strong px-4 py-3">
+        <div>
+          <p className="text-sm font-medium">Ví dụ cấu hình — chỉ để xem, không lưu</p>
+          <p className="mt-1 max-w-3xl text-xs leading-relaxed text-on-surface-muted">
+            Đây là những công tắc mà admin sẽ dùng khi Application Builder thành hình (V2). Mọi ô ở
+            tab này bị khoá và giá trị chỉ là ví dụ minh hoạ hình dạng cấu hình; đổi chúng không có
+            hiệu lực. Muốn làm thật cần: version hoá cấu hình đã publish, model quyền (D09) và audit
+            mọi thay đổi cấu hình.
+          </p>
+        </div>
+        <StatusBadge kind="concept" />
+      </div>
+
+      <div className="grid gap-3 lg:grid-cols-2">
+        <ConfigPanel title="Dạng xem đang bật" subtitle="View nào xuất hiện trong mini-app">
+          <ul className="space-y-2">
+            {views.map((entry) => (
+              <li key={entry.name} className="flex items-start gap-2.5">
+                <ConfigCheckbox checked={entry.enabled} label={entry.name} />
+                <span className="min-w-0 text-xs leading-relaxed text-on-surface-muted">
+                  {entry.note}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </ConfigPanel>
+
+        <ConfigPanel title="Cột trong danh sách" subtitle={`Lấy từ schema của ${app.object.key}`}>
+          {listColumns.length === 0 ? (
+            <p className="text-xs text-on-surface-muted">Object chưa có field để hiển thị.</p>
+          ) : (
+            <ul className="space-y-2">
+              {listColumns.map((field) => (
+                <li key={field.key} className="flex items-center gap-2.5">
+                  <ConfigCheckbox checked label={field.label} />
+                  <span className="font-mono text-[11px] text-on-surface-muted">{field.key}</span>
+                </li>
+              ))}
+            </ul>
+          )}
+        </ConfigPanel>
+
+        <ConfigPanel
+          title="Action theo trạng thái"
+          subtitle={
+            statusField
+              ? `Trạng thái lấy từ field ${statusField.key}`
+              : 'Cần một field select để có trạng thái'
+          }
+        >
+          {statusField?.options && statusField.options.length > 0 ? (
+            <div className="overflow-x-auto">
+              <table className="w-full text-xs">
+                <thead className="text-left text-on-surface-muted">
+                  <tr>
+                    <th scope="col" className="py-1.5 pr-3 font-medium">
+                      Trạng thái
+                    </th>
+                    {CONFIG_ACTIONS.map((action) => (
+                      <th key={action} scope="col" className="px-2 py-1.5 font-medium">
+                        {action}
+                      </th>
+                    ))}
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border">
+                  {statusField.options.map((option) => (
+                    <tr key={option.value}>
+                      <td className="py-2 pr-3">
+                        {option.label}
+                        <span className="ml-1.5 font-mono text-[10px] text-on-surface-muted">
+                          {option.value}
+                        </span>
+                      </td>
+                      {CONFIG_ACTIONS.map((action) => (
+                        <td key={action} className="px-2 py-2">
+                          <ConfigCheckbox checked label={`${action} khi ${option.label}`} />
+                        </td>
+                      ))}
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          ) : (
+            <p className="text-xs text-on-surface-muted">
+              Object này chưa khai field trạng thái nên chưa minh hoạ được action theo trạng thái.
+            </p>
+          )}
+        </ConfigPanel>
+
+        <ConfigPanel title="Quyền theo role" subtitle="Ai xem, ai tạo, ai duyệt (ví dụ)">
+          <div className="overflow-x-auto">
+            <table className="w-full text-xs">
+              <thead className="text-left text-on-surface-muted">
+                <tr>
+                  <th scope="col" className="py-1.5 pr-3 font-medium">
+                    Role
+                  </th>
+                  <th scope="col" className="px-2 py-1.5 font-medium">
+                    Xem
+                  </th>
+                  <th scope="col" className="px-2 py-1.5 font-medium">
+                    Tạo
+                  </th>
+                  <th scope="col" className="px-2 py-1.5 font-medium">
+                    Duyệt
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border">
+                {CONFIG_ROLES.map((row) => (
+                  <tr key={row.role}>
+                    <td className="py-2 pr-3">{row.role}</td>
+                    <td className="px-2 py-2">
+                      <ConfigCheckbox checked={row.canView} label={`Xem — ${row.role}`} />
+                    </td>
+                    <td className="px-2 py-2">
+                      <ConfigCheckbox checked={row.canCreate} label={`Tạo — ${row.role}`} />
+                    </td>
+                    <td className="px-2 py-2">
+                      <ConfigCheckbox checked={row.canApprove} label={`Duyệt — ${row.role}`} />
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </ConfigPanel>
+      </div>
+    </div>
+  );
+}
+
+function ConfigPanel({
+  title,
+  subtitle,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  children: ReactNode;
+}) {
+  return (
+    <section className="rounded-xl border border-border bg-surface-raised/40 p-4">
+      <h3 className="text-sm font-semibold">{title}</h3>
+      <p className="mt-0.5 text-[11px] text-on-surface-muted">{subtitle}</p>
+      <div className="mt-3">{children}</div>
+    </section>
+  );
+}
+
+function ConfigCheckbox({ checked, label }: { checked: boolean; label: string }) {
+  return (
+    <input
+      type="checkbox"
+      defaultChecked={checked}
+      disabled
+      aria-label={label}
+      className="mt-0.5 size-3.5 shrink-0 accent-[var(--accent)]"
+    />
   );
 }
