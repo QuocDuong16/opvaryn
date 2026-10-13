@@ -1,0 +1,51 @@
+version: "2"
+
+run:
+  timeout: 5m
+  tests: true
+
+linters:
+  default: none
+  enable:
+    - errcheck
+    - govet
+    - ineffassign
+    - staticcheck
+    - unused
+    - revive
+    - gosec
+    - gocritic
+    - bodyclose
+    - sqlclosecheck
+    - rowserrcheck
+    - nilerr
+    - nilnil
+    - noctx
+    - prealloc
+    - unconvert
+    - unparam
+    - whitespace
+    - misspell
+    - nolintlint
+  settings:
+    errcheck:
+      check-blank: false
+
+    revive:
+      severity: warning
+      rules:
+        - name: unused-parameter
+          severity: warning
+        - name: early-return
+          severity: warning
+        - name: import-shadowing
+          severity: warning
+
+    nolintlint:
+      require-explanation: true
+      require-specific: true
+      allow-unused: false
+
+issues:
+  max-issues-per-linter: 0
+  max-same-issues: 0

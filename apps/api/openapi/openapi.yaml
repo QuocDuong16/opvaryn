@@ -1,0 +1,233 @@
+openapi: 3.0.3
+info:
+  title: OPVARYN API
+  version: 0.1.0
+  description: |
+    Interactive demo API for OPVARYN — Business Operations Platform.
+
+    This document is the single source of truth for the HTTP contract. Go types in
+    `apps/api/internal/api/v1/types.gen.go` and TypeScript types in
+    `packages/contracts/src/generated/schema.ts` are generated from it with
+    `make contract-generate`; never edit the generated files by hand.
+
+    Scope note: the workflow runtime is intentionally absent. It is implemented only
+    after the process execution contract decisions in
+    `operations-playbook/architecture.html` (section 04) are made.
+servers:
+  - url: http://localhost:21501
+    description: Local development
+tags:
+  - name: system
+    description: Health, readiness and product metadata
+  - name: business-objects
+    description: Business object definitions (demo vertical slice)
+paths:
+  /healthz:
+    get:
+      operationId: getHealth
+      tags: [system]
+      summary: Liveness probe
+      description: Returns ok while the process is serving requests.
+      responses:
+        '200':
+          description: Service is alive
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+  /readyz:
+    get:
+      operationId: getReadiness
+      tags: [system]
+      summary: Readiness probe
+      description: Returns ok only when the database dependency is reachable.
+      responses:
+        '200':
+          description: Service and dependencies are ready
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+        '503':
+          description: A dependency is unavailable; the response body still follows HealthStatus
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/HealthStatus'
+  /api/v1/meta:
+    get:
+      operationId: getMeta
+      tags: [system]
+      summary: Product metadata
+      description: Identifies the running build. The web shell uses it to show the demo stage.
+      responses:
+        '200':
+          description: Product name, version and delivery stage
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Meta'
+  /api/v1/business-objects:
+    get:
+      operationId: listBusinessObjects
+      tags: [business-objects]
+      summary: List business object definitions
+      description: Returns every business object definition known to this environment.
+      responses:
+        '200':
+          description: Business object definitions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessObjectList'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      operationId: createBusinessObject
+      tags: [business-objects]
+      summary: Create a business object definition
+      description: |
+        Creates a business object definition. `key` is the stable machine identifier used
+        by forms, workflows and API integrations; it cannot be changed later.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateBusinessObjectRequest'
+      responses:
+        '201':
+          description: Business object definition created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/BusinessObject'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          description: A business object with this key already exists
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+components:
+  responses:
+    BadRequest:
+      description: The request body or parameters are invalid
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    ServiceUnavailable:
+      description: The database dependency is unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+          enum: [ok, unavailable]
+    Meta:
+      type: object
+      required: [name, version, stage]
+      properties:
+        name:
+          type: string
+          example: OPVARYN
+        version:
+          type: string
+          example: 0.1.0
+        stage:
+          type: string
+          enum: [demo, mvp, production]
+          example: demo
+    ErrorResponse:
+      type: object
+      required: [code, message]
+      description: |
+        Stable error envelope. `code` is a machine-readable identifier; clients switch on
+        it and never on the human-readable message.
+      properties:
+        code:
+          type: string
+          example: invalid_request
+        message:
+          type: string
+          example: 'key: must match ^[a-z][a-z0-9_]{1,63}$'
+    FieldType:
+      type: string
+      description: Field kinds supported by the form builder.
+      enum: [text, number, date, select, file, rows]
+    FieldDefinition:
+      type: object
+      required: [key, label, type]
+      properties:
+        key:
+          type: string
+          example: estimated_amount
+        label:
+          type: string
+          example: Số tiền dự kiến
+        type:
+          $ref: '#/components/schemas/FieldType'
+        required:
+          type: boolean
+          default: false
+    BusinessObject:
+      type: object
+      required: [id, key, name, fields, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldDefinition'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    BusinessObjectList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/BusinessObject'
+    CreateBusinessObjectRequest:
+      type: object
+      required: [key, name]
+      properties:
+        key:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{1,63}$'
+          example: purchase_request
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: Đề nghị mua hàng
+        description:
+          type: string
+          maxLength: 500
+        fields:
+          type: array
+          items:
+            $ref: '#/components/schemas/FieldDefinition'
