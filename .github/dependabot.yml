@@ -2,6 +2,14 @@
 # the mise tool pins (go, node, pnpm, Go analysis tools) are updated by hand in
 # mise.toml + mise.lock, and container digests follow the same manual review
 # (this repository deliberately does not use Renovate).
+#
+# Policy: minor and patch updates arrive grouped as pull requests. Major upgrades
+# are deliberate decisions, so they are not automated here — they would otherwise
+# arrive as unreviewed surprise PRs (e.g. TypeScript 7). `ignore` with
+# `update-types` only suppresses version updates: Dependabot alerts and security
+# updates still fire, so a vulnerable major is never hidden.
+# GitHub Actions are the exception: action majors must be picked up because older
+# majors stop working when their runtime is retired.
 version: 2
 updates:
   - package-ecosystem: gomod
@@ -17,6 +25,9 @@ updates:
       go-minor-patch:
         patterns: ['*']
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
   - package-ecosystem: npm
     directory: /
@@ -34,8 +45,12 @@ updates:
       npm-minor-patch:
         patterns: ['*']
         update-types: [minor, patch]
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
 
-  # Keeps the SHA-pinned actions in .github/workflows current.
+  # GitHub Actions stay fully automated, majors included: actions must keep up
+  # with GitHub's runtime retirements, and every bump is a reviewed pull request.
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -53,3 +68,8 @@ updates:
       timezone: Asia/Ho_Chi_Minh
     commit-message:
       prefix: 'deps(docker)'
+    ignore:
+      # A PostgreSQL major upgrade needs a migration and restore plan, not a
+      # drive-by pull request.
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
