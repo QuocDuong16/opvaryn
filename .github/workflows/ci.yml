@@ -75,6 +75,9 @@ jobs:
         with:
           cache: true
 
+      - name: Install workspace dependencies
+        run: pnpm install --frozen-lockfile
+
       # Uses the same pinned image as local development (deployments/docker-compose.yml).
       - name: Start PostgreSQL
         run: make docker-up
@@ -86,6 +89,12 @@ jobs:
       # health, readiness, metadata, create, duplicate and validation responses.
       - name: Smoke test the API
         run: make smoke-api
+
+      # Builds the web app too, renders the demo pages, replays the form server
+      # actions and verifies the stored rows and the saved dashboard layout.
+      # The job name stays stable: the branch ruleset requires this exact check.
+      - name: Smoke test the demo flows
+        run: make smoke-demo-flows
 
       - name: Show container logs on failure
         if: failure()

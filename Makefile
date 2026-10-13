@@ -6,7 +6,7 @@
         docker-up docker-down docker-logs docker-config docker-clean \
         contract-generate contract-check \
         api-tools-check api-fix api-build api-test api-lint api-vuln api-check \
-        smoke-api seed-demo \
+        smoke-api smoke-demo-flows seed-demo \
         web-install web-lint web-format web-typecheck web-test web-build web-check \
         actions-lint docs-check quality-check clean
 
@@ -150,6 +150,9 @@ web-check: ## Run web lint, format, type, test, and build checks
 
 smoke-api: ## Build the API, start it and smoke test it against local Postgres
 	bash scripts/smoke-api.sh
+
+smoke-demo-flows: ## Build both servers, start them and smoke test the web demo flows
+	bash scripts/smoke-demo-flows.sh
 
 seed-demo: ## Seed the demo business objects and records through the running API
 	bash scripts/seed-demo.sh
