@@ -4,8 +4,9 @@
 
 - Routes follow the demo nav defined once in `app/nav.ts` (`NAV_ITEMS`, `navItemFor`):
   `/` overview, `/objects` (+ `/objects/[key]`), `/forms`, `/workflows`, `/tasks`, `/analytics`,
-  `/apps`, `/settings`. `navItemFor` matches nested routes by longest prefix, so
-  `/objects/it_incident` resolves to the Objects area.
+  `/apps`, `/roadmap`, `/settings`. `navItemFor` matches nested routes by longest prefix, so
+  `/objects/it_incident` resolves to the Objects area; nav `index` values are sequential and the
+  shell test enforces both invariants.
 - Root layout (`app/layout.tsx`) reads the theme cookie server-side, sets `data-theme` on
   `<html>` (no flash, no client theme script), loads Inter via `next/font`, and mounts
   `Sidebar` (lg+) / `Topbar` (breadcrumb + compact mobile nav + theme toggle).
@@ -31,11 +32,18 @@
 - `/tasks` **mock**: `TaskInbox` reduces `demo-tasks.ts` through the pure `inbox-reducer.ts`
   (approve/reject/return/reset, reason required, only pending tasks can transition); no server
   call.
-- `/analytics` **mock**: `DashboardStudio` picks metric/dimension/chart over `demo-metrics.ts`
-  (`seriesFor`, `formatMetricValue`, `deltaBetween`); the save-layout button is disabled.
+- `/analytics` **mock numbers + live layout**: `DashboardStudio` renders a widget grid over
+  `demo-metrics.ts` (`seriesFor`, `formatMetricValue`, `deltaBetween`) arranged with the pure
+  `dashboard-layout.ts` module (add/remove/move/resize via drag-and-drop and ↑↓ buttons). The
+  layout is stored in the `opvaryn.dashboard` httpOnly cookie through
+  `app/analytics/actions.ts` (`lib/dashboard.ts` reads it; ADR 0004 explains why a cookie instead
+  of a table). Numbers stay fixtures and are labeled `mock`; the layout is labeled `live`.
 - `/apps` **mock + live**: `MiniApp` switches view — list/detail read live records, kanban groups
-  by the first `select` field (mock policy), integration panel lists mock connectors. Status
-  badges are per view, not per page.
+  by the first `select` field (mock policy), `Cấu hình` is the administration preview (concept:
+  every control is disabled and the copy says nothing is stored), integration panel lists mock
+  connectors. Status badges are per view, not per page.
+- `/roadmap` **concept**: the playbook roadmap as a screen (four phases, MVP acceptance criteria,
+  non-goals, open decisions D04–D10, resourcing estimates). Content only, no behavior.
 - `/settings` **live**: endpoint table (kept in sync with the OpenAPI paths), ports, toolchain
   pins and the demo-data commands.
 
@@ -86,10 +94,15 @@
 
 - Dev/start ports are hardcoded in `apps/web/package.json` (`next dev --port 21500`).
   `next.config.ts` only sets `transpilePackages: ['@opvaryn/contracts']`.
-- Tests in `apps/web/__tests__/`: `shell.test.tsx` (badge labels, nav integrity),
+- Tests in `apps/web/__tests__/`: `shell.test.tsx` (badge labels, nav integrity and numbering),
   `inbox-reducer.test.ts` (task transitions, no fixture mutation),
-  `record-values.test.ts` (FormData → API values), `field-draft.test.ts` (editor serialization).
+  `record-values.test.ts` (FormData → API values), `field-draft.test.ts` (editor serialization),
+  `dashboard-layout.test.ts` (lenient read vs strict write validation, every transition).
   Vitest aliases `@` → app root and sets `environment: 'jsdom'`; coverage has no thresholds yet.
-- Verified end-to-end manually (no browser backend in this environment): the record form and the
-  create-object form accept a replay of their progressive-enhancement multipart POST and produce
-  a stored row/definition; validation and conflict messages surface in the form.
+- There is no browser backend in this environment, so interactive flows are verified by
+  `make smoke-demo-flows` (`scripts/smoke-demo-flows.sh`): it builds and starts both servers,
+  renders a page, replays the form's progressive-enhancement POST and checks the result through
+  the API and the re-rendered page. Two gotchas that script encodes: the page has more than one
+  server-action form (the theme toggle is one), so forms are selected by a marker input; and a
+  hidden input rendered by the server (e.g. `fields`, `layout`) must be excluded from the replay,
+  because `formData.get` returns the first value.

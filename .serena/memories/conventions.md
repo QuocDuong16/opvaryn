@@ -45,6 +45,14 @@
   tested; the screen labels each simulated part, and a fixture never pretends to be server data.
 - Screens generated from a business object schema (entry form, record table, mini-app views)
   render from the definition; never hard-code the field list of a specific object.
+- Never ship interactivity that does nothing: a control that cannot work yet is rendered
+  disabled with an explanation (the Application Builder configuration tab). Toggles, drag handles
+  or forms that silently discard input are not acceptable demo material.
+- User configuration with no entity of its own lives in an httpOnly cookie written by a server
+  action and read on the server (`opvaryn.theme`, `opvaryn.dashboard`). Reads stay lenient so a
+  stale cookie still renders; writes are strict and reject rather than prune. The pure module
+  owning the shape (e.g. `components/analytics/dashboard-layout.ts`) is unit tested and shared by
+  the reader, the writer and the UI.
 - Server-rendered dates/times use an explicit `timeZone` in `Intl.DateTimeFormat` for
   deterministic output.
 

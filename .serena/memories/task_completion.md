@@ -9,12 +9,16 @@
   - `docs-check`: required files exist (README, AGENTS, LICENSE, SECURITY, CONTRIBUTING,
     CODE_OF_CONDUCT, docs/README) and every local Markdown link resolves (`scripts/check-docs.mjs`).
 - CI is GitHub Actions and runs this same gate plus an integration job (`make docker-up` →
-  migrate → `make smoke-api`). A change that passes locally but breaks a workflow still fails CI,
-  so run `make actions-lint` after touching `.github/` and keep workflows calling Makefile targets.
-- End-to-end check available locally: `make smoke-api` (requires Postgres running and migrations
-  applied; it builds and starts its own API instance, so stop any dev server first). It covers
-  business objects, records and the error branches; `make seed-demo` (needs the API running) loads
-  the demo dataset through the same endpoints.
+  migrate → `make smoke-api` → `make smoke-demo-flows`). A change that passes locally but breaks a
+  workflow still fails CI, so run `make actions-lint` after touching `.github/` and keep workflows
+  calling Makefile targets. The integration job keeps its name because the branch ruleset requires
+  it verbatim.
+- End-to-end checks available locally: `make smoke-api` (requires Postgres running and migrations
+  applied; it builds and starts its own API instance, so stop any dev server first) covers business
+  objects, records and the error branches; `make smoke-demo-flows` builds and starts both servers
+  and replays the web forms (record entry, object builder, dashboard layout) against a production
+  build; `make seed-demo` (needs the API running) loads the demo dataset through the same
+  endpoints.
 - Run formatters BEFORE the gate, it fails on formatting: `gofmt -w` for Go,
   `cd apps/web && pnpm format` for web.
 - Contract changes: edit `openapi/openapi.yaml`, run `make contract-generate`, commit the

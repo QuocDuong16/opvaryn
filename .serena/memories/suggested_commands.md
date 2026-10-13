@@ -26,6 +26,11 @@ All workflows are root Makefile targets; `make help` lists everything.
   and applied migrations; covers business objects, object records, validation errors and the 404
   envelope); `make seed-demo` — demo dataset; `make actions-lint` — actionlint over
   `.github/workflows`.
+- `make smoke-demo-flows` — builds the API and the web app (production build), starts both, then
+  replays the demo form server actions and verifies the stored rows and the saved dashboard
+  layout. Requires `pnpm install` and a migrated database, and refuses to start while anything
+  answers on 21500/21501 — stop dev servers first (`ss -ltnp` + kill by pid). It leaves
+  `flow_*`/`flow_web_*` objects behind in a local database, like `smoke-api` leaves `smoke_*`.
 
 ## Database / infra
 

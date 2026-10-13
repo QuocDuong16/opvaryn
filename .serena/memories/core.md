@@ -12,8 +12,9 @@ playbook page `demo-mvp.html`), not MVP V1.
 - `deployments/docker-compose.yml` — local PostgreSQL 18 only (image pinned by digest).
 - `operations-playbook/` — requirements source: standalone offline HTML notebook, NOT code.
 - `docs/adr/` — decisions binding for this repository (0001 stack, 0002 demo scope + labels,
-  0003 demo data slice + mock surfaces).
+  0003 demo data slice + mock surfaces, 0004 dashboard layout storage + demo-flow tests).
 - `scripts/` — quality gates (`check-docs.mjs`), `smoke-api.sh` (end-to-end API smoke test),
+  `smoke-demo-flows.sh` (web flows: builds both servers, replays the demo forms),
   `seed-demo.sh` (idempotent demo dataset through the public API) and `playbook-rename.py`
   (doc maintenance).
 - `.github/` — CI (`workflows/`: quality gate, integration smoke, CodeQL, dependency review),
