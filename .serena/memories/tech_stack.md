@@ -40,8 +40,10 @@
 - Known accepted risk: Dependabot alert (high) on `braces@3.0.3`, reachable only through the dev
   chain `eslint-config-next → @next/eslint-plugin-next → fast-glob → micromatch → braces`. It is
   not in the production dependency tree and 3.0.3 is the latest published version, so no patched
-  release exists to upgrade to. Leave it accepted and re-check when braces ships a fix; do not
-  "resolve" it by downgrading or dropping `eslint-config-next`.
+  release exists to upgrade to. There is also no upgrade path around it: the newest
+  `eslint-config-next` (16.4.0, the version in use) pins `fast-glob` to exactly 3.3.1, which pulls
+  `micromatch@4.0.8` → `braces@3.0.3`. Leave it accepted and re-check when braces ships a fix; do
+  not "resolve" it by downgrading or dropping `eslint-config-next`.
 - Typescript 7 (native compiler) is currently incompatible with the toolchain:
   `openapi-typescript@7.13.0` crashes with `createKeywordTypeNode` undefined, breaking
   `make contract-check`. Do not accept a TS 7 bump until openapi-typescript and the

@@ -10,6 +10,9 @@ All workflows are root Makefile targets; `make help` lists everything.
   API :21501, PostgreSQL :21532.
 - The migration command must run from `apps/api` — the runner's default `-dir` is `sql/migrations`
   relative to the working directory.
+- Demo dataset: `make seed-demo` (needs the API running) seeds `purchase_request` and
+  `it_incident` with sample records through the public API. Idempotent; it warns and skips when an
+  object already exists with a different schema, because the demo cannot edit schemas yet.
 - Smoke tests: `curl -s localhost:21501/readyz` (also verifies the DB), `curl -s
   localhost:21501/api/v1/meta`.
 
@@ -20,7 +23,9 @@ All workflows are root Makefile targets; `make help` lists everything.
   `make contract-check`.
 - `make api-fix` (go mod tidy + gofmt), `cd apps/web && pnpm format` (prettier --write).
 - `make smoke-api` — builds, starts and smoke tests the API end-to-end (needs `make docker-up`
-  and applied migrations); `make actions-lint` — actionlint over `.github/workflows`.
+  and applied migrations; covers business objects, object records, validation errors and the 404
+  envelope); `make seed-demo` — demo dataset; `make actions-lint` — actionlint over
+  `.github/workflows`.
 
 ## Database / infra
 

@@ -18,6 +18,9 @@
   personal data.
 - `internal/domain` holds only implemented entities. Adding a guessed entity or schema ahead of
   the workflow decisions is forbidden (see invariants in `mem:core`).
+- Record values are validated in the service against the object's field definitions before the
+  store sees them (`validateRecordValues`), because only the service knows the schema. The store
+  owns persistence and constraint mapping, never business rules.
 
 ## Web (`apps/web`)
 
@@ -37,6 +40,11 @@
   nav and breadcrumb. A new screen = nav entry + route + stage badge.
 - Screens without real behavior use `components/ui/module-placeholder.tsx` and must declare a
   stage; real screens use `PageHeader` for the eyebrow/title/lead rhythm.
+- Simulated surfaces keep typed fixtures next to their components (`components/<area>/demo-*.ts`)
+  and put state transitions in pure modules (`*-reducer.ts`, `demo-metrics.ts`) that are unit
+  tested; the screen labels each simulated part, and a fixture never pretends to be server data.
+- Screens generated from a business object schema (entry form, record table, mini-app views)
+  render from the definition; never hard-code the field list of a specific object.
 - Server-rendered dates/times use an explicit `timeZone` in `Intl.DateTimeFormat` for
   deterministic output.
 

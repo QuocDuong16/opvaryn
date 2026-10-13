@@ -12,7 +12,9 @@
   migrate → `make smoke-api`). A change that passes locally but breaks a workflow still fails CI,
   so run `make actions-lint` after touching `.github/` and keep workflows calling Makefile targets.
 - End-to-end check available locally: `make smoke-api` (requires Postgres running and migrations
-  applied; it builds and starts its own API instance, so stop any dev server first).
+  applied; it builds and starts its own API instance, so stop any dev server first). It covers
+  business objects, records and the error branches; `make seed-demo` (needs the API running) loads
+  the demo dataset through the same endpoints.
 - Run formatters BEFORE the gate, it fails on formatting: `gofmt -w` for Go,
   `cd apps/web && pnpm format` for web.
 - Contract changes: edit `openapi/openapi.yaml`, run `make contract-generate`, commit the
@@ -21,7 +23,10 @@
   upgrade the dependency instead of suppressing (already happened once for golang.org/x/text).
 - New behavior needs tests: Go service tests for rules/validation
   (`internal/service/*_test.go` with fake stores), Vitest + Testing Library for web
-  components/utilities (`apps/web/__tests__/`).
+  components/utilities (`apps/web/__tests__/`). Pure demo logic (task reducer, form-value
+  conversion, field-draft serialization) is unit tested; there is no browser automation in this
+  environment, so interactive flows are verified by replaying the form's progressive-enhancement
+  POST against the dev server.
 - Behavior changes update the docs they touch in the same change (README, `.env.example`, docs/);
   new durable decisions get an ADR (`mem:conventions`).
 - Do not leave dev servers or background processes running; verify ports are free
