@@ -3,6 +3,7 @@
 | Tài liệu | Nội dung |
 | --- | --- |
 | [`../README.md`](../README.md) | Điểm vào dự án: trạng thái, bắt đầu nhanh, cấu trúc repository |
+| [`demo-guide.md`](demo-guide.md) | Runbook chạy và trình bày demo: setup, walkthrough từng màn hình, sự cố thường gặp |
 | [`../AGENTS.md`](../AGENTS.md) | Quy ước làm việc cho agent và contributor |
 | [`../operations-playbook/index.html`](../operations-playbook/index.html) | Nguồn yêu cầu: tầm nhìn, module, kiến trúc dự kiến, roadmap, decision log |
 | [`../LICENSE.md`](../LICENSE.md) | Giấy phép proprietary: không sao chép, không thương mại |

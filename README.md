@@ -31,7 +31,8 @@ chi tiết phạm vi nằm ở [ADR 0002](docs/adr/0002-demo-scope-and-labels.md
 
 ## Bắt đầu nhanh
 
-Yêu cầu: [mise](https://mise.jdx.dev) và Docker.
+Yêu cầu: [mise](https://mise.jdx.dev) và Docker. Hướng dẫn đầy đủ (kèm walkthrough từng màn hình và
+xử lý sự cố) nằm ở [docs/demo-guide.md](docs/demo-guide.md).
 
 ```bash
 mise install                 # pin go 1.27.2, node 26.9.0, pnpm 12.12.0 + Go tools
@@ -41,8 +42,13 @@ cp .env.example .env         # cổng 21xxx, không đụng project khác trên 
 make docker-up               # PostgreSQL 18 (localhost:21532)
 cd apps/api && go run ./cmd/migrate && cd ../..
 
-make seed-demo              # tuỳ chọn: nạp 2 business object mẫu + bản ghi demo qua API
-make dev                     # API :21501 + web :21500
+make dev                     # terminal 1: API :21501 + web :21500
+```
+
+Đợi API và web lên, rồi ở terminal 2 nạp dữ liệu mẫu (tuỳ chọn — cần API đang chạy):
+
+```bash
+make seed-demo               # 2 business object mẫu + 9 bản ghi, qua chính API
 ```
 
 Mở http://localhost:21500 và đi theo Walkthrough ở trang Tổng quan. Trang Objects cho phép tạo
@@ -143,6 +149,7 @@ thái thương hiệu thương mại là **provisional** cho đến khi hoàn t�
 
 - [operations-playbook/index.html](operations-playbook/index.html) — tầm nhìn, module, kiến trúc
   dự kiến, roadmap, decision log D01–D10.
+- [docs/demo-guide.md](docs/demo-guide.md) — runbook chạy demo: setup, walkthrough 9 màn hình, sự cố.
 - [docs/README.md](docs/README.md) — quan hệ giữa playbook và repo, danh sách ADR.
 - [AGENTS.md](AGENTS.md) — quy ước làm việc, biên giới kiến trúc, quy tắc an toàn dữ liệu.
 - [LICENSE.md](LICENSE.md) · [SECURITY.md](SECURITY.md) · [CONTRIBUTING.md](CONTRIBUTING.md) ·
