@@ -63,6 +63,13 @@ Working agreement for agents and contributors in this repository.
   details to clients.
 - Validate input at the API boundary. Use `context` and timeouts for request-scoped I/O.
 - Never log credentials, tokens or personal data. Do not swallow errors.
+- Identity is local auth with the OIDC seam described in `docs/adr/0008`: passwords are argon2id
+  PHC strings, session tokens are stored only as SHA-256 hashes, and login answers identically for
+  an unknown email and a wrong password. The actor of a process transition is the signed-in user,
+  never a value from the request body; a task is decided only with a role the user holds.
+  Accounts and departments are created with `make useradm` (the first user cannot come from the
+  API). Endpoints that are *not* yet protected are listed in ADR 0008 — do not add new unprotected
+  endpoints without updating that ADR.
 
 ## Database and data safety
 

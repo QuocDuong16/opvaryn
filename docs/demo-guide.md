@@ -80,6 +80,37 @@ Câu nên nói ở mục 5, 6, 7, 8: "phần này là mô phỏng vì workflow r
 quyết định D05/D08 trong playbook". Nhãn `Mock` / `Concept` đã hiện sẵn ở góc phải mỗi màn hình, nên
 người xem tự kiểm chứng được.
 
+## 5b. Đăng nhập (identity đã có, UI chưa nối)
+
+Runtime quy trình yêu cầu đăng nhập. Màn hình demo hiện **chưa** dùng session — chúng vẫn là
+fixture — nên buổi trình diễn UI không bị ảnh hưởng; phần cần session là API.
+
+Tạo bộ phận và tài khoản (chạy một lần, sau khi đã migrate):
+
+```bash
+make useradm ARGS="-create-department -key ky_thuat -department-name 'Kỹ thuật'"
+make useradm ARGS="-create-department -key ke_toan -department-name 'Kế toán'"
+make useradm ARGS="-create -email lan@opvaryn.local -name 'Nguyễn Lan' -password demo-password-opvaryn -department ky_thuat -roles truong_bo_phan"
+make useradm ARGS="-create -email bao@opvaryn.local -name 'Trần Bảo' -password demo-password-opvaryn -department ke_toan -roles ke_toan"
+make useradm ARGS="-list"
+```
+
+> Mật khẩu trên chỉ dùng cho môi trường local. Trước khi cho người thật dùng: đổi mật khẩu, tạo
+> tài khoản theo người thật, và đọc mục "chưa bảo vệ" trong `docs/adr/0008`.
+
+Gọi API bằng session:
+
+```bash
+curl -s -c /tmp/opvaryn.cookies -X POST localhost:21501/api/v1/auth/login \
+  -H 'Content-Type: application/json' \
+  -d '{"email":"lan@opvaryn.local","password":"demo-password-opvaryn"}'
+curl -s -b /tmp/opvaryn.cookies localhost:21501/api/v1/me
+curl -s -b /tmp/opvaryn.cookies -X POST localhost:21501/api/v1/auth/logout
+```
+
+Không có session: `/api/v1/me`, start instance, đọc instance và quyết định task đều trả **401**;
+quyết định một task mà role của bạn không giữ trả **403**.
+
 ## 6. Dừng
 
 - `make dev`: `Ctrl+C` ở terminal 1 (dừng cả API và web).

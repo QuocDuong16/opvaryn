@@ -104,11 +104,13 @@ kèm bảng outbox và ADR riêng (bất biến 3: lỗi tích hợp không đư
 đánh giá). Actor là role do caller cung cấp cho tới khi có identity (D09), sau đó là user đã xác
 thực.
 
-### 11. Phân quyền — khoảng trống có chủ đích
+### 11. Phân quyền
 
-Engine kiểm tra **role của hành động**: một task chỉ được quyết định bởi actor nhận đúng role mà
-task được giao. Nhưng **chưa có authentication**: API tin actor do caller khai báo. Đây là giới hạn
-chỉ chấp nhận được trong môi trường demo/local, phải đóng bằng D09 trước khi dùng thật.
+Engine kiểm tra **role của hành động**: một task chỉ được quyết định bởi actor đang giữ đúng role mà
+task được giao. Từ ADR 0008, actor đó là **user đã xác thực qua session** — request body không còn
+khai báo được `actorRole`, nên không thể nhận vụ của người khác bằng cách sửa payload. Phân quyền
+theo bộ phận (D09b) và ma trận quyền cho các endpoint định nghĩa vẫn là việc tiếp theo, ghi ở
+ADR 0008.
 
 ### 12. Hoãn có ý thức
 

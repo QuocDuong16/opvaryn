@@ -27,6 +27,9 @@ Các màn hình theo kế hoạch 8 tuần của bản demo đã dựng xong, m�
 - **Live (MVP)**: workflow runtime tự xây trên PostgreSQL — process definition publish theo phiên
   bản bất biến, instance gắn với phiên bản lúc start, human task duyệt theo role với
   compare-and-swap, reject terminal, return reset attempt, event log append-only (ADR 0005/0007).
+- **Live (MVP)**: identity local — đăng nhập bằng mật khẩu argon2id, session cookie httpOnly (chỉ
+  lưu hash của token), role và bộ phận trên user; các endpoint runtime yêu cầu đăng nhập và actor
+  của mọi transition là user thật (ADR 0008). Tài khoản tạo bằng `make useradm`.
 - **Concept**: điều kiện hiển thị và calculated field của Form Builder, tab Cấu hình của Application
   Builder, escalation, template library, và nội dung Roadmap — các phần phụ thuộc quyết định còn mở.
 
