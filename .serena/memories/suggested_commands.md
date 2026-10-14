@@ -12,7 +12,10 @@ All workflows are root Makefile targets; `make help` lists everything.
   relative to the working directory.
 - Demo dataset: `make seed-demo` (needs the API running) seeds `purchase_request` and
   `it_incident` with sample records through the public API. Idempotent; it warns and skips when an
-  object already exists with a different schema, because the demo cannot edit schemas yet.
+  object already exists with a different schema.
+- Accounts and departments: `make useradm ARGS="-create-department -key ky_thuat -department-name 'Kỹ thuật'"`,
+  `make useradm ARGS="-create -email lan@opvaryn.local -name 'Lan' -password '...' -department ky_thuat -roles truong_bo_phan"`,
+  `make useradm ARGS="-list"`, `make useradm ARGS="-set-password -email ... -password ..."`.
 - Smoke tests: `curl -s localhost:21501/readyz` (also verifies the DB), `curl -s
   localhost:21501/api/v1/meta`.
 

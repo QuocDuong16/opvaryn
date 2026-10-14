@@ -15,7 +15,9 @@ playbook page `demo-mvp.html`), not MVP V1.
   0003 demo data slice + mock surfaces, 0004 dashboard layout storage + demo-flow tests).
   0005 is **Accepted**: the owner settled D04/D05/D08 (self-built runtime on PostgreSQL, JSON
   conditions, reject terminal / return resets, role resolver). 0006 is definition versioning +
-  publish; 0007 is the process execution contract the runtime implements.
+  publish; 0007 is the process execution contract the runtime implements; 0008 settles D09a/D09b
+  (local auth with an OIDC seam, RBAC + department scope), D07 (pilot: purchase request, IT
+  incident, HR onboarding) and D10 (single internal host with Docker Compose).
 - `scripts/` — quality gates (`check-docs.mjs`), `smoke-api.sh` (end-to-end API smoke test),
   `smoke-demo-flows.sh` (web flows: builds both servers, replays the demo forms),
   `seed-demo.sh` (idempotent demo dataset through the public API) and `playbook-rename.py`

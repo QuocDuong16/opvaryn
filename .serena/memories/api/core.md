@@ -22,10 +22,16 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   `POST /api/v1/process-instances` (start from a stored record),
   `GET /api/v1/process-instances/{id}` (instance + tasks + event log) and
   `POST /api/v1/process-instances/{id}/tasks/{taskId}/decisions`.
+- Identity (ADR 0008): `POST /api/v1/auth/login` (sets the httpOnly `opvaryn.session` cookie),
+  `POST /api/v1/auth/logout` (204) and `GET /api/v1/me`. `sessionMiddleware` resolves the cookie
+  once per request into the request context; `requireUser` answers 401. The runtime endpoints
+  (start instance, decide task, read instance) require a session, and the decision's actor and
+  roles come from the authenticated user — `actorRole`/`actor` are gone from the request bodies.
 - Error mapping lives in `writeStoreError`: `ValidationError` → 400, `store.ErrNotFound` → 404,
   `store.ErrConflict`/`ErrTaskClosed`/`service.ErrStateConflict` → 409, `service.ErrForbidden` → 403
-  (`done by role`, D08b), `store.ErrUnavailable` → 503. `parseUUIDParam` turns a malformed path id
-  into a 400 instead of a zero UUID.
+  (the user does not hold the role, D08b), `service.ErrUnauthorized` → 401 `unauthorized`,
+  `store.ErrUnavailable` → 503. `parseUUIDParam` turns a malformed path id into a 400 instead of a
+  zero UUID.
 - `system.go` = health/readiness/meta handlers; `businessobject.go` = list/create/get handlers
   plus the domain ↔ `apiv1` mapping helpers (`toAPIBusinessObject` including optional select
   `options`, `toDomainFields`, `pointerOrNil`/`stringValue` for optional fields);
@@ -60,6 +66,14 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   into the event log. `EvaluateCondition` treats a missing/null value as false for every operator.
 - `processGraph` indexes a published version (nodes, unconditional successors, condition branches);
   a broken stored graph is an internal error because publishing validates it.
+- `Identity` (ADR 0008) owns the only password hashes: arangon2id PHC strings
+  (`HashPassword`/`VerifyPassword`, parameters travel with the hash), sessions whose token is
+  returned once and stored only as SHA-256, and user administration. `LocalProvider` implements the
+  `Provider` seam an OIDC provider will fill later; an unknown email still runs a dummy hash so
+  response time does not reveal whether an address exists, and both failures return
+  `ErrInvalidCredentials`. `CreateUser` validates email shape, department existence and role keys;
+  `SetPassword`/`ListUsers` never expose hashes. Accounts come from `cmd/useradm`
+  (`make useradm ARGS="-create ..."`), because the first user cannot be created through the API.
 - `ObjectRecords` wraps `recordStore` (look up definition → validate values → insert). Validation
   (`validateRecordValues` → `validateFieldValue`) rejects unknown keys, missing required fields,
   wrong types per field type (text/file string ≤4000, number, date `YYYY-MM-DD`, select must be a
@@ -97,7 +111,9 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   then drops `business_objects.fields`), `0004_process_runtime.sql` (`process_definitions`,
   `process_definition_versions`, `process_instances` with a state/finished_at consistency check,
   `process_tasks` with a partial unique index on one open task per node+attempt and a CHECK that
-  returned/rejected tasks carry a reason, `process_events`).
+  returned/rejected tasks carry a reason, `process_events`), `0005_identity.sql` (`departments` as a
+  closed catalogue, `users` with lower-cased emails and a NOT NULL department, `user_roles`,
+  `sessions` storing only the token hash).
 - `store/process.go` owns the atomic writes: `StartProcessInstance` (instance + tasks + events in
   one transaction) and `CompleteProcessTask` (task CAS then instance CAS then cancels/creates/events;
   a failed CAS returns `ErrTaskClosed` or `ErrConflict`, and `explainTaskMiss` tells a missing task
@@ -115,8 +131,10 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   persistence.
 - `scripts/smoke-api.sh` (`make smoke-api`) exercises every endpoint against real PostgreSQL,
   including record creation, the unknown-key/option/required/duplicate branches, the 404 envelope,
-  publishing a definition version, the version history order and that records keep the version
-  they were created under; `scripts/seed-demo.sh` (`make seed-demo`) seeds demo data through the
-  API.
+  publishing a definition version, the version history order, that records keep the version they
+  were created under, and the whole identity + runtime path (it bootstraps a department and two
+  users with `useradm`, logs in, asserts 401 without a session, 403 for a task the user does not
+  hold, 409 on a second decision and that the audit is attributed to the signed-in user);
+  `scripts/seed-demo.sh` (`make seed-demo`) seeds demo data through the API.
 - Adding an endpoint: `openapi/openapi.yaml` → `make contract-generate` → service rule + test →
   store method (+ new migration when schema changes) → handler mapping → `make api-check`.

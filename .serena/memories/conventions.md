@@ -26,6 +26,12 @@
   never updated. Records store the version they were created under and are always read with it —
   never re-render or rewrite old data with a newer schema. The version table is the single source
   of truth; do not reintroduce a fields column on the object row.
+- Identity follows ADR 0008: passwords are argon2id PHC strings, session tokens are stored only as
+  SHA-256 hashes, login answers identically for an unknown email and a wrong password, and
+  passwords/tokens never reach a log. The actor of a transition is the signed-in user, never a body
+  field; a task is decided only with a role that user holds. Accounts and departments come from
+  `make useradm`. Endpoints that are still unprotected are listed in ADR 0008 — adding a new
+  unprotected endpoint means updating that ADR first.
 - The process engine follows ADR 0007: one transaction per decision with compare-and-swap on the
   task and the instance (the second caller gets 409, never a second transition), reject terminal,
   return resets to a new attempt, instances bound to the version they started with, every
