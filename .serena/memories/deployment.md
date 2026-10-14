@@ -9,6 +9,9 @@ This memory holds only what is easy to get wrong when changing the deployment.
   (`make docker-up`, local dev with `make dev` on the host); profile `pilot` = `migrate` → `api` →
   `web` → `caddy` → `backup` (`make pilot-up`). Do not split into two files: the two topologies must
   not drift.
+- **Ports stay in the 21xxx range**, Caddy included: `CADDY_HTTP_PORT=21580` and
+  `CADDY_HTTPS_PORT=21443` by default (80/443 belong to other projects on a shared machine); a dedicated
+  internal host sets 80/443 in `.env`. Do not default any published port outside the range.
 - **Caddy is the only service published to the network** (`deployments/caddy/Caddyfile`): it terminates
   TLS for `OPVARYN_HOSTNAME` using Caddy's own CA (`tls internal`, the honest option for a hostname no
   public CA can validate), adds a few security headers and redirects HTTP→HTTPS. `api` and `web` bind

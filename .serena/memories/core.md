@@ -57,8 +57,10 @@ open playbook decision), OIDC when the organisation has an IdP, and drag-and-dro
   Analytics numbers and the kanban/connector panels (ADR 0003, updated 2026-10-14).
 - Applied migrations are immutable: the runner verifies sha256 per version and refuses a changed
   file. A feature adds a new migration; it never edits an applied one.
-- Local ports are fixed in the 21xxx range — web 21500, API 21501, PostgreSQL 21532 — chosen to
-  avoid collisions with the sibling projects in `~/Workspace`.
+- Local ports are fixed in the 21xxx range — web 21500, API 21501, PostgreSQL 21532, and the pilot
+  stack's TLS terminator 21580/21443 — chosen to avoid collisions with the sibling projects in
+  `~/Workspace`. Every published port, including anything new, stays in that range unless the owner
+  says otherwise; a dedicated host can move Caddy to 80/443 in `.env`.
 - `operations-playbook/` is a document. Change it only as an explicit doc change (see
   `mem:suggested_commands` for the script), never as a side effect of code work.
 - Sibling repos in `~/Workspace/nian-*` are a larger, more mature ecosystem; this repo mirrors
