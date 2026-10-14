@@ -20,6 +20,8 @@ export type ObjectRecord = components['schemas']['ObjectRecord'];
 export type CreateObjectRecordRequest = components['schemas']['CreateObjectRecordRequest'];
 /** Stable error envelope returned by every failing endpoint. */
 export type ErrorResponse = components['schemas']['ErrorResponse'];
+/** The signed-in user with roles and department. */
+export type Me = components['schemas']['Me'];
 /** Build identity reported by the API. */
 export type Meta = components['schemas']['Meta'];
 /** Liveness/readiness answer. `ok` or `unavailable`. */
@@ -27,6 +29,7 @@ export type HealthStatus = components['schemas']['HealthStatus'];
 
 export interface ApiClient {
   getMeta(): Promise<Meta>;
+  getMe(): Promise<Me>;
   getReadiness(): Promise<HealthStatus>;
   listBusinessObjects(): Promise<BusinessObject[]>;
   getBusinessObject(key: string): Promise<BusinessObject>;
@@ -87,6 +90,8 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
 
   return {
     getMeta: () => request<Meta>('/api/v1/meta'),
+
+    getMe: () => request<Me>('/api/v1/me'),
 
     // Readiness answers from the body, not the status code: 503 with
     // status=unavailable is a valid answer, not a transport error.

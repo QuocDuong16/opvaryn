@@ -1,3 +1,4 @@
+import { SessionSummary } from '@/components/auth/session-summary';
 import { Breadcrumb } from '@/components/app-shell/breadcrumb';
 import { CompactNav } from '@/components/app-shell/nav';
 import { ThemeToggle } from '@/components/app-shell/theme-toggle';
@@ -11,6 +12,7 @@ export function Topbar() {
           <span className="hidden rounded-full border border-border px-2.5 py-0.5 font-mono text-[11px] tracking-wide text-on-surface-muted sm:inline-block">
             DEMO BUILD
           </span>
+          <SessionSummary />
           <ThemeToggle />
         </div>
       </div>
