@@ -26,6 +26,26 @@ export type ProcessTask = components['schemas']['ProcessTask'];
 export type ProcessEvent = components['schemas']['ProcessEvent'];
 /** An instance together with its tasks and its event log. */
 export type ProcessInstanceView = components['schemas']['ProcessInstanceView'];
+/** One instance as a list row: the instance plus the tasks still waiting. */
+export type ProcessInstanceSummary = components['schemas']['ProcessInstanceSummary'];
+/** Request body for starting an instance from a stored record. */
+export type StartProcessInstanceRequest = components['schemas']['StartProcessInstanceRequest'];
+/** A process definition with the newest published graph. */
+export type ProcessDefinition = components['schemas']['ProcessDefinition'];
+/** One immutable published graph of a process definition. */
+export type ProcessDefinitionVersion = components['schemas']['ProcessDefinitionVersion'];
+/** One node of a process graph. */
+export type ProcessNode = components['schemas']['ProcessNode'];
+/** One edge of a process graph. */
+export type ProcessEdge = components['schemas']['ProcessEdge'];
+/** The JSON condition a condition node carries (D04). */
+export type ProcessCondition = components['schemas']['ProcessCondition'];
+/** Request body for creating a process definition and publishing version 1. */
+export type CreateProcessDefinitionRequest =
+  components['schemas']['CreateProcessDefinitionRequest'];
+/** Request body for publishing the next version of a process definition. */
+export type UpdateProcessDefinitionRequest =
+  components['schemas']['UpdateProcessDefinitionRequest'];
 /** One open task with the instance it belongs to. */
 export type InboxItem = components['schemas']['InboxItem'];
 /** Request body for deciding one human task. */
@@ -50,8 +70,21 @@ export interface ApiClient {
   listBusinessObjectVersions(key: string): Promise<BusinessObjectVersion[]>;
   listObjectRecords(key: string): Promise<ObjectRecord[]>;
   createObjectRecord(key: string, input: CreateObjectRecordRequest): Promise<ObjectRecord>;
+  listProcessDefinitions(): Promise<ProcessDefinition[]>;
+  getProcessDefinition(key: string): Promise<ProcessDefinition>;
+  createProcessDefinition(input: CreateProcessDefinitionRequest): Promise<ProcessDefinition>;
+  updateProcessDefinition(
+    key: string,
+    input: UpdateProcessDefinitionRequest,
+  ): Promise<ProcessDefinition>;
+  listProcessDefinitionVersions(key: string): Promise<ProcessDefinitionVersion[]>;
   listInboxTasks(): Promise<InboxItem[]>;
   getProcessInstance(instanceId: string): Promise<ProcessInstanceView>;
+  listProcessInstances(filter?: {
+    objectKey?: string;
+    definitionKey?: string;
+  }): Promise<ProcessInstanceSummary[]>;
+  startProcessInstance(input: StartProcessInstanceRequest): Promise<ProcessInstanceView>;
   decideProcessTask(
     instanceId: string,
     taskId: string,
@@ -167,8 +200,50 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
       return payload.data;
     },
 
+    async listProcessDefinitions() {
+      const payload = await request<{ data: ProcessDefinition[] }>('/api/v1/process-definitions');
+      return payload.data;
+    },
+
+    getProcessDefinition: (key) =>
+      request<ProcessDefinition>(`/api/v1/process-definitions/${encodeURIComponent(key)}`),
+
+    createProcessDefinition: (input) =>
+      request<ProcessDefinition>('/api/v1/process-definitions', { method: 'POST', body: input }),
+
+    updateProcessDefinition: (key, input) =>
+      request<ProcessDefinition>(`/api/v1/process-definitions/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        body: input,
+      }),
+
+    async listProcessDefinitionVersions(key) {
+      const payload = await request<{ data: ProcessDefinitionVersion[] }>(
+        `/api/v1/process-definitions/${encodeURIComponent(key)}/versions`,
+      );
+      return payload.data;
+    },
+
     getProcessInstance: (instanceId) =>
       request<ProcessInstanceView>(`/api/v1/process-instances/${encodeURIComponent(instanceId)}`),
+
+    async listProcessInstances(filter = {}) {
+      const params = new URLSearchParams();
+      if (filter.objectKey) {
+        params.set('objectKey', filter.objectKey);
+      }
+      if (filter.definitionKey) {
+        params.set('definitionKey', filter.definitionKey);
+      }
+      const query = params.size > 0 ? `?${params.toString()}` : '';
+      const payload = await request<{ data: ProcessInstanceSummary[] }>(
+        `/api/v1/process-instances${query}`,
+      );
+      return payload.data;
+    },
+
+    startProcessInstance: (input) =>
+      request<ProcessInstanceView>('/api/v1/process-instances', { method: 'POST', body: input }),
 
     decideProcessTask: (instanceId, taskId, input) =>
       request<ProcessInstanceView>(

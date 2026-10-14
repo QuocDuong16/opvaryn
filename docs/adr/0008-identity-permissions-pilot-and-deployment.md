@@ -83,9 +83,8 @@
 
 ## Việc chưa làm ở bước này (để không tự lừa mình)
 
-- Màn hình Workflows vẫn là preview thiết kế; chưa có trình thiết kế đọc/ghi definition qua API.
-- **Chưa có màn hình liệt kê instance**: inbox là lối vào duy nhất, và một instance đã kết thúc chỉ
-  mở được khi biết id của nó. Danh sách instance theo bản ghi hoặc theo định nghĩa là việc kế tiếp.
+- Trình thiết kế quy trình là biểu mẫu (node/edge + publish version), không phải canvas kéo thả:
+  canvas chỉ vẽ phiên bản đã publish. Kéo thả và chỉnh trực tiếp trên sơ đồ vẫn chưa có.
 - OIDC: chỉ có interface (`service.Provider`), chưa có provider nào cắm vào.
 - Reset mật khẩu tự phục vụ (email), khoá tài khoản sau nhiều lần sai, và xoay session: hiện là
   thao tác của admin qua `make useradm`.

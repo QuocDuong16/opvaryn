@@ -6,7 +6,7 @@ import {
   formatPayloadValue,
   nextTasks,
   openTasksForUser,
-} from '@/components/tasks/task-timeline';
+} from '@/components/process/process-timeline';
 
 function event(type: string, payload: Record<string, unknown> = {}, id = 1): ProcessEvent {
   return {

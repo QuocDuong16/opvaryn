@@ -455,7 +455,7 @@ check_surface() {
 
 check_surface "/" "overview" "Walkthrough bản demo" "Trạng thái nền tảng"
 check_surface "/forms?object=$object_key" "forms" "Preview form" 'name="priority"'
-check_surface "/workflows" "workflows" "Màn hình còn dùng fixture — runtime đã có ở API" "Trưởng bộ phận duyệt"
+check_surface "/workflows" "workflows" "Tạo quy trình mới" "Node catalog theo lộ trình"
 # No process was started yet, so the live inbox is empty for this role — and it says so.
 check_surface "/tasks" "tasks" "Không có việc nào đang chờ bạn" "Engine đã có gì, inbox còn thiếu gì"
 check_surface "/apps" "applications" "Kanban" "Cấu hình" "Tích hợp"
@@ -673,6 +673,136 @@ events = [event["type"] for event in view["events"]]
 if events.count("instance_returned") != 1 or events[-1] != "task_created":
     sys.exit(f"unexpected event trail after the reset: {events}")
 print("flows: the reset created a clean attempt 2 and kept the audit trail")
+PY
+
+# ------------------------- flow H: the designer screen and running from a record ----
+
+echo "flows: [H] a definition is published from the web and run from a record"
+
+web_flow_key="flow_design_$stamp"
+status="$(web_get "/workflows" "$tmp_dir/workflows.html")"
+assert_status "$status" "200" "workflows page"
+assert_contains "$tmp_dir/workflows.html" "Tạo quy trình mới" "workflows page"
+assert_contains "$tmp_dir/workflows.html" "$process_key" "the flow created in G is listed"
+
+# The create form carries its graph in one hidden input, whose SSR value must be
+# excluded: formData.get returns the first value of a name.
+mapfile -t create_flow_args < <(form_args "$tmp_dir/workflows.html" graph graph)
+[[ ${#create_flow_args[@]} -ge 4 ]] || fail "[H] the create form has no server-action fields"
+
+flow_graph='{"nodes":[{"key":"start","type":"start","title":"Nhận yêu cầu"},{"key":"check","type":"human_task","title":"Kiểm tra yêu cầu","assigneeRole":"'"$approver_role"'"},{"key":"end","type":"end","title":"Kết thúc"}],"edges":[{"from":"start","to":"check"},{"from":"check","to":"end"}]}'
+status="$(web_post "/workflows" "$tmp_dir/workflow-created.html" \
+  "${create_flow_args[@]}" \
+  --form-string "key=$web_flow_key" \
+  --form-string 'name=Luồng thiết kế từ web' \
+  --form-string "objectKey=$object_key" \
+  --form-string "graph=$flow_graph")"
+assert_status "$status" "200" "definition create"
+assert_contains "$tmp_dir/workflow-created.html" "Đã publish" "definition create"
+
+status="$(web_get "/workflows/$web_flow_key" "$tmp_dir/workflow-detail.html")"
+assert_status "$status" "200" "workflow detail page"
+assert_contains "$tmp_dir/workflow-detail.html" "Sơ đồ $web_flow_key v1" "the canvas draws the published graph"
+assert_contains "$tmp_dir/workflow-detail.html" "Kiểm tra yêu cầu" "the canvas names the node"
+assert_contains "$tmp_dir/workflow-detail.html" "role $approver_role" "the node shows its role"
+assert_contains "$tmp_dir/workflow-detail.html" "Instance của quy trình này" "the instance section"
+assert_contains "$tmp_dir/workflow-detail.html" "Publish phiên bản mới" "the publish form"
+assert_contains "$tmp_dir/workflow-detail.html" "Chưa có quy trình nào đang chạy" "no instance yet"
+
+# A definition the service rejects: the graph has no human task, and the message
+# comes from the Go service, not from the browser.
+bad_graph='{"nodes":[{"key":"start","type":"start","title":"Bắt đầu"},{"key":"end","type":"end","title":"Kết thúc"}],"edges":[{"from":"start","to":"end"}]}'
+status="$(web_post "/workflows" "$tmp_dir/workflow-invalid.html" \
+  "${create_flow_args[@]}" \
+  --form-string "key=${web_flow_key}_bad" \
+  --form-string 'name=Luồng sai' \
+  --form-string "objectKey=$object_key" \
+  --form-string "graph=$bad_graph")"
+assert_status "$status" "200" "invalid definition create"
+assert_contains "$tmp_dir/workflow-invalid.html" 'role="alert"' "invalid definition create"
+assert_contains "$tmp_dir/workflow-invalid.html" "at least one human_task" "the service explains the graph"
+
+echo "flows: [H] a run started from the object page shows up as an instance"
+record_id="$(python3 - "$tmp_dir/records.json" <<'PY'
+import json, sys
+
+records = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+match = next((r for r in records if r["values"].get("title") == "Kiểm thử luồng demo"), None)
+if match is None:
+    sys.exit("flows: the record created in flow A is missing")
+print(match["id"])
+PY
+)"
+
+# A definition bound to the other object, to prove the run form offers only the
+# definitions whose conditions have fields to read on this record.
+other_flow_key="flow_other_$stamp"
+other_flow_body="$(printf '{"key":"%s","name":"Luồng của object khác","objectKey":"%s","nodes":[{"key":"start","type":"start","title":"Bắt đầu"},{"key":"check","type":"human_task","title":"Kiểm tra tài sản","assigneeRole":"%s"},{"key":"end","type":"end","title":"Kết thúc"}],"edges":[{"from":"start","to":"check"},{"from":"check","to":"end"}]}' "$other_flow_key" "$web_object_key" "$approver_role")"
+status="$(curl -sS -b "$cookie_jar" -o "$tmp_dir/other-flow.json" -w '%{http_code}' -X POST \
+  "$api_base/api/v1/process-definitions" -H 'Content-Type: application/json' -d "$other_flow_body")"
+assert_status "$status" "201" "creating a definition for the other object"
+
+status="$(web_get "/objects/$object_key" "$tmp_dir/object-run.html")"
+assert_status "$status" "200" "object page with the run form"
+assert_contains "$tmp_dir/object-run.html" "Chạy quy trình" "the run form is offered"
+assert_contains "$tmp_dir/object-run.html" "$web_flow_key" "definitions of this object are offered"
+assert_not_contains "$tmp_dir/object-run.html" "$other_flow_key" "a definition of another object is not offered"
+
+mapfile -t start_args < <(form_args "$tmp_dir/object-run.html" definitionKey)
+[[ ${#start_args[@]} -ge 4 ]] || fail "[H] the run form has no server-action fields"
+status="$(web_post "/objects/$object_key" "$tmp_dir/instance-started.html" \
+  "${start_args[@]}" \
+  --form-string "definitionKey=$web_flow_key" \
+  --form-string "recordId=$record_id")"
+assert_status "$status" "200" "starting a run from the web"
+assert_contains "$tmp_dir/instance-started.html" "Đã chạy" "starting a run from the web"
+assert_contains "$tmp_dir/instance-started.html" "việc đầu tiên thuộc role $approver_role" "the run names the first role"
+
+status="$(web_get "/objects/$object_key" "$tmp_dir/object-instances.html")"
+assert_status "$status" "200" "object page after the run"
+assert_contains "$tmp_dir/object-instances.html" "Quy trình trên các bản ghi này" "the instance section"
+assert_contains "$tmp_dir/object-instances.html" "v1 · attempt 1" "the instance is listed with its version"
+assert_contains "$tmp_dir/object-instances.html" "Kiểm tra yêu cầu" "the list names the waiting task"
+
+status="$(web_get "/workflows/$web_flow_key" "$tmp_dir/workflow-instances.html")"
+assert_status "$status" "200" "workflow detail after the run"
+assert_contains "$tmp_dir/workflow-instances.html" "Kiểm tra yêu cầu" "the definition lists its instance"
+
+status="$(web_get "/tasks" "$tmp_dir/inbox-run.html")"
+assert_status "$status" "200" "inbox after the run"
+assert_contains "$tmp_dir/inbox-run.html" "Kiểm tra yêu cầu" "the new task reaches the approver's inbox"
+
+echo "flows: [H] publishing v2 leaves the running instance on v1"
+mapfile -t publish_args < <(form_args "$tmp_dir/workflow-instances.html" graph graph)
+[[ ${#publish_args[@]} -ge 4 ]] || fail "[H] the publish form has no server-action fields"
+flow_graph_v2='{"nodes":[{"key":"start","type":"start","title":"Nhận yêu cầu"},{"key":"check","type":"human_task","title":"Kiểm tra yêu cầu (v2)","assigneeRole":"'"$approver_role"'"},{"key":"end","type":"end","title":"Kết thúc"}],"edges":[{"from":"start","to":"check"},{"from":"check","to":"end"}]}'
+status="$(web_post "/workflows/$web_flow_key" "$tmp_dir/workflow-published.html" \
+  "${publish_args[@]}" \
+  --form-string 'name=Luồng thiết kế từ web (v2)' \
+  --form-string "graph=$flow_graph_v2")"
+assert_status "$status" "200" "definition publish"
+assert_contains "$tmp_dir/workflow-published.html" "Đã publish phiên bản v2" "definition publish"
+
+status="$(web_get "/workflows/$web_flow_key" "$tmp_dir/workflow-v2.html")"
+assert_status "$status" "200" "workflow detail after the publish"
+assert_contains "$tmp_dir/workflow-v2.html" "phiên bản đang dùng v2" "the newest version is in use"
+assert_contains "$tmp_dir/workflow-v2.html" "Kiểm tra yêu cầu (v2)" "the canvas shows the new graph"
+# The instance keeps the version it started with: this is ADR 0006 in the UI.
+assert_contains "$tmp_dir/workflow-v2.html" "v1 · attempt 1" "the running instance stays on v1"
+curl -sS -b "$cookie_jar" -o "$tmp_dir/instances.json" "$api_base/api/v1/process-instances?definitionKey=$web_flow_key"
+python3 - "$tmp_dir/instances.json" "$web_flow_key" <<'PY' || fail "[H] the instance list does not match the UI"
+import json, sys
+
+summaries = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+if len(summaries) != 1:
+    sys.exit(f"expected one instance of {sys.argv[2]}, got {len(summaries)}")
+instance = summaries[0]["instance"]
+if instance["definitionVersion"] != 1 or instance["state"] != "running":
+    sys.exit(f'expected a running instance on v1, got v{instance["definitionVersion"]} {instance["state"]}')
+open_roles = [task["assigneeRole"] for task in summaries[0]["openTasks"]]
+if len(open_roles) != 1:
+    sys.exit(f"expected one open task in the list row, got {open_roles}")
+print("flows: the instance list carries the version, the state and the waiting role")
 PY
 
 echo "flows: PASS"

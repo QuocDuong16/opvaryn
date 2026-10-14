@@ -5,10 +5,14 @@ import {
   type BusinessObject,
   type BusinessObjectVersion,
   type ObjectRecord,
+  type ProcessDefinition,
+  type ProcessInstanceSummary,
 } from '@opvaryn/contracts';
 
 import { ObjectForm } from '@/components/forms/object-form';
 import { FieldSchema } from '@/components/objects/field-schema';
+import { InstanceList } from '@/components/process/instance-list';
+import { StartInstanceForm } from '@/components/process/start-instance-form';
 import { RecordList } from '@/components/objects/record-list';
 import { UpdateObjectForm } from '@/components/objects/update-object-form';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
@@ -33,13 +37,17 @@ export default async function ObjectDetailPage({ params }: PageProps) {
   let object: BusinessObject | null = null;
   let versions: BusinessObjectVersion[] = [];
   let records: ObjectRecord[] = [];
+  let definitions: ProcessDefinition[] = [];
+  let instances: ProcessInstanceSummary[] = [];
   let error: string | null = null;
 
   try {
     object = await api.getBusinessObject(key);
-    [versions, records] = await Promise.all([
+    [versions, records, definitions, instances] = await Promise.all([
       api.listBusinessObjectVersions(key),
       api.listObjectRecords(key),
+      api.listProcessDefinitions(),
+      api.listProcessInstances({ objectKey: key }),
     ]);
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'not_found') {
@@ -47,6 +55,10 @@ export default async function ObjectDetailPage({ params }: PageProps) {
     }
     error = describeApiError(cause);
   }
+
+  // Only definitions bound to this object: the engine evaluates conditions against
+  // the record's values, so a definition for another object has nothing to read.
+  const usableDefinitions = definitions.filter((definition) => definition.objectKey === key);
 
   if (!object) {
     return (
@@ -160,6 +172,23 @@ export default async function ObjectDetailPage({ params }: PageProps) {
             </h2>
             <RecordList versions={versions} records={records} />
           </section>
+
+          <section>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
+                Quy trình trên các bản ghi này ({instances.length})
+              </h2>
+              <StatusBadge kind="live" />
+            </div>
+            <p className="mb-3 text-xs text-on-surface-muted">
+              Danh sách instance đọc theo phạm vi của bạn: instance hiện khi bản ghi của nó hiện.
+              Instance đã kết thúc vẫn nằm đây và mở được, kể cả khi không còn việc nào trong inbox.
+            </p>
+            <InstanceList
+              instances={instances}
+              emptyHint="Chạy một quy trình ở biểu mẫu bên phải để thấy instance, bước đang chờ và người giữ việc."
+            />
+          </section>
         </div>
 
         <aside className="space-y-6 lg:sticky lg:top-20 lg:self-start">
@@ -173,6 +202,17 @@ export default async function ObjectDetailPage({ params }: PageProps) {
               <ObjectForm object={object} />
             </div>
           </Card>
+
+          <div className="space-y-3">
+            <h2 className="text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
+              Chạy quy trình
+            </h2>
+            <StartInstanceForm
+              definitions={usableDefinitions}
+              records={records}
+              fields={object.fields}
+            />
+          </div>
 
           <UpdateObjectForm object={object} />
         </aside>

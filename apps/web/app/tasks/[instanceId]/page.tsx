@@ -15,7 +15,7 @@ import {
   describeEvent,
   nextTasks,
   openTasksForUser,
-} from '@/components/tasks/task-timeline';
+} from '@/components/process/process-timeline';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';

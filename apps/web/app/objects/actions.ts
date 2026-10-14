@@ -7,6 +7,7 @@ import type { BusinessObject, FieldDefinition } from '@opvaryn/contracts';
 import type { CreateObjectState } from '@/components/objects/create-object-state';
 import type { CreateRecordState } from '@/components/forms/object-form-state';
 import type { UpdateObjectState } from '@/components/objects/update-object-state';
+import type { StartInstanceState } from '@/components/process/start-instance-state';
 import { recordValuesFromForm } from '@/components/forms/record-values';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 
@@ -134,6 +135,43 @@ export async function createObjectRecordAction(
       status: 'success',
       message: `Đã lưu bản ghi ${created.id.slice(0, 8)}… vào ${object.name}.`,
       recordId: created.id,
+    };
+  } catch (cause) {
+    return { status: 'error', message: describeApiError(cause) };
+  }
+}
+
+/**
+ * Starts a process instance for one stored record. The engine picks the definition
+ * version current at this moment and walks to its first waiting task; this action
+ * only assembles the request and says where the new work landed.
+ */
+export async function startProcessInstanceAction(
+  _previous: StartInstanceState,
+  formData: FormData,
+): Promise<StartInstanceState> {
+  const definitionKey = String(formData.get('definitionKey') ?? '').trim();
+  const recordId = String(formData.get('recordId') ?? '').trim();
+
+  if (definitionKey === '' || recordId === '') {
+    return { status: 'error', message: 'Chọn một quy trình và một bản ghi để chạy.' };
+  }
+
+  try {
+    const view = await createServerApiClient().startProcessInstance({ definitionKey, recordId });
+    revalidatePath(`/objects/${view.instance.objectKey}`);
+    revalidatePath(`/workflows/${view.instance.definitionKey}`);
+    revalidatePath('/workflows');
+    revalidatePath('/tasks');
+    const waiting = view.tasks.filter((task) => task.status === 'open');
+    const roles = [...new Set(waiting.map((task) => task.assigneeRole))].join(', ');
+    return {
+      status: 'success',
+      instanceId: view.instance.id,
+      message:
+        waiting.length === 0
+          ? `Đã chạy ${definitionKey} — quy trình kết thúc ngay vì không có bước chờ người.`
+          : `Đã chạy ${definitionKey} ở phiên bản v${view.instance.definitionVersion} — việc đầu tiên thuộc role ${roles}.`,
     };
   } catch (cause) {
     return { status: 'error', message: describeApiError(cause) };

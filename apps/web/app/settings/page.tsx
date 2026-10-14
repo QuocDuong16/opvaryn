@@ -60,6 +60,11 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
     purpose: 'Lịch sử phiên bản của quy trình',
   },
   {
+    method: 'GET',
+    path: '/api/v1/process-instances',
+    purpose: 'Instance theo phạm vi đọc, lọc theo business object hoặc quy trình',
+  },
+  {
     method: 'POST',
     path: '/api/v1/process-instances',
     purpose: 'Khởi tạo instance từ một bản ghi đã lưu',

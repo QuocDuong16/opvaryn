@@ -70,17 +70,34 @@ Thứ tự gợi ý, kèm phần cần nói rõ để không trình bày quá:
 | 3 | **Object detail** `/objects/<key>` | Form nhập liệu sinh từ schema vừa tạo; lưu một bản ghi; thử để trống field bắt buộc để thấy server chặn và báo lỗi | live |
 | 3b | **Publish phiên bản** (cùng trang) | Sửa schema rồi **Publish phiên bản v2**: bản ghi cũ vẫn nằm ở nhóm "phiên bản cũ" với đúng schema cũ, bản ghi mới dùng schema mới. Đây là bất biến #1 của playbook chạy thật | live |
 | 4 | **Forms** `/forms` | Đổi schema, thấy form đổi theo; danh sách "chưa có trong demo" | live + concept |
-| 5 | **Workflows** `/workflows` | Sơ đồ hai quy trình, click từng node xem cấu hình và nhánh điều kiện — preview thiết kế; định nghĩa thật publish qua API | **mock** |
+| 5 | **Workflows** `/workflows` | Danh sách định nghĩa đọc từ API; mở một định nghĩa để xem canvas của phiên bản đã publish, xem lại phiên bản cũ, và publish phiên bản mới bằng biểu mẫu. Cần role `process_designer`/`admin` mới ghi được | **live** |
+| 5b | **Chạy quy trình** (trang bản ghi) | Chọn quy trình + bản ghi rồi **Chạy quy trình**: instance xuất hiện ngay trong danh sách instance của bản ghi và trong inbox của role đầu tiên | **live** |
 | 6 | **Tasks** `/tasks` | Inbox thật theo role của người đang đăng nhập; mở một việc để xem bản ghi, event log và **duyệt / trả về / từ chối**; thử bằng hai tài khoản khác role để thấy việc chuyển người | **live** |
 | 7 | **Analytics** `/analytics` | Kéo–thả sắp widget, đổi metric/dimension, **Lưu bố cục**, rồi F5 để thấy bố cục còn nguyên | số liệu **mock**, bố cục **live** |
 | 8 | **Applications** `/apps` | Danh sách và chi tiết đọc bản ghi thật; kanban; tab **Cấu hình** (các ô đều bị khoá); panel tích hợp | live + mock + concept |
 | 9 | **Roadmap** `/roadmap` | Bốn phase, điều kiện nghiệm thu MVP, quyết định đang mở chặn tiến độ và các quyết định đã chốt | concept |
 | 10 | **Cài đặt** `/settings` | Danh sách endpoint, cổng, lệnh seed/smoke — tiện để chứng minh dữ liệu thật bằng curl | live |
 
-Câu nên nói ở mục 5, 7, 8: "phần này là mô phỏng — trình thiết kế workflow, số liệu analytics,
-kanban và connector chưa chạy thật". Nhãn `Mock` / `Concept` đã hiện sẵn ở góc phải mỗi màn hình, nên
+Câu nên nói ở mục 7 và 8: "phần này là mô phỏng — số liệu analytics, kanban và connector chưa chạy
+thật". Nhãn `Mock` / `Concept` đã hiện sẵn ở góc phải mỗi màn hình, nên
 người xem tự kiểm chứng được. Riêng mục 6 (Tasks) là **live**: mọi quyết định đi qua engine, ghi
 event log, và người thứ hai quyết định cùng một task sẽ nhận 409.
+
+### Walkthrough màn hình Workflows (live)
+
+1. `/workflows` liệt kê định nghĩa đọc từ API (kèm số node và business object). Mở một định nghĩa
+   (`purchase_approval` sau khi seed) để thấy canvas **vẽ graph của phiên bản đã publish** — toạ độ
+   tính từ graph nên sơ đồ luôn khớp với cái engine chạy; click từng node để xem role, điều kiện và
+   các đường chuyển tiếp.
+2. Chọn `v1` ở dải phiên bản để thấy bản cũ vẫn xem lại được: instance đang chạy vẫn theo bản đó.
+3. Sửa graph trong biểu mẫu **Publish phiên bản mới** (thêm node, đổi role, đổi literal điều kiện)
+   rồi publish: bảng lịch sử có v2, canvas đổi theo, và **instance đang chạy vẫn ghi v1** — bất biến
+   version chạy thật trên màn hình.
+4. Graph sai (thiếu việc của người, chu trình, điều kiện sai kiểu) sẽ bị service từ chối kèm lý do
+   cụ thể — thử xoá node việc của người rồi publish để thấy thông báo.
+5. Muốn chạy thử: mở một bản ghi của business object tương ứng, chọn quy trình ở khung **Chạy quy
+   trình** rồi bấm chạy; instance hiện ngay trong mục "Quy trình trên các bản ghi này" và việc đầu
+   tiên rơi vào inbox của role tương ứng.
 
 ### Walkthrough màn hình Tasks (live)
 

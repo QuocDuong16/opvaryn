@@ -17,10 +17,11 @@ Working agreement for agents and contributors in this repository.
   `operations-playbook/decisions.html` (D01–D10). Do not silently pick a direction that
   contradicts an open decision; ask instead.
 - Demo surfaces and their status follow ADR 0002 and ADR 0003, extended by ADR 0007 and
-  ADR 0008: business object definitions, records, sign-in/permissions and the task inbox with
-  its approve/return/reject decisions are `live` against PostgreSQL and the Go service; the
-  workflow designer screen, analytics and kanban/connector panels are `mock` fixtures;
-  conditional visibility, calculated fields and SLA/escalation are `concept`.
+  ADR 0008: business object definitions, records, sign-in/permissions, the task inbox with its
+  approve/return/reject decisions, and the workflow designer (read, publish version, run a
+  process from a record) are `live` against PostgreSQL and the Go service; analytics numbers and
+  the kanban/connector panels are `mock` fixtures; conditional visibility, calculated fields and
+  SLA/escalation are `concept`.
 
 ## Working agreement
 

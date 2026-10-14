@@ -152,7 +152,9 @@ export default function RoadmapPage() {
             <dd className="mt-1 text-sm">
               Business object và bản ghi: schema, form sinh từ schema, validate ở server, lưu
               PostgreSQL. Đăng nhập và phân quyền theo role + bộ phận. Inbox theo người, duyệt / trả
-              về / từ chối qua engine có event log. Bố cục dashboard lưu trong cookie.
+              về / từ chối qua engine có event log. Định nghĩa quy trình: canvas của phiên bản đã
+              publish, publish phiên bản mới, chạy quy trình từ bản ghi và xem instance. Bố cục
+              dashboard lưu trong cookie.
             </dd>
           </div>
           <div>
@@ -160,15 +162,15 @@ export default function RoadmapPage() {
               Mô phỏng (mock)
             </dt>
             <dd className="mt-1 text-sm">
-              Trình thiết kế workflow trong web (định nghĩa hiện publish qua API), số liệu
-              analytics, kanban và connector — giao diện thật, dữ liệu fixture.
+              Số liệu analytics (metric catalog trên fixture), kanban và connector — giao diện thật,
+              dữ liệu fixture.
             </dd>
           </div>
           <div>
             <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Chưa có</dt>
             <dd className="mt-1 text-sm">
-              Trình thiết kế quy trình trong web, OIDC, read model analytics, tích hợp thật, SLA và
-              escalation, deployment — phần còn lại của MVP V1 và V1.x.
+              Kéo thả trên canvas, OIDC, read model analytics, tích hợp thật, SLA và escalation,
+              deployment — phần còn lại của MVP V1 và V1.x.
             </dd>
           </div>
         </dl>

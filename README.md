@@ -24,8 +24,12 @@ tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
 - **Live**: Tasks — inbox đọc từ engine theo đúng role người đang đăng nhập, mở một việc để xem bản
   ghi (theo phiên bản định nghĩa của nó), event log append-only, và duyệt / trả về / từ chối qua
   đúng một transaction có compare-and-swap.
-- **Mock**: Workflows (sơ đồ quy trình đọc từ fixture — trình thiết kế trong web chưa nối API),
-  số liệu Analytics (metric catalog trên fixture), kanban và connector trong Application showcase.
+- **Live**: Workflows — danh sách định nghĩa, canvas vẽ graph của **phiên bản đã publish** (toạ độ
+  tính từ graph, không lưu), xem lại phiên bản cũ, tạo định nghĩa mới và publish phiên bản tiếp theo
+  bằng biểu mẫu; mọi kiểm tra graph nằm ở service Go. Trang bản ghi cũng có mục **chạy quy trình** và
+  danh sách instance theo bản ghi/định nghĩa (`GET /api/v1/process-instances`).
+- **Mock**: số liệu Analytics (metric catalog trên fixture), kanban và connector trong Application
+  showcase.
 - **Live (MVP)**: workflow runtime tự xây trên PostgreSQL — process definition publish theo phiên
   bản bất biến, instance gắn với phiên bản lúc start, human task duyệt theo role với
   compare-and-swap, reject terminal, return reset attempt, event log append-only (ADR 0005/0007).
