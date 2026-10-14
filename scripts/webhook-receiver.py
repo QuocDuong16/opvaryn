@@ -3,8 +3,12 @@
 
 It writes every accepted request to the file named by argv[1] as one JSON line
 (signature header, event header and body), answers 500 to the first `argv[2]`
-requests so the retry path is exercised for real, and 204 afterwards. It is a test
-fixture, not a product: no framework, no state beyond a counter.
+attempts of *each* delivery (keyed on the X-OPVARYN-Delivery header) so the retry
+path is exercised for every event, and 204 afterwards. Refusing per delivery, not
+once globally, keeps the smoke assertion deterministic: a pending row an earlier
+run left in a shared database cannot swallow the refusal this run's own delivery
+needs. It is a test fixture, not a product: no framework, no state beyond a
+counter.
 
 Usage: python3 scripts/webhook-receiver.py <output-file> <fail-first-n> <port>
 """
@@ -13,19 +17,19 @@ import sys
 from http.server import BaseHTTPRequestHandler, HTTPServer
 
 output_path, fail_first, port = sys.argv[1], int(sys.argv[2]), int(sys.argv[3])
-seen = 0
+attempts: dict[str, int] = {}
 
 
 class Handler(BaseHTTPRequestHandler):
     protocol_version = "HTTP/1.1"
 
     def do_POST(self) -> None:  # noqa: N802 - http.server's naming
-        global seen
         length = int(self.headers.get("Content-Length", "0"))
         body = self.rfile.read(length).decode("utf-8")
-        seen += 1
+        delivery = self.headers.get("X-OPVARYN-Delivery", "")
+        attempts[delivery] = attempts.get(delivery, 0) + 1
 
-        if seen <= fail_first:
+        if attempts[delivery] <= fail_first:
             # A receiver that is not ready must make the sender retry.
             self.send_response(500)
             self.send_header("Content-Length", "0")

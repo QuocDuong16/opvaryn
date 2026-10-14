@@ -571,52 +571,60 @@ status="$(request GET /api/v1/process-metrics)"
 [[ "$status" == "401" ]] || fail "reading process metrics anonymously returned $status, expected 401"
 
 echo "smoke: outbound webhook (queued with the event, retried, delivered, signed)"
-# The instance started above queued notifications. The receiver refused the first one, so
-# the delivery must have been retried and only then recorded as delivered — the whole
-# point of ADR 0012 is that this happens without the decision waiting for it.
-# Wait for the *retried* delivery specifically: the receiver refused the first request, so
-# a row with attempts 2 and status delivered is the proof that the retry happened.
+# The first instance started above queued notifications and the receiver refuses the first
+# request it sees, so a row for *this run's* instance with attempts 2 and status delivered
+# is the proof that the retry happened without the decision waiting for it (ADR 0012).
+# The wait is scoped to that instance: rows an earlier run left in a shared database must
+# not answer for this one.
 for _ in $(seq 1 30); do
   status="$(request_as "$designer_jar" GET /api/v1/webhook-deliveries)"
   [[ "$status" == "200" ]] || fail "reading the delivery log returned $status"
-  if grep -q '"status":"delivered"' "$body_file" && grep -q '"attempts":2' "$body_file"; then
+  if python3 - "$body_file" "$instance_id" <<'PY'
+import json, sys
+
+rows = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+if any(r["instanceId"] == sys.argv[2] and r["status"] == "delivered" and r["attempts"] == 2 for r in rows):
+    sys.exit(0)
+sys.exit(1)
+PY
+  then
     break
   fi
   sleep 1
 done
-grep -q '"status":"delivered"' "$body_file" || fail "no delivery was recorded as delivered"
-grep -q '"attempts":2' "$body_file" || fail "the refused attempt was not retried"
+python3 - "$body_file" "$instance_id" <<'PY' || fail "the refused delivery of this run's instance was not retried to delivered"
+import json, sys
+
+rows = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+mine = [r for r in rows if r["instanceId"] == sys.argv[2]]
+if not mine:
+    sys.exit("no delivery was recorded for the instance this run started")
+if not any(r["status"] == "delivered" and r["attempts"] == 2 for r in mine):
+    sys.exit(f"expected a delivered row after 2 attempts, got {mine}")
+print(f"smoke: the refused notification was retried and delivered ({len(mine)} deliveries for this instance)")
+PY
 grep -q '"enabled":true' "$body_file" || fail "the delivery log must report that the integration is on"
 
+# The receiver holds every delivery this run made, and the run's own rejection lands last:
+# assert over the whole set, never over the last line (which event arrives last is timing).
 python3 - "$receiver_file" <<'CHECK_WEBHOOK_RECEIVER'
-import json, sys
+import hashlib, hmac, json, sys
 
 lines = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8")]
 if not lines:
     sys.exit("the receiver got nothing")
-accepted = lines[-1]
-payload = json.loads(accepted["body"])
-if payload["event"] != "instance_started" and payload["event"] != "task_created":
-    sys.exit(f"unexpected event reached the receiver: {payload['event']}")
-if "instance" not in payload or "definitionKey" not in payload["instance"]:
-    sys.exit(f"the payload does not describe the instance: {payload}")
-if not accepted["signature"].startswith("sha256="):
-    sys.exit(f"the delivery was not signed: {accepted['signature']!r}")
-print(f"smoke: the receiver accepted a signed {payload['event']} notification")
+payloads = [json.loads(line["body"]) for line in lines]
+events = {payload["event"] for payload in payloads}
+if not events & {"instance_started", "task_created"}:
+    sys.exit(f"no start or task event reached the receiver, only {sorted(events)}")
+for line, payload in zip(lines, payloads):
+    if "instance" not in payload or "definitionKey" not in payload["instance"]:
+        sys.exit(f"a payload does not describe the instance: {payload}")
+    expected = "sha256=" + hmac.new(b"smoke-webhook-secret", line["body"].encode("utf-8"), hashlib.sha256).hexdigest()
+    if line["signature"] != expected:
+        sys.exit(f"a signature does not match the body and the shared secret: {line['signature']!r}")
+print(f"smoke: the receiver accepted {len(lines)} signed notifications ({', '.join(sorted(events))})")
 CHECK_WEBHOOK_RECEIVER
-
-# The integration must never decide anything: a decision taken while the receiver was
-# refusing still returned 200 above, and the log says exactly what happened.
-python3 - "$receiver_file" <<'CHECK_WEBHOOK_SIGNATURE'
-import hashlib, hmac, json, sys
-
-lines = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8")]
-accepted = lines[-1]
-expected = "sha256=" + hmac.new(b"smoke-webhook-secret", accepted["body"].encode("utf-8"), hashlib.sha256).hexdigest()
-if accepted["signature"] != expected:
-    sys.exit("the signature does not match the body and the shared secret")
-print("smoke: the signature verifies against the shared secret")
-CHECK_WEBHOOK_SIGNATURE
 
 echo "smoke: logout ends the session"
 status="$(request_as "$designer_jar" POST /api/v1/auth/logout)"

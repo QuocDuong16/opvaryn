@@ -29,6 +29,16 @@ This memory holds only what is easy to get wrong when changing the deployment.
   append to the image's server entrypoint and start a second API server instead of migrating.
 - Node 26 images no longer ship corepack, so the web Dockerfile installs pnpm explicitly at the
   version mise.toml pins. Keep those two in step.
+- `apps/api/Dockerfile` also builds **`useradm`** into the runtime image: a fresh host has no
+  accounts, and the runbook bootstraps the first one by running it inside the API container
+  (ADR 0008). Anything an operator is told to run in a container has to exist in that image.
+- `x-api-env` in compose forwards every variable the API reads and `.env.example` documents.
+  `OPVARYN_WEBHOOK_*` were missing, which made the outbound integration (ADR 0012) impossible to
+  switch on in the pilot stack; an empty `OPVARYN_WEBHOOK_URL` keeps it off.
+- `OPVARYN_HOSTNAME` must resolve (DNS record, or `/etc/hosts` on clients) before anything works:
+  Caddy issues the certificate for that exact name. With the 21xxx defaults the HTTP→HTTPS redirect
+  targets port 443, because Caddy does not know the published mapping — share URLs with the
+  explicit port unless the host really publishes 80/443.
 
 ## Backup and restore (the part with a rule attached)
 

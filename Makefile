@@ -3,7 +3,7 @@
 .DEFAULT_GOAL := help
 
 .PHONY: help install dev dev-api dev-web \
-        docker-up docker-down docker-logs docker-config docker-clean \
+        docker-up docker-down docker-logs docker-logs-tail docker-config docker-clean \
         images-build pilot-up pilot-down pilot-logs backup restore-drill \
         contract-generate contract-check \
         api-tools-check api-fix api-build api-test api-lint api-vuln api-check \
@@ -40,6 +40,9 @@ docker-down: ## Stop local services
 
 docker-logs: ## Follow local service logs
 	$(DOCKER_COMPOSE) logs -f
+
+docker-logs-tail: ## Print the recent logs and exit (used by CI when a step fails)
+	$(DOCKER_COMPOSE) logs --tail=200 --no-log-prefix
 
 docker-config: ## Validate the effective Docker Compose configuration (both modes)
 	$(DOCKER_COMPOSE) config

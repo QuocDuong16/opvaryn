@@ -115,9 +115,11 @@ jobs:
       - name: Build the deployment images
         run: make images-build
 
+      # A snapshot, never `make docker-logs`: following the logs on failure keeps the
+      # step (and therefore the job) alive until the 40-minute timeout.
       - name: Show container logs on failure
         if: failure()
-        run: make docker-logs
+        run: make docker-logs-tail
 
       - name: Stop PostgreSQL
         if: always()
