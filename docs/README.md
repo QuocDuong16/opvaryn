@@ -4,6 +4,7 @@
 | --- | --- |
 | [`../README.md`](../README.md) | Điểm vào dự án: trạng thái, bắt đầu nhanh, cấu trúc repository |
 | [`demo-guide.md`](demo-guide.md) | Runbook chạy và trình bày demo: setup, walkthrough từng màn hình, sự cố thường gặp |
+| [`ops-runbook.md`](ops-runbook.md) | Runbook vận hành trên host nội bộ: deploy, cấu hình, backup, diễn tập phục hồi, sự cố |
 | [`../AGENTS.md`](../AGENTS.md) | Quy ước làm việc cho agent và contributor |
 | [`../operations-playbook/index.html`](../operations-playbook/index.html) | Nguồn yêu cầu: tầm nhìn, module, kiến trúc dự kiến, roadmap, decision log |
 | [`../LICENSE.md`](../LICENSE.md) | Giấy phép proprietary: không sao chép, không thương mại |
@@ -30,5 +31,8 @@
 - [0002 — Phạm vi demo và quy ước nhãn live/mock/concept](adr/0002-demo-scope-and-labels.md)
 - [0003 — Lát cắt dữ liệu của demo: bản ghi business object và phân chia live/mock](adr/0003-demo-data-slice-and-mock-surfaces.md)
 - [0004 — Bố cục dashboard lưu bằng cookie, và cách kiểm thử luồng demo](adr/0004-dashboard-layout-storage-and-demo-flow-tests.md)
-- [0005 — Đề xuất quyết định cho execution contract (D04, D05, D08) — **chờ chốt**](adr/0005-runtime-decisions-proposal.md)
+- [0005 — Quyết định cho execution contract (D04, D05, D08) — Accepted](adr/0005-runtime-decisions-proposal.md)
 - [0006 — Versioning cho definition: publish là bất biến, bản ghi gắn với phiên bản](adr/0006-definition-versioning.md)
+- [0007 — Process Execution Contract (node, transition, audit)](adr/0007-process-execution-contract.md)
+- [0008 — Identity, phân quyền, quy trình pilot và môi trường chạy](adr/0008-identity-permissions-pilot-and-deployment.md)
+- [0009 — Kiến trúc triển khai trên một host nội bộ, và backup có diễn tập phục hồi](adr/0009-deployment-topology-and-backup.md)

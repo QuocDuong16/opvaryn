@@ -96,6 +96,12 @@ jobs:
       - name: Smoke test the demo flows
         run: make smoke-demo-flows
 
+      # The deployment images are part of the product: build them here so a broken
+      # Dockerfile or a base image that stopped resolving fails the gate instead of
+      # the next deploy. Nothing is pushed anywhere.
+      - name: Build the deployment images
+        run: make images-build
+
       - name: Show container logs on failure
         if: failure()
         run: make docker-logs

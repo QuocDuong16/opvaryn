@@ -122,10 +122,22 @@ Working agreement for agents and contributors in this repository.
 
 ## Docker and operations
 
-- `deployments/docker-compose.yml` runs local Postgres only. Pin images by digest; do not
-  use `latest`.
+- `deployments/docker-compose.yml` holds both modes: without a profile it starts local Postgres
+  only (`make docker-up`, for `make dev` on the host); with the `pilot` profile it is the whole
+  product on one internal host (`make pilot-up`: migrate → api → web → backup). One file on
+  purpose, so the two topologies cannot drift.
+- Pin images by digest, never `latest`; Dependabot watches both the compose file and the two
+  Dockerfiles. `apps/web/Dockerfile` builds from the repository root (it needs the workspace
+  contracts package) and runs the Next.js standalone server.
+- `api` waits for the one-shot `migrate` service to exit successfully, so a deploy never serves an
+  unmigrated database. A migration that fails stops the rollout; migrations are immutable, so a
+  mistake is fixed with a new file.
+- Backups are not backups until restored: `make backup` writes and re-reads a dump, and
+  `make restore-drill` restores it into a scratch database, compares it with the source and proves
+  the API can sign in against it. Run the drill after schema/backup changes and before a pilot.
+  `docs/ops-runbook.md` is the operator's page; ADR 0009 records why the topology is what it is.
 - Keep ports in the 21xxx range (documented in `.env.example`) to avoid collisions with
-  other local projects.
+  other local projects. Secrets live in `.env` on the host, never in the repository.
 
 ## CI and compliance
 

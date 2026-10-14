@@ -1,8 +1,11 @@
-# Local infrastructure for OPVARYN development: PostgreSQL only.
+# OPVARYN deployment topology (ADR 0009).
 #
-# Application processes run on the host through `make dev` while the product is
-# a demo. Container images and deployment topology arrive with the deployment
-# work, which is an open decision (playbook D10).
+# Default (`docker compose up` / `make docker-up`): PostgreSQL only, for local
+# development where the API and web app run on the host through `make dev`.
+#
+# Profile `pilot` (`make pilot-up`): the whole product on one internal host —
+# migrations, API, web app and the backup job. The web image is built from the
+# repository root because it consumes the workspace contracts package.
 name: opvaryn
 
 x-logging: &logging
@@ -10,6 +13,14 @@ x-logging: &logging
   options:
     max-size: '10m'
     max-file: '3'
+
+x-api-env: &api-env
+  DATABASE_URL: postgres://${POSTGRES_USER:-opvaryn}:${POSTGRES_PASSWORD:-opvaryn}@postgres:5432/${POSTGRES_DB:-opvaryn}?sslmode=disable
+  API_ENV: ${API_ENV:-development}
+  API_LOG_LEVEL: ${API_LOG_LEVEL:-info}
+  API_PORT: '21501'
+  CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:21500}
+  TZ: ${TZ:-Asia/Ho_Chi_Minh}
 
 services:
   postgres:
@@ -39,6 +50,120 @@ services:
         limits:
           cpus: '1'
           memory: 1g
+
+  # One-shot: applies every migration the API image carries, then exits. `api`
+  # waits for it to finish successfully, so a deploy never serves an unmigrated
+  # database and a failed migration stops the rollout instead of half-starting it.
+  # The entrypoint is replaced (not the command): the image's entrypoint is the
+  # server, and a one-shot service must not inherit it.
+  migrate:
+    profiles: ['pilot']
+    build:
+      context: ./apps/api
+    image: ${OPVARYN_API_IMAGE:-opvaryn-api:local}
+    entrypoint: ['/app/migrate']
+    environment: *api-env
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: 'no'
+    # The image's HTTP healthcheck does not apply to a process that exits.
+    healthcheck:
+      disable: true
+    logging: *logging
+
+  api:
+    profiles: ['pilot']
+    build:
+      context: ./apps/api
+    image: ${OPVARYN_API_IMAGE:-opvaryn-api:local}
+    restart: unless-stopped
+    environment: *api-env
+    ports:
+      - '${API_PORT:-21501}:21501'
+    depends_on:
+      postgres:
+        condition: service_healthy
+      migrate:
+        condition: service_completed_successfully
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:21501/readyz >/dev/null 2>&1 || exit 1']
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    logging: *logging
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 512m
+
+  web:
+    profiles: ['pilot']
+    build:
+      context: .
+      dockerfile: apps/web/Dockerfile
+    image: ${OPVARYN_WEB_IMAGE:-opvaryn-web:local}
+    restart: unless-stopped
+    environment:
+      # Server-side only: the browser never talks to the API directly (ADR 0008).
+      API_BASE_URL: http://api:21501
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+    ports:
+      - '${WEB_PORT:-21500}:21500'
+    depends_on:
+      api:
+        condition: service_healthy
+    healthcheck:
+      test: ['CMD-SHELL', 'wget -qO- http://127.0.0.1:21500/ >/dev/null 2>&1 || exit 1']
+      interval: 15s
+      timeout: 5s
+      start_period: 15s
+      retries: 5
+    logging: *logging
+    deploy:
+      resources:
+        limits:
+          cpus: '1'
+          memory: 768m
+
+  # Backup job: a loop around scripts/backup-db.sh (pg_dump + verify + retention).
+  # It reuses the PostgreSQL image, so pg_dump matches the server version exactly.
+  # Dumps land on the host through the bind mount; a backup that never leaves the
+  # database host is not a backup, so BACKUP_DIR should point at a second disk or
+  # a synced directory (see docs/ops-runbook.md).
+  backup:
+    profiles: ['pilot']
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
+    restart: unless-stopped
+    # The job writes into a bind mount owned by the host user, so it runs as root
+    # inside its own container: the only thing it can touch is the dump directory,
+    # and a uid mismatch would otherwise make every backup fail on permissions.
+    user: '0'
+    environment:
+      PGHOST: postgres
+      PGPORT: '5432'
+      PGPASSWORD: ${POSTGRES_PASSWORD:-opvaryn}
+      PGUSER: ${POSTGRES_USER:-opvaryn}
+      PGDATABASE: ${POSTGRES_DB:-opvaryn}
+      BACKUP_INTERVAL_SECONDS: ${BACKUP_INTERVAL_SECONDS:-86400}
+      BACKUP_KEEP: ${BACKUP_KEEP:-14}
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+    entrypoint: ['/bin/sh', '-c']
+    command:
+      - |
+        while true; do
+          sh /usr/local/bin/backup-db.sh || echo "backup: run failed, will retry at the next interval"
+          sleep "$${BACKUP_INTERVAL_SECONDS}"
+        done
+    volumes:
+      - ./scripts/backup-db.sh:/usr/local/bin/backup-db.sh:ro
+      - ${BACKUP_DIR:-./deployments/backups}:/backups
+    depends_on:
+      postgres:
+        condition: service_healthy
+    logging: *logging
 
 volumes:
   postgres_data:

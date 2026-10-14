@@ -4,6 +4,7 @@
 
 .PHONY: help install dev dev-api dev-web \
         docker-up docker-down docker-logs docker-config docker-clean \
+        images-build pilot-up pilot-down pilot-logs backup restore-drill \
         contract-generate contract-check \
         api-tools-check api-fix api-build api-test api-lint api-vuln api-check \
         useradm \
@@ -45,6 +46,26 @@ docker-config: ## Validate the effective Docker Compose configuration
 
 docker-clean: ## Stop services and delete Compose volumes
 	$(DOCKER_COMPOSE) down -v --remove-orphans
+
+##@ Deployment (one internal host, ADR 0009)
+
+images-build: ## Build the API and web images without starting anything
+	$(DOCKER_COMPOSE) --profile pilot build
+
+pilot-up: ## Start the whole product on this host (migrate, API, web, backup)
+	$(DOCKER_COMPOSE) --profile pilot up -d --build --wait
+
+pilot-down: ## Stop the pilot stack, keeping the database volume and dumps
+	$(DOCKER_COMPOSE) --profile pilot down
+
+pilot-logs: ## Follow the pilot stack logs
+	$(DOCKER_COMPOSE) --profile pilot logs -f --tail=50
+
+backup: ## Write a verified dump now (one-off run of the backup job)
+	$(DOCKER_COMPOSE) --profile pilot run --rm --entrypoint /bin/sh backup -c 'sh /usr/local/bin/backup-db.sh'
+
+restore-drill: ## Restore the newest dump into a scratch database and prove the API serves it
+	bash scripts/restore-drill.sh
 
 ##@ API contracts
 

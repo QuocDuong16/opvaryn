@@ -73,3 +73,29 @@ updates:
       # drive-by pull request.
       - dependency-name: '*'
         update-types: ['version-update:semver-major']
+
+  # Base images of the two images this repository builds. They are pinned by
+  # digest, so a pull request is the only way they move.
+  - package-ecosystem: docker
+    directory: /apps/api
+    schedule:
+      interval: weekly
+      day: thursday
+      timezone: Asia/Ho_Chi_Minh
+    commit-message:
+      prefix: 'deps(docker)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']
+
+  - package-ecosystem: docker
+    directory: /apps/web
+    schedule:
+      interval: weekly
+      day: thursday
+      timezone: Asia/Ho_Chi_Minh
+    commit-message:
+      prefix: 'deps(docker)'
+    ignore:
+      - dependency-name: '*'
+        update-types: ['version-update:semver-major']

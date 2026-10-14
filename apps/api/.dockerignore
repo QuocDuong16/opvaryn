@@ -1,0 +1,6 @@
+# Build context for the API image: apps/api only.
+.git
+bin/
+server
+migrate
+*.log

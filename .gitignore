@@ -19,3 +19,6 @@ coverage/
 .zcode/
 .vscode/
 .idea/
+
+# Deployment artefacts
+/deployments/backups/

@@ -1,0 +1,18 @@
+# Build context for the web image (repository root). Everything the build does not
+# read is excluded so the context stays small and the cache stays stable.
+.git
+.github
+.zcode
+.vscode
+.idea
+node_modules
+**/node_modules
+**/.next
+**/coverage
+apps/api
+docs
+operations-playbook
+deployments
+scripts
+*.log
+.env

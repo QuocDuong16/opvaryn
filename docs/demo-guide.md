@@ -181,6 +181,9 @@ quyết định một task mà role của bạn không giữ trả **403**.
 
 ## 8. Sau khi xem demo
 
-- Mốc tiếp theo là **MVP V1** (20–30 tuần theo playbook) và nó bị chặn một phần bởi các quyết định
-  còn mở (D04–D10) — xem trang `/roadmap` trong app hoặc `operations-playbook/decisions.html`.
+- Phần lớn **MVP V1** đã chạy trên chính repo này (runtime, identity, inbox, thiết kế quy trình, ba
+  quy trình pilot); phần còn lại và các quyết định còn mở nằm ở trang `/roadmap` trong app và
+  `operations-playbook/decisions.html` — hiện chỉ **D06** (analytics) còn mở.
+- Muốn chạy sản phẩm trên một host nội bộ (Docker Compose, backup, diễn tập phục hồi):
+  [ops-runbook.md](ops-runbook.md).
 - Muốn kiểm tra chất lượng đầy đủ trước khi commit: `make quality-check`.

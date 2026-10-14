@@ -44,13 +44,14 @@ tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
   Builder, SLA/escalation, template library, và nội dung Roadmap — các phần phụ thuộc quyết định
   còn mở hoặc thuộc V1.x.
 
-Quyết định D04/D05/D07/D08/D09 đã chốt và đang chạy trong code (ADR 0005–0008); D06 (analytics) và
-D10 (deployment) còn mở. Chi tiết phạm vi demo ở
+Quyết định D04/D05/D07/D08/D09/D10 đã chốt và đang chạy trong code (ADR 0005–0009); D06 (analytics)
+còn mở. Chi tiết phạm vi demo ở
 [ADR 0002](docs/adr/0002-demo-scope-and-labels.md),
 [ADR 0003](docs/adr/0003-demo-data-slice-and-mock-surfaces.md),
 [ADR 0004](docs/adr/0004-dashboard-layout-storage-and-demo-flow-tests.md) và hạng mục MVP đã làm ở
 [ADR 0006](docs/adr/0006-definition-versioning.md), [ADR 0007](docs/adr/0007-process-execution-contract.md),
-[ADR 0008](docs/adr/0008-identity-permissions-pilot-and-deployment.md).
+[ADR 0008](docs/adr/0008-identity-permissions-pilot-and-deployment.md),
+[ADR 0009](docs/adr/0009-deployment-topology-and-backup.md).
 
 ## Bắt đầu nhanh
 
@@ -71,11 +72,30 @@ make dev                     # terminal 1: API :21501 + web :21500
 Đợi API và web lên, rồi ở terminal 2 nạp dữ liệu mẫu (tuỳ chọn — cần API đang chạy):
 
 ```bash
-make seed-demo               # 2 business object mẫu + 9 bản ghi, qua chính API
+make seed-demo               # 3 business object, 3 quy trình pilot + việc đang chờ, qua chính API
 ```
 
 Mở http://localhost:21500 và đi theo Walkthrough ở trang Tổng quan. Trang Objects cho phép tạo
 business object thật với field schema; mở một object để nhập bản ghi bằng form sinh từ schema.
+
+## Chạy trên host nội bộ
+
+Toàn bộ sản phẩm (migrate → API → web → job backup) chạy bằng Docker Compose trên một host, đúng
+quyết định D10:
+
+```bash
+cp .env.example .env         # đổi POSTGRES_PASSWORD trước khi dùng thật
+make pilot-up                # build image rồi dựng cả stack (profile `pilot`)
+make pilot-logs              # theo dõi log
+make backup                  # ghi một dump đã được kiểm tra đọc lại
+make restore-drill           # phục hồi dump mới nhất vào DB tạm và chứng minh API chạy được trên đó
+make pilot-down              # dừng stack, giữ volume và dump
+```
+
+`make docker-up` (không profile) vẫn chỉ dựng PostgreSQL cho dev local. Quy trình vận hành đầy đủ —
+bí mật, cập nhật phiên bản, phục hồi khi database hỏng, xử lý sự cố — nằm ở
+[docs/ops-runbook.md](docs/ops-runbook.md); lý do đằng sau topology ở
+[ADR 0009](docs/adr/0009-deployment-topology-and-backup.md).
 
 Các target thường dùng:
 
