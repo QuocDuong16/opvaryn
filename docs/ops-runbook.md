@@ -25,6 +25,11 @@ API và web chỉ bind loopback: ops vào được từ chính host, còn mạng
 
 ## 2. Chuẩn bị host (một lần)
 
+Chọn tên nội bộ cho host (`OPVARYN_HOSTNAME`, mặc định `opvaryn.local`) và **trỏ nó về máy chủ này**
+trước khi bắt đầu: một bản ghi DNS nội bộ, hoặc `/etc/hosts` trên từng máy khách nếu chưa có DNS.
+Caddy phát chứng chỉ cho đúng tên đó, nên tên không phân giải được thì không máy khách nào mở được
+trang (và bước kiểm tra bên dưới cũng không chạy).
+
 ```bash
 git clone <repo> /opt/opvaryn && cd /opt/opvaryn
 cp .env.example .env          # rồi sửa, xem mục 3
@@ -76,6 +81,10 @@ Cổng publish mặc định **21580/21443** để không đụng project khác 
 của repo). Trên host nội bộ riêng, đặt `CADDY_HTTP_PORT=80` và `CADDY_HTTPS_PORT=443` trong `.env`
 để người dùng không phải gõ cổng trong URL.
 
+> Với cổng mặc định, hãy chia sẻ URL **kèm cổng**: `https://<OPVARYN_HOSTNAME>:21443`. Caddy chuyển
+> `http://<tên>:21580` sang `https://<tên>/` — tức cổng 443 — vì nó không biết cổng publish bên
+> ngoài; chỉ khi đặt 80/443 thì URL không cổng mới đúng.
+
 - Mọi cấu hình nằm trong `.env` trên host (đã bị `.gitignore`). **Không** commit `.env`, không đặt
   bí mật vào `NEXT_PUBLIC_*`.
 - Bắt buộc đổi trước khi chạy thật: `POSTGRES_PASSWORD` (mật khẩu DB) và mật khẩu các tài khoản tạo
@@ -86,6 +95,9 @@ của repo). Trên host nội bộ riêng, đặt `CADDY_HTTP_PORT=80` và `CADD
   cờ `Secure` và trình duyệt sẽ gửi nó qua cả HTTP.
 - API và web **chỉ bind loopback**: đừng thêm publish `0.0.0.0` cho chúng, mọi truy cập từ mạng phải
   đi qua Caddy.
+- Tích hợp webhook ra ngoài (ADR 0012) bật bằng `OPVARYN_WEBHOOK_URL` và `OPVARYN_WEBHOOK_SECRET`
+  trong `.env`; URL để trống là tắt, và đó là mặc định. Lịch sử gửi (kể cả lần thử lại) xem ở trang
+  Cài đặt của web, hoặc `GET /api/v1/webhook-deliveries`.
 
 ## 4. Cập nhật phiên bản
 

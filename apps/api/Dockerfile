@@ -14,8 +14,12 @@ RUN go mod download
 
 COPY . .
 # Static, stripped binaries: the runtime image needs no libc and no toolchain.
+# useradm ships too: a fresh host has no accounts and no other way to create the
+# first one (the bootstrap problem in ADR 0008), so docs/ops-runbook.md runs it
+# inside this container.
 RUN CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags '-s -w' -o /out/server ./cmd/server \
-    && CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags '-s -w' -o /out/migrate ./cmd/migrate
+    && CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags '-s -w' -o /out/migrate ./cmd/migrate \
+    && CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags '-s -w' -o /out/useradm ./cmd/useradm
 
 FROM alpine:3.22@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8 AS runtime
 
@@ -24,7 +28,7 @@ RUN apk add --no-cache ca-certificates tzdata \
     && adduser -D -H -u 10001 opvaryn
 
 WORKDIR /app
-COPY --from=build /out/server /out/migrate ./
+COPY --from=build /out/server /out/migrate /out/useradm ./
 # The migration runner reads sql/migrations relative to its working directory.
 COPY --from=build /src/sql ./sql
 

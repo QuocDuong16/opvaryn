@@ -20,6 +20,13 @@ x-api-env: &api-env
   API_LOG_LEVEL: ${API_LOG_LEVEL:-info}
   API_PORT: '21501'
   CORS_ALLOWED_ORIGINS: ${CORS_ALLOWED_ORIGINS:-http://localhost:21500}
+  # Outbound webhook (ADR 0012). These are read from the environment and documented in
+  # .env.example, so the pilot stack has to pass them through: an empty URL keeps the
+  # integration off, which is the default.
+  OPVARYN_WEBHOOK_URL: ${OPVARYN_WEBHOOK_URL:-}
+  OPVARYN_WEBHOOK_SECRET: ${OPVARYN_WEBHOOK_SECRET:-}
+  OPVARYN_WEBHOOK_TIMEOUT: ${OPVARYN_WEBHOOK_TIMEOUT:-5s}
+  OPVARYN_WEBHOOK_MAX_ATTEMPTS: ${OPVARYN_WEBHOOK_MAX_ATTEMPTS:-5}
   TZ: ${TZ:-Asia/Ho_Chi_Minh}
 
 services:
