@@ -433,8 +433,7 @@ assert_contains "$tmp_dir/analytics.html" "Tỉ lệ duyệt" "the approval rate
 assert_contains "$tmp_dir/analytics.html" "Tỉ lệ phải chạy lại" "the rework rate is shown"
 assert_contains "$tmp_dir/analytics.html" "SLA chưa có" "the missing SLA policy is stated, not faked"
 assert_contains "$tmp_dir/analytics.html" "Tổng giá trị luồng demo" "the live metric is listed"
-assert_contains "$tmp_dir/analytics.html" "1.500.000" "the dashboard shows the real number"
-assert_contains "$tmp_dir/analytics.html" "trên 1 bản ghi bạn được đọc" "the widget says how much data it rests on"
+assert_contains "$tmp_dir/analytics.html" "1500000" "the metric table shows the real value"
 
 mapfile -t layout_args < <(form_args "$tmp_dir/analytics.html" layout layout)
 [[ ${#layout_args[@]} -ge 4 ]] || fail "[D] the layout form has no server-action fields"
@@ -447,6 +446,8 @@ assert_contains "$tmp_dir/layout-saved.html" "Đã lưu 1 widget" "layout save"
 
 curl -sS -b "$cookie_jar" -o "$tmp_dir/analytics-saved.html" "$web_base/analytics"
 assert_contains "$tmp_dir/analytics-saved.html" "Tổng giá trị luồng demo" "saved layout renders the chosen metric"
+assert_contains "$tmp_dir/analytics-saved.html" "1.500.000" "the widget shows the real number, formatted"
+assert_contains "$tmp_dir/analytics-saved.html" "trên 1 bản ghi bạn được đọc" "the widget says how much data it rests on"
 saved_widgets="$(count_occurrences "$tmp_dir/analytics-saved.html" "trên 1 bản ghi bạn được đọc")"
 [[ "$saved_widgets" -ge 1 ]] ||
   fail "[D] the saved layout should still render its widget, found $saved_widgets"
