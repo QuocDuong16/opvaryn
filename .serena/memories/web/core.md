@@ -81,8 +81,13 @@
   non-goals, resourcing estimates). `OPEN_DECISIONS` lists only what is still open (D06 analytics,
   D10 deployment) and `DECIDED` maps the closed ones (D04/D05/D07/D08/D09) to their ADRs — keep both
   in step with `docs/adr/`; the MVP-acceptance note states which criteria are met (3 and 4).
-- `/settings` **live**: endpoint table (kept in sync with the OpenAPI paths), ports, toolchain
-  pins and the demo-data commands.
+- `/settings` **live**: endpoint table (kept in sync with the OpenAPI paths), ports, toolchain pins,
+  the demo-data commands, and the **webhook delivery log** (enabled/off, status, attempts, last error)
+  with its own try/catch so a missing role or a stopped API only greys that card.
+- `/analytics` also carries the operational read model (ADR 0011): a GET form filters by process and
+  window, and the KPI cards show instances, cycle time, step time, approval rate and rework rate.
+  `components/analytics/process-metrics.ts` (pure, tested) owns the formatting — keep durations and
+  rates rendered there, and keep "chưa có dữ liệu" for an absent rate instead of a zero.
 
 ## Data access
 

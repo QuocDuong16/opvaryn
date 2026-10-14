@@ -153,6 +153,13 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   record whose instance has an open task for a role the caller holds — that last clause is what
   keeps cross-department approval working. `FindObjectRecord` returns the object key and the scope
   columns the service needs to stamp and check.
+- `ProcessMetrics` (ADR 0011) answers the operational read model over `process_instances`/`process_tasks`
+  (counts, cycle time, step time, approval/rework rate) with the same scope fragment; `Webhooks`
+  (ADR 0012) queues outbound deliveries, drains them with retry/backoff and exposes the delivery log.
+  Both are fixed catalogues: process metrics because each number has one correct definition, webhooks
+  because the payload is a contract. Placeholders in the process-metric SQL follow the scope
+  convention ($2..$4 = scope, so the query's own parameters sit at $1 and $5) — getting that wrong
+  makes PostgreSQL cast a timestamp to boolean.
 - `store/metric.go` (D06): metric CRUD plus `MetricValue`, which builds SQL from a `domain.MetricQuery`
   plan — aggregation, operators and columns come from allowlists, every value is a bind parameter, and
   the query joins `business_object_records` to apply `recordVisibleToScope`. The total is always its
