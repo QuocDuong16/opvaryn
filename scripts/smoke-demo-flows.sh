@@ -776,6 +776,22 @@ status="$(web_get "/tasks" "$tmp_dir/inbox-run.html")"
 assert_status "$status" "200" "inbox after the run"
 assert_contains "$tmp_dir/inbox-run.html" "Kiểm tra yêu cầu" "the new task reaches the approver's inbox"
 
+echo "flows: [H] a definition naming a role nobody holds is flagged"
+ghost_role="flow_ghost_$stamp"
+ghost_key="flow_ghost_flow_$stamp"
+ghost_body="$(printf '{"key":"%s","name":"Luồng thiếu người nhận","objectKey":"%s","nodes":[{"key":"start","type":"start","title":"Bắt đầu"},{"key":"check","type":"human_task","title":"Việc của role không tồn tại","assigneeRole":"%s"},{"key":"end","type":"end","title":"Kết thúc"}],"edges":[{"from":"start","to":"check"},{"from":"check","to":"end"}]}' "$ghost_key" "$object_key" "$ghost_role")"
+status="$(curl -sS -b "$cookie_jar" -o "$tmp_dir/ghost-flow.json" -w '%{http_code}' -X POST \
+  "$api_base/api/v1/process-definitions" -H 'Content-Type: application/json' -d "$ghost_body")"
+assert_status "$status" "201" "creating a definition with an unheld role"
+
+# The graph is valid, so publishing it succeeds; the screen is what warns, because an
+# instance would stop at that node and appear in nobody's inbox.
+status="$(web_get "/workflows/$ghost_key" "$tmp_dir/ghost-detail.html")"
+assert_status "$status" "200" "detail page of the definition with an unheld role"
+assert_contains "$tmp_dir/ghost-detail.html" "Role chưa có ai giữ" "the unheld role is flagged"
+assert_contains "$tmp_dir/ghost-detail.html" "$ghost_role" "the warning names the role"
+assert_contains "$tmp_dir/ghost-detail.html" "-add-role" "the warning says how to fix it"
+
 echo "flows: [H] publishing v2 leaves the running instance on v1"
 mapfile -t publish_args < <(form_args "$tmp_dir/workflow-instances.html" graph graph)
 [[ ${#publish_args[@]} -ge 4 ]] || fail "[H] the publish form has no server-action fields"

@@ -176,6 +176,7 @@ quyết định một task mà role của bạn không giữ trả **403**.
 | `make seed-demo` báo CẢNH BÁO schema khác | Object đã tồn tại với schema cũ nên script bỏ qua bản ghi của nó. Muốn đủ dữ liệu mẫu: `make docker-clean` rồi làm lại mục 2 |
 | `make smoke-api` / `make smoke-demo-flows` báo đã có server | Hai script tự khởi động server riêng; tắt `make dev` trước |
 | `/apps` hiện nhiều object lạ (`smoke_*`, `flow_*`, `qa_*`) | Rác do các lần chạy smoke test để lại; `make docker-clean` để dọn sạch |
+| Danh sách role gợi ý trong trình thiết kế có `smoke_*`/`flow_*` | Tài khoản của smoke test cũng nằm trong database local, và danh mục role liệt kê role có người giữ; `make docker-clean` rồi seed lại nếu muốn sạch |
 | Bố cục dashboard "mất" khi đổi máy hoặc trình duyệt | Bố cục lưu theo cookie trình duyệt, chưa theo user (ADR 0004) — đúng như thiết kế của demo |
 | `pnpm install` lỗi `ERR_PNPM_IGNORED_BUILDS` | Một package mới cần build script; thêm vào `onlyBuiltDependencies` trong `pnpm-workspace.yaml` (ghi trong `mem:tech_stack`) |
 
