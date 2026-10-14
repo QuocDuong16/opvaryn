@@ -88,6 +88,9 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   `ErrInvalidCredentials`. `CreateUser` validates email shape, department existence and role keys;
   `SetPassword`/`ListUsers` never expose hashes. Accounts come from `cmd/useradm`
   (`make useradm ARGS="-create ..."`), because the first user cannot be created through the API.
+  `useradm` also has `-add-role` (additive) and `-prune-sessions` (deletes sessions whose expiry
+  passed; housekeeping only, since lookups already filter on `expires_at`, and the API deliberately
+  has no scheduler).
 - Authorisation lives in `internal/service/authz.go` (`requireAuthenticated`, `requireDesigner`)
   and in each service, never in the UI (playbook invariant 4). Matrix: reading definitions is open
   to any signed-in user (forms are generated from them); creating/publishing a definition needs
