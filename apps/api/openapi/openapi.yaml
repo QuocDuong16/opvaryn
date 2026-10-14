@@ -231,6 +231,196 @@ paths:
           $ref: '#/components/responses/NotFound'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/process-definitions:
+    get:
+      operationId: listProcessDefinitions
+      tags: [process-definitions]
+      summary: List process definitions
+      responses:
+        '200':
+          description: Process definitions
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessDefinitionList'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      operationId: createProcessDefinition
+      tags: [process-definitions]
+      summary: Create a process definition and publish version 1
+      description: |
+        Validates the graph (one start, at least one end and one human task, DAG,
+        reachable nodes, condition branches) and the conditions against the field
+        definitions of the bound business object, then publishes version 1.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateProcessDefinitionRequest'
+      responses:
+        '201':
+          description: Process definition created and published
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessDefinition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/process-definitions/{key}:
+    get:
+      operationId: getProcessDefinition
+      tags: [process-definitions]
+      summary: Get one process definition with its newest published version
+      parameters:
+        - $ref: '#/components/parameters/DefinitionKey'
+      responses:
+        '200':
+          description: The process definition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessDefinition'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    put:
+      operationId: updateProcessDefinition
+      tags: [process-definitions]
+      summary: Publish the next version of a process definition
+      description: |
+        Validates the new graph exactly like creation and publishes the next immutable
+        version. Instances keep running on the version they started with.
+      parameters:
+        - $ref: '#/components/parameters/DefinitionKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateProcessDefinitionRequest'
+      responses:
+        '200':
+          description: The definition with its newly published version
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessDefinition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/process-definitions/{key}/versions:
+    get:
+      operationId: listProcessDefinitionVersions
+      tags: [process-definitions]
+      summary: List the published versions of a process definition
+      parameters:
+        - $ref: '#/components/parameters/DefinitionKey'
+      responses:
+        '200':
+          description: Published versions, newest first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessDefinitionVersionList'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/process-instances:
+    post:
+      operationId: startProcessInstance
+      tags: [process-runtime]
+      summary: Start a process instance from a stored record
+      description: |
+        Binds the instance to the definition version current at start and walks the
+        graph to its first waiting human task (or straight to the end).
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/StartProcessInstanceRequest'
+      responses:
+        '201':
+          description: Instance started
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessInstanceView'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/process-instances/{instanceId}:
+    get:
+      operationId: getProcessInstance
+      tags: [process-runtime]
+      summary: Get an instance with its tasks and its event log
+      parameters:
+        - $ref: '#/components/parameters/InstanceId'
+      responses:
+        '200':
+          description: The instance, its tasks and its events
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessInstanceView'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/process-instances/{instanceId}/tasks/{taskId}/decisions:
+    post:
+      operationId: decideProcessTask
+      tags: [process-runtime]
+      summary: Decide one human task (approve, return, reject)
+      description: |
+        Applies exactly one decision. Approve advances along the graph, return resets
+        the instance to a new attempt, reject is terminal. The task is decided with a
+        compare-and-swap, so a second caller gets 409 instead of applying a second
+        transition. The actor role must match the role the task was assigned to.
+      parameters:
+        - $ref: '#/components/parameters/InstanceId'
+        - $ref: '#/components/parameters/TaskId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/DecideProcessTaskRequest'
+      responses:
+        '200':
+          description: The instance after the decision
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessInstanceView'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '403':
+          description: The actor role does not hold the task
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
 components:
   parameters:
     ObjectKey:
@@ -241,6 +431,30 @@ components:
       schema:
         type: string
         pattern: '^[a-z][a-z0-9_]{1,63}$'
+    DefinitionKey:
+      name: key
+      in: path
+      required: true
+      description: Stable machine key of the process definition.
+      schema:
+        type: string
+        pattern: '^[a-z][a-z0-9_]{1,63}$'
+    InstanceId:
+      name: instanceId
+      in: path
+      required: true
+      description: Process instance identifier.
+      schema:
+        type: string
+        format: uuid
+    TaskId:
+      name: taskId
+      in: path
+      required: true
+      description: Human task identifier.
+      schema:
+        type: string
+        format: uuid
   responses:
     BadRequest:
       description: The request body or parameters are invalid
@@ -256,6 +470,12 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     ServiceUnavailable:
       description: The database dependency is unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Conflict:
+      description: The addressed resource moved while the request was in flight
       content:
         application/json:
           schema:
@@ -485,3 +705,314 @@ components:
           description: Published versions, newest first.
           items:
             $ref: '#/components/schemas/BusinessObjectVersion'
+    ProcessNodeType:
+      type: string
+      description: Node kinds of the MVP graph (ADR 0007). Other kinds belong to V1.x.
+      enum: [start, human_task, condition, end]
+    ProcessCondition:
+      type: object
+      description: |
+        The whole rule language of MVP (D04): a field of the bound business object,
+        an allowlisted operator and a literal. Validated against the field definition
+        when the definition is published.
+      required: [field, op, value]
+      properties:
+        field:
+          type: string
+          example: estimated_amount
+        op:
+          type: string
+          enum: [eq, ne, gt, gte, lt, lte]
+        value:
+          nullable: true
+          description: Literal compared against the field value (number, string or date string).
+          example: 20000000
+    ProcessNode:
+      type: object
+      required: [key, type, title]
+      properties:
+        key:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{1,63}$'
+        type:
+          $ref: '#/components/schemas/ProcessNodeType'
+        title:
+          type: string
+          maxLength: 120
+        assigneeRole:
+          type: string
+          description: Required on human_task nodes; the role that receives the task (D08b).
+          example: truong_bo_phan
+        condition:
+          $ref: '#/components/schemas/ProcessCondition'
+    ProcessEdge:
+      type: object
+      required: [from, to]
+      properties:
+        from:
+          type: string
+        to:
+          type: string
+        when:
+          type: string
+          enum: ['', 'true', 'false']
+          description: Branch selector on edges leaving a condition node.
+    ProcessDefinition:
+      type: object
+      required: [id, key, name, objectKey, nodes, edges, version, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        objectKey:
+          type: string
+          description: Business object whose records flow through this process.
+        version:
+          type: integer
+          minimum: 1
+          description: Newest published version number.
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessNode'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessEdge'
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ProcessDefinitionList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessDefinition'
+    ProcessDefinitionVersion:
+      type: object
+      required: [id, version, name, objectKey, nodes, edges, publishedAt, publishedBy]
+      properties:
+        id:
+          type: string
+          format: uuid
+        version:
+          type: integer
+          minimum: 1
+        name:
+          type: string
+        description:
+          type: string
+        objectKey:
+          type: string
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessNode'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessEdge'
+        publishedAt:
+          type: string
+          format: date-time
+        publishedBy:
+          type: string
+    ProcessDefinitionVersionList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          description: Published versions, newest first.
+          items:
+            $ref: '#/components/schemas/ProcessDefinitionVersion'
+    CreateProcessDefinitionRequest:
+      type: object
+      required: [key, name, objectKey, nodes, edges]
+      properties:
+        key:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{1,63}$'
+          example: purchase_approval
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+          example: Duyệt đề nghị mua hàng
+        description:
+          type: string
+          maxLength: 500
+        objectKey:
+          type: string
+          example: purchase_request
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessNode'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessEdge'
+    UpdateProcessDefinitionRequest:
+      type: object
+      required: [name, objectKey, nodes, edges]
+      properties:
+        name:
+          type: string
+          minLength: 1
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 500
+        objectKey:
+          type: string
+        nodes:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessNode'
+        edges:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessEdge'
+    ProcessInstanceState:
+      type: string
+      enum: [running, completed, rejected]
+    ProcessTaskStatus:
+      type: string
+      enum: [open, approved, returned, rejected, cancelled]
+    ProcessTask:
+      type: object
+      required: [id, nodeKey, title, assigneeRole, attempt, status, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        nodeKey:
+          type: string
+        title:
+          type: string
+        assigneeRole:
+          type: string
+        attempt:
+          type: integer
+          minimum: 1
+        status:
+          $ref: '#/components/schemas/ProcessTaskStatus'
+        reason:
+          type: string
+        decidedBy:
+          type: string
+        createdAt:
+          type: string
+          format: date-time
+        decidedAt:
+          type: string
+          format: date-time
+    ProcessEvent:
+      type: object
+      required: [id, type, actor, payload, createdAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        type:
+          type: string
+          example: task_approved
+        nodeKey:
+          type: string
+        actor:
+          type: string
+        payload:
+          type: object
+          additionalProperties: true
+        createdAt:
+          type: string
+          format: date-time
+    ProcessInstance:
+      type: object
+      required: [id, definitionKey, definitionVersion, objectKey, recordId, state, currentNode, attempt, startedAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        definitionKey:
+          type: string
+        definitionVersion:
+          type: integer
+          minimum: 1
+          description: Definition version this instance is bound to; later publishes do not change it.
+        objectKey:
+          type: string
+        recordId:
+          type: string
+          format: uuid
+        state:
+          $ref: '#/components/schemas/ProcessInstanceState'
+        currentNode:
+          type: string
+        attempt:
+          type: integer
+          minimum: 1
+          description: Incremented every time a return resets the instance.
+        startedAt:
+          type: string
+          format: date-time
+        finishedAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    ProcessInstanceView:
+      type: object
+      required: [instance, tasks, events]
+      properties:
+        instance:
+          $ref: '#/components/schemas/ProcessInstance'
+        tasks:
+          type: array
+          items:
+            $ref: '#/components/schemas/ProcessTask'
+        events:
+          type: array
+          description: Append-only audit log, oldest first.
+          items:
+            $ref: '#/components/schemas/ProcessEvent'
+    StartProcessInstanceRequest:
+      type: object
+      required: [definitionKey, recordId]
+      properties:
+        definitionKey:
+          type: string
+        recordId:
+          type: string
+          format: uuid
+        actor:
+          type: string
+          description: Written to the audit log; a real identity arrives with D09.
+          example: nhan_vien
+    DecideProcessTaskRequest:
+      type: object
+      required: [decision, actorRole]
+      properties:
+        decision:
+          type: string
+          enum: [approve, return, reject]
+        reason:
+          type: string
+          maxLength: 500
+          description: Required for return and reject decisions.
+        actorRole:
+          type: string
+          description: Must match the role the task was assigned to.

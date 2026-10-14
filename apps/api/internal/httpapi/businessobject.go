@@ -104,6 +104,12 @@ func writeStoreError(w http.ResponseWriter, log *slog.Logger, err error, action 
 		writeError(w, log, http.StatusNotFound, codeNotFound, "the requested resource does not exist")
 	case errors.Is(err, store.ErrConflict):
 		writeError(w, log, http.StatusConflict, codeConflict, "a business object with this key already exists")
+	case errors.Is(err, service.ErrForbidden):
+		writeError(w, log, http.StatusForbidden, codeForbidden,
+			"the actor role does not hold this task")
+	case errors.Is(err, service.ErrStateConflict), errors.Is(err, store.ErrTaskClosed):
+		writeError(w, log, http.StatusConflict, codeConflict,
+			"the task or instance already moved on; reload and check the timeline")
 	case errors.Is(err, store.ErrUnavailable):
 		log.Error(action+" failed", "error", err)
 		writeError(w, log, http.StatusServiceUnavailable, codeUnavailable, "database is unavailable, try again shortly")

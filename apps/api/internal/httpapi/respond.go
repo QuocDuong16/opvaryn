@@ -10,6 +10,9 @@ import (
 	"log/slog"
 	"net/http"
 
+	"github.com/go-chi/chi/v5"
+	"github.com/google/uuid"
+
 	apiv1 "github.com/QuocDuong16/opvaryn/api/internal/api/v1"
 )
 
@@ -23,9 +26,29 @@ const (
 	codeInvalidRequest = "invalid_request"
 	codeNotFound       = "not_found"
 	codeConflict       = "conflict"
+	codeForbidden      = "forbidden"
 	codeUnavailable    = "service_unavailable"
 	codeInternal       = "internal_error"
 )
+
+// parseUUIDParam reads a path parameter as a UUID. A malformed identifier is a
+// client error, so it must not reach the service as a zero UUID.
+func parseUUIDParam(
+	w http.ResponseWriter,
+	log *slog.Logger,
+	r *http.Request,
+	param string,
+	label string,
+) (uuid.UUID, bool) {
+	raw := chi.URLParam(r, param)
+	id, err := uuid.Parse(raw)
+	if err != nil {
+		writeError(w, log, http.StatusBadRequest, codeInvalidRequest,
+			fmt.Sprintf("%s must be a UUID, got %q", label, raw))
+		return uuid.Nil, false
+	}
+	return id, true
+}
 
 func writeJSON(w http.ResponseWriter, log *slog.Logger, status int, payload any) {
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")

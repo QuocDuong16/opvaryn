@@ -9,6 +9,27 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for DecideProcessTaskRequestDecision.
+const (
+	Approve DecideProcessTaskRequestDecision = "approve"
+	Reject  DecideProcessTaskRequestDecision = "reject"
+	Return  DecideProcessTaskRequestDecision = "return"
+)
+
+// Valid indicates whether the value is a known member of the DecideProcessTaskRequestDecision enum.
+func (e DecideProcessTaskRequestDecision) Valid() bool {
+	switch e {
+	case Approve:
+		return true
+	case Reject:
+		return true
+	case Return:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FieldType.
 const (
 	Date   FieldType = "date"
@@ -78,6 +99,129 @@ func (e MetaStage) Valid() bool {
 	}
 }
 
+// Defines values for ProcessConditionOp.
+const (
+	Eq  ProcessConditionOp = "eq"
+	Gt  ProcessConditionOp = "gt"
+	Gte ProcessConditionOp = "gte"
+	Lt  ProcessConditionOp = "lt"
+	Lte ProcessConditionOp = "lte"
+	Ne  ProcessConditionOp = "ne"
+)
+
+// Valid indicates whether the value is a known member of the ProcessConditionOp enum.
+func (e ProcessConditionOp) Valid() bool {
+	switch e {
+	case Eq:
+		return true
+	case Gt:
+		return true
+	case Gte:
+		return true
+	case Lt:
+		return true
+	case Lte:
+		return true
+	case Ne:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProcessEdgeWhen.
+const (
+	Empty ProcessEdgeWhen = ""
+	False ProcessEdgeWhen = "false"
+	True  ProcessEdgeWhen = "true"
+)
+
+// Valid indicates whether the value is a known member of the ProcessEdgeWhen enum.
+func (e ProcessEdgeWhen) Valid() bool {
+	switch e {
+	case Empty:
+		return true
+	case False:
+		return true
+	case True:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProcessInstanceState.
+const (
+	ProcessInstanceStateCompleted ProcessInstanceState = "completed"
+	ProcessInstanceStateRejected  ProcessInstanceState = "rejected"
+	ProcessInstanceStateRunning   ProcessInstanceState = "running"
+)
+
+// Valid indicates whether the value is a known member of the ProcessInstanceState enum.
+func (e ProcessInstanceState) Valid() bool {
+	switch e {
+	case ProcessInstanceStateCompleted:
+		return true
+	case ProcessInstanceStateRejected:
+		return true
+	case ProcessInstanceStateRunning:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProcessNodeType.
+const (
+	Condition ProcessNodeType = "condition"
+	End       ProcessNodeType = "end"
+	HumanTask ProcessNodeType = "human_task"
+	Start     ProcessNodeType = "start"
+)
+
+// Valid indicates whether the value is a known member of the ProcessNodeType enum.
+func (e ProcessNodeType) Valid() bool {
+	switch e {
+	case Condition:
+		return true
+	case End:
+		return true
+	case HumanTask:
+		return true
+	case Start:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for ProcessTaskStatus.
+const (
+	ProcessTaskStatusApproved  ProcessTaskStatus = "approved"
+	ProcessTaskStatusCancelled ProcessTaskStatus = "cancelled"
+	ProcessTaskStatusOpen      ProcessTaskStatus = "open"
+	ProcessTaskStatusRejected  ProcessTaskStatus = "rejected"
+	ProcessTaskStatusReturned  ProcessTaskStatus = "returned"
+)
+
+// Valid indicates whether the value is a known member of the ProcessTaskStatus enum.
+func (e ProcessTaskStatus) Valid() bool {
+	switch e {
+	case ProcessTaskStatusApproved:
+		return true
+	case ProcessTaskStatusCancelled:
+		return true
+	case ProcessTaskStatusOpen:
+		return true
+	case ProcessTaskStatusRejected:
+		return true
+	case ProcessTaskStatusReturned:
+		return true
+	default:
+		return false
+	}
+}
+
 // BusinessObject defines model for BusinessObject.
 type BusinessObject struct {
 	CreatedAt   time.Time `json:"createdAt"`
@@ -140,6 +284,35 @@ type CreateObjectRecordRequest struct {
 	// must be present and every value must match the declared field type.
 	Values map[string]interface{} `json:"values"`
 }
+
+// CreateProcessDefinitionRequest defines model for CreateProcessDefinitionRequest.
+type CreateProcessDefinitionRequest struct {
+	Description *string       `json:"description,omitempty"`
+	Edges       []ProcessEdge `json:"edges"`
+
+	// Key Example: purchase_approval
+	Key string `json:"key"`
+
+	// Name Example: Duyệt đề nghị mua hàng
+	Name  string        `json:"name"`
+	Nodes []ProcessNode `json:"nodes"`
+
+	// ObjectKey Example: purchase_request
+	ObjectKey string `json:"objectKey"`
+}
+
+// DecideProcessTaskRequest defines model for DecideProcessTaskRequest.
+type DecideProcessTaskRequest struct {
+	// ActorRole Must match the role the task was assigned to.
+	ActorRole string                           `json:"actorRole"`
+	Decision  DecideProcessTaskRequestDecision `json:"decision"`
+
+	// Reason Required for return and reject decisions.
+	Reason *string `json:"reason,omitempty"`
+}
+
+// DecideProcessTaskRequestDecision defines model for DecideProcessTaskRequest.Decision.
+type DecideProcessTaskRequestDecision string
 
 // ErrorResponse Stable error envelope. `code` is a machine-readable identifier; clients switch on
 // it and never on the human-readable message.
@@ -225,6 +398,166 @@ type ObjectRecordList struct {
 	Data []ObjectRecord `json:"data"`
 }
 
+// ProcessCondition The whole rule language of MVP (D04): a field of the bound business object,
+// an allowlisted operator and a literal. Validated against the field definition
+// when the definition is published.
+type ProcessCondition struct {
+	// Field Example: estimated_amount
+	Field string             `json:"field"`
+	Op    ProcessConditionOp `json:"op"`
+
+	// Value Literal compared against the field value (number, string or date string).
+	//
+	// Example: 20000000
+	Value interface{} `json:"value"`
+}
+
+// ProcessConditionOp defines model for ProcessCondition.Op.
+type ProcessConditionOp string
+
+// ProcessDefinition defines model for ProcessDefinition.
+type ProcessDefinition struct {
+	CreatedAt   time.Time          `json:"createdAt"`
+	Description *string            `json:"description,omitempty"`
+	Edges       []ProcessEdge      `json:"edges"`
+	Id          openapi_types.UUID `json:"id"`
+	Key         string             `json:"key"`
+	Name        string             `json:"name"`
+	Nodes       []ProcessNode      `json:"nodes"`
+
+	// ObjectKey Business object whose records flow through this process.
+	ObjectKey string    `json:"objectKey"`
+	UpdatedAt time.Time `json:"updatedAt"`
+
+	// Version Newest published version number.
+	Version int `json:"version"`
+}
+
+// ProcessDefinitionList defines model for ProcessDefinitionList.
+type ProcessDefinitionList struct {
+	Data []ProcessDefinition `json:"data"`
+}
+
+// ProcessDefinitionVersion defines model for ProcessDefinitionVersion.
+type ProcessDefinitionVersion struct {
+	Description *string            `json:"description,omitempty"`
+	Edges       []ProcessEdge      `json:"edges"`
+	Id          openapi_types.UUID `json:"id"`
+	Name        string             `json:"name"`
+	Nodes       []ProcessNode      `json:"nodes"`
+	ObjectKey   string             `json:"objectKey"`
+	PublishedAt time.Time          `json:"publishedAt"`
+	PublishedBy string             `json:"publishedBy"`
+	Version     int                `json:"version"`
+}
+
+// ProcessDefinitionVersionList defines model for ProcessDefinitionVersionList.
+type ProcessDefinitionVersionList struct {
+	// Data Published versions, newest first.
+	Data []ProcessDefinitionVersion `json:"data"`
+}
+
+// ProcessEdge defines model for ProcessEdge.
+type ProcessEdge struct {
+	From string `json:"from"`
+	To   string `json:"to"`
+
+	// When Branch selector on edges leaving a condition node.
+	When *ProcessEdgeWhen `json:"when,omitempty"`
+}
+
+// ProcessEdgeWhen Branch selector on edges leaving a condition node.
+type ProcessEdgeWhen string
+
+// ProcessEvent defines model for ProcessEvent.
+type ProcessEvent struct {
+	Actor     string                 `json:"actor"`
+	CreatedAt time.Time              `json:"createdAt"`
+	Id        int64                  `json:"id"`
+	NodeKey   *string                `json:"nodeKey,omitempty"`
+	Payload   map[string]interface{} `json:"payload"`
+
+	// Type Example: task_approved
+	Type string `json:"type"`
+}
+
+// ProcessInstance defines model for ProcessInstance.
+type ProcessInstance struct {
+	// Attempt Incremented every time a return resets the instance.
+	Attempt       int    `json:"attempt"`
+	CurrentNode   string `json:"currentNode"`
+	DefinitionKey string `json:"definitionKey"`
+
+	// DefinitionVersion Definition version this instance is bound to; later publishes do not change it.
+	DefinitionVersion int                  `json:"definitionVersion"`
+	FinishedAt        *time.Time           `json:"finishedAt,omitempty"`
+	Id                openapi_types.UUID   `json:"id"`
+	ObjectKey         string               `json:"objectKey"`
+	RecordId          openapi_types.UUID   `json:"recordId"`
+	StartedAt         time.Time            `json:"startedAt"`
+	State             ProcessInstanceState `json:"state"`
+	UpdatedAt         time.Time            `json:"updatedAt"`
+}
+
+// ProcessInstanceState defines model for ProcessInstanceState.
+type ProcessInstanceState string
+
+// ProcessInstanceView defines model for ProcessInstanceView.
+type ProcessInstanceView struct {
+	// Events Append-only audit log, oldest first.
+	Events   []ProcessEvent  `json:"events"`
+	Instance ProcessInstance `json:"instance"`
+	Tasks    []ProcessTask   `json:"tasks"`
+}
+
+// ProcessNode defines model for ProcessNode.
+type ProcessNode struct {
+	// AssigneeRole Required on human_task nodes; the role that receives the task (D08b).
+	//
+	// Example: truong_bo_phan
+	AssigneeRole *string `json:"assigneeRole,omitempty"`
+
+	// Condition The whole rule language of MVP (D04): a field of the bound business object,
+	// an allowlisted operator and a literal. Validated against the field definition
+	// when the definition is published.
+	Condition *ProcessCondition `json:"condition,omitempty"`
+	Key       string            `json:"key"`
+	Title     string            `json:"title"`
+
+	// Type Node kinds of the MVP graph (ADR 0007). Other kinds belong to V1.x.
+	Type ProcessNodeType `json:"type"`
+}
+
+// ProcessNodeType Node kinds of the MVP graph (ADR 0007). Other kinds belong to V1.x.
+type ProcessNodeType string
+
+// ProcessTask defines model for ProcessTask.
+type ProcessTask struct {
+	AssigneeRole string             `json:"assigneeRole"`
+	Attempt      int                `json:"attempt"`
+	CreatedAt    time.Time          `json:"createdAt"`
+	DecidedAt    *time.Time         `json:"decidedAt,omitempty"`
+	DecidedBy    *string            `json:"decidedBy,omitempty"`
+	Id           openapi_types.UUID `json:"id"`
+	NodeKey      string             `json:"nodeKey"`
+	Reason       *string            `json:"reason,omitempty"`
+	Status       ProcessTaskStatus  `json:"status"`
+	Title        string             `json:"title"`
+}
+
+// ProcessTaskStatus defines model for ProcessTaskStatus.
+type ProcessTaskStatus string
+
+// StartProcessInstanceRequest defines model for StartProcessInstanceRequest.
+type StartProcessInstanceRequest struct {
+	// Actor Written to the audit log; a real identity arrives with D09.
+	//
+	// Example: nhan_vien
+	Actor         *string            `json:"actor,omitempty"`
+	DefinitionKey string             `json:"definitionKey"`
+	RecordId      openapi_types.UUID `json:"recordId"`
+}
+
 // UpdateBusinessObjectRequest defines model for UpdateBusinessObjectRequest.
 type UpdateBusinessObjectRequest struct {
 	Description *string `json:"description,omitempty"`
@@ -236,12 +569,34 @@ type UpdateBusinessObjectRequest struct {
 	Name string `json:"name"`
 }
 
+// UpdateProcessDefinitionRequest defines model for UpdateProcessDefinitionRequest.
+type UpdateProcessDefinitionRequest struct {
+	Description *string       `json:"description,omitempty"`
+	Edges       []ProcessEdge `json:"edges"`
+	Name        string        `json:"name"`
+	Nodes       []ProcessNode `json:"nodes"`
+	ObjectKey   string        `json:"objectKey"`
+}
+
+// DefinitionKey defines model for DefinitionKey.
+type DefinitionKey = string
+
+// InstanceId defines model for InstanceId.
+type InstanceId = openapi_types.UUID
+
 // ObjectKey defines model for ObjectKey.
 type ObjectKey = string
+
+// TaskId defines model for TaskId.
+type TaskId = openapi_types.UUID
 
 // BadRequest Stable error envelope. `code` is a machine-readable identifier; clients switch on
 // it and never on the human-readable message.
 type BadRequest = ErrorResponse
+
+// Conflict Stable error envelope. `code` is a machine-readable identifier; clients switch on
+// it and never on the human-readable message.
+type Conflict = ErrorResponse
 
 // NotFound Stable error envelope. `code` is a machine-readable identifier; clients switch on
 // it and never on the human-readable message.
@@ -259,3 +614,15 @@ type UpdateBusinessObjectJSONRequestBody = UpdateBusinessObjectRequest
 
 // CreateObjectRecordJSONRequestBody defines body for CreateObjectRecord for application/json ContentType.
 type CreateObjectRecordJSONRequestBody = CreateObjectRecordRequest
+
+// CreateProcessDefinitionJSONRequestBody defines body for CreateProcessDefinition for application/json ContentType.
+type CreateProcessDefinitionJSONRequestBody = CreateProcessDefinitionRequest
+
+// UpdateProcessDefinitionJSONRequestBody defines body for UpdateProcessDefinition for application/json ContentType.
+type UpdateProcessDefinitionJSONRequestBody = UpdateProcessDefinitionRequest
+
+// StartProcessInstanceJSONRequestBody defines body for StartProcessInstance for application/json ContentType.
+type StartProcessInstanceJSONRequestBody = StartProcessInstanceRequest
+
+// DecideProcessTaskJSONRequestBody defines body for DecideProcessTask for application/json ContentType.
+type DecideProcessTaskJSONRequestBody = DecideProcessTaskRequest

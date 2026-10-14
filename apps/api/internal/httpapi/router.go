@@ -16,8 +16,10 @@ import (
 
 // Services groups the API services the router exposes.
 type Services struct {
-	BusinessObjects *service.BusinessObjects
-	ObjectRecords   *service.ObjectRecords
+	BusinessObjects    *service.BusinessObjects
+	ObjectRecords      *service.ObjectRecords
+	ProcessDefinitions *service.ProcessDefinitions
+	ProcessRuntime     *service.ProcessRuntime
 }
 
 // NewRouter builds the HTTP handler for the demo API.
@@ -53,6 +55,24 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 				r.Get("/versions", handleListBusinessObjectVersions(services.BusinessObjects, log))
 				r.Get("/records", handleListObjectRecords(services.ObjectRecords, log))
 				r.Post("/records", handleCreateObjectRecord(services.ObjectRecords, log))
+			})
+		})
+
+		r.Route("/process-definitions", func(r chi.Router) {
+			r.Get("/", handleListProcessDefinitions(services.ProcessDefinitions, log))
+			r.Post("/", handleCreateProcessDefinition(services.ProcessDefinitions, log))
+			r.Route("/{key}", func(r chi.Router) {
+				r.Get("/", handleGetProcessDefinition(services.ProcessDefinitions, log))
+				r.Put("/", handleUpdateProcessDefinition(services.ProcessDefinitions, log))
+				r.Get("/versions", handleListProcessDefinitionVersions(services.ProcessDefinitions, log))
+			})
+		})
+
+		r.Route("/process-instances", func(r chi.Router) {
+			r.Post("/", handleStartProcessInstance(services.ProcessRuntime, log))
+			r.Route("/{instanceId}", func(r chi.Router) {
+				r.Get("/", handleGetProcessInstance(services.ProcessRuntime, log))
+				r.Post("/tasks/{taskId}/decisions", handleDecideProcessTask(services.ProcessRuntime, log))
 			})
 		})
 	})

@@ -162,6 +162,129 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/process-definitions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List process definitions */
+        get: operations["listProcessDefinitions"];
+        put?: never;
+        /**
+         * Create a process definition and publish version 1
+         * @description Validates the graph (one start, at least one end and one human task, DAG,
+         *     reachable nodes, condition branches) and the conditions against the field
+         *     definitions of the bound business object, then publishes version 1.
+         */
+        post: operations["createProcessDefinition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process-definitions/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get one process definition with its newest published version */
+        get: operations["getProcessDefinition"];
+        /**
+         * Publish the next version of a process definition
+         * @description Validates the new graph exactly like creation and publishes the next immutable
+         *     version. Instances keep running on the version they started with.
+         */
+        put: operations["updateProcessDefinition"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process-definitions/{key}/versions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List the published versions of a process definition */
+        get: operations["listProcessDefinitionVersions"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process-instances": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Start a process instance from a stored record
+         * @description Binds the instance to the definition version current at start and walks the
+         *     graph to its first waiting human task (or straight to the end).
+         */
+        post: operations["startProcessInstance"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process-instances/{instanceId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Get an instance with its tasks and its event log */
+        get: operations["getProcessInstance"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/process-instances/{instanceId}/tasks/{taskId}/decisions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Decide one human task (approve, return, reject)
+         * @description Applies exactly one decision. Approve advances along the graph, return resets
+         *     the instance to a new attempt, reject is terminal. The task is decided with a
+         *     compare-and-swap, so a second caller gets 409 instead of applying a second
+         *     transition. The actor role must match the role the task was assigned to.
+         */
+        post: operations["decideProcessTask"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -300,6 +423,178 @@ export interface components {
             /** @description Published versions, newest first. */
             data: components["schemas"]["BusinessObjectVersion"][];
         };
+        /**
+         * @description Node kinds of the MVP graph (ADR 0007). Other kinds belong to V1.x.
+         * @enum {string}
+         */
+        ProcessNodeType: "start" | "human_task" | "condition" | "end";
+        /**
+         * @description The whole rule language of MVP (D04): a field of the bound business object,
+         *     an allowlisted operator and a literal. Validated against the field definition
+         *     when the definition is published.
+         */
+        ProcessCondition: {
+            /** @example estimated_amount */
+            field: string;
+            /** @enum {string} */
+            op: "eq" | "ne" | "gt" | "gte" | "lt" | "lte";
+            /**
+             * @description Literal compared against the field value (number, string or date string).
+             * @example 20000000
+             */
+            value: unknown;
+        };
+        ProcessNode: {
+            key: string;
+            type: components["schemas"]["ProcessNodeType"];
+            title: string;
+            /**
+             * @description Required on human_task nodes; the role that receives the task (D08b).
+             * @example truong_bo_phan
+             */
+            assigneeRole?: string;
+            condition?: components["schemas"]["ProcessCondition"];
+        };
+        ProcessEdge: {
+            from: string;
+            to: string;
+            /**
+             * @description Branch selector on edges leaving a condition node.
+             * @enum {string}
+             */
+            when?: "" | "true" | "false";
+        };
+        ProcessDefinition: {
+            /** Format: uuid */
+            id: string;
+            key: string;
+            name: string;
+            description?: string;
+            /** @description Business object whose records flow through this process. */
+            objectKey: string;
+            /** @description Newest published version number. */
+            version: number;
+            nodes: components["schemas"]["ProcessNode"][];
+            edges: components["schemas"]["ProcessEdge"][];
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ProcessDefinitionList: {
+            data: components["schemas"]["ProcessDefinition"][];
+        };
+        ProcessDefinitionVersion: {
+            /** Format: uuid */
+            id: string;
+            version: number;
+            name: string;
+            description?: string;
+            objectKey: string;
+            nodes: components["schemas"]["ProcessNode"][];
+            edges: components["schemas"]["ProcessEdge"][];
+            /** Format: date-time */
+            publishedAt: string;
+            publishedBy: string;
+        };
+        ProcessDefinitionVersionList: {
+            /** @description Published versions, newest first. */
+            data: components["schemas"]["ProcessDefinitionVersion"][];
+        };
+        CreateProcessDefinitionRequest: {
+            /** @example purchase_approval */
+            key: string;
+            /** @example Duyệt đề nghị mua hàng */
+            name: string;
+            description?: string;
+            /** @example purchase_request */
+            objectKey: string;
+            nodes: components["schemas"]["ProcessNode"][];
+            edges: components["schemas"]["ProcessEdge"][];
+        };
+        UpdateProcessDefinitionRequest: {
+            name: string;
+            description?: string;
+            objectKey: string;
+            nodes: components["schemas"]["ProcessNode"][];
+            edges: components["schemas"]["ProcessEdge"][];
+        };
+        /** @enum {string} */
+        ProcessInstanceState: "running" | "completed" | "rejected";
+        /** @enum {string} */
+        ProcessTaskStatus: "open" | "approved" | "returned" | "rejected" | "cancelled";
+        ProcessTask: {
+            /** Format: uuid */
+            id: string;
+            nodeKey: string;
+            title: string;
+            assigneeRole: string;
+            attempt: number;
+            status: components["schemas"]["ProcessTaskStatus"];
+            reason?: string;
+            decidedBy?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            decidedAt?: string;
+        };
+        ProcessEvent: {
+            /** Format: int64 */
+            id: number;
+            /** @example task_approved */
+            type: string;
+            nodeKey?: string;
+            actor: string;
+            payload: {
+                [key: string]: unknown;
+            };
+            /** Format: date-time */
+            createdAt: string;
+        };
+        ProcessInstance: {
+            /** Format: uuid */
+            id: string;
+            definitionKey: string;
+            /** @description Definition version this instance is bound to; later publishes do not change it. */
+            definitionVersion: number;
+            objectKey: string;
+            /** Format: uuid */
+            recordId: string;
+            state: components["schemas"]["ProcessInstanceState"];
+            currentNode: string;
+            /** @description Incremented every time a return resets the instance. */
+            attempt: number;
+            /** Format: date-time */
+            startedAt: string;
+            /** Format: date-time */
+            finishedAt?: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        ProcessInstanceView: {
+            instance: components["schemas"]["ProcessInstance"];
+            tasks: components["schemas"]["ProcessTask"][];
+            /** @description Append-only audit log, oldest first. */
+            events: components["schemas"]["ProcessEvent"][];
+        };
+        StartProcessInstanceRequest: {
+            definitionKey: string;
+            /** Format: uuid */
+            recordId: string;
+            /**
+             * @description Written to the audit log; a real identity arrives with D09.
+             * @example nhan_vien
+             */
+            actor?: string;
+        };
+        DecideProcessTaskRequest: {
+            /** @enum {string} */
+            decision: "approve" | "return" | "reject";
+            /** @description Required for return and reject decisions. */
+            reason?: string;
+            /** @description Must match the role the task was assigned to. */
+            actorRole: string;
+        };
     };
     responses: {
         /** @description The request body or parameters are invalid */
@@ -329,10 +624,25 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
+        /** @description The addressed resource moved while the request was in flight */
+        Conflict: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
     };
     parameters: {
         /** @description Stable machine key of the business object. */
         ObjectKey: string;
+        /** @description Stable machine key of the process definition. */
+        DefinitionKey: string;
+        /** @description Process instance identifier. */
+        InstanceId: string;
+        /** @description Human task identifier. */
+        TaskId: string;
     };
     requestBodies: never;
     headers: never;
@@ -597,6 +907,228 @@ export interface operations {
             };
             400: components["responses"]["BadRequest"];
             404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listProcessDefinitions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Process definitions */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDefinitionList"];
+                };
+            };
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    createProcessDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateProcessDefinitionRequest"];
+            };
+        };
+        responses: {
+            /** @description Process definition created and published */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDefinition"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getProcessDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the process definition. */
+                key: components["parameters"]["DefinitionKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The process definition */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDefinition"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    updateProcessDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the process definition. */
+                key: components["parameters"]["DefinitionKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateProcessDefinitionRequest"];
+            };
+        };
+        responses: {
+            /** @description The definition with its newly published version */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDefinition"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listProcessDefinitionVersions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the process definition. */
+                key: components["parameters"]["DefinitionKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Published versions, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessDefinitionVersionList"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    startProcessInstance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["StartProcessInstanceRequest"];
+            };
+        };
+        responses: {
+            /** @description Instance started */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessInstanceView"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getProcessInstance: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Process instance identifier. */
+                instanceId: components["parameters"]["InstanceId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The instance, its tasks and its events */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessInstanceView"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    decideProcessTask: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Process instance identifier. */
+                instanceId: components["parameters"]["InstanceId"];
+                /** @description Human task identifier. */
+                taskId: components["parameters"]["TaskId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["DecideProcessTaskRequest"];
+            };
+        };
+        responses: {
+            /** @description The instance after the decision */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessInstanceView"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            /** @description The actor role does not hold the task */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
