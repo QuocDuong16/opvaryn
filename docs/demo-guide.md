@@ -96,7 +96,16 @@ make useradm ARGS="-list"
 ```
 
 > Mật khẩu trên chỉ dùng cho môi trường local. Trước khi cho người thật dùng: đổi mật khẩu, tạo
-> tài khoản theo người thật, và đọc mục "chưa bảo vệ" trong `docs/adr/0008`.
+> tài khoản theo người thật, và đọc mục "chưa làm" trong `docs/adr/0008`.
+
+Hai điều cần biết khi trình diễn phần này:
+
+- **Màn hình tạo/publish định nghĩa cần role `process_designer`** (hoặc `admin`). Tài khoản
+  `lan@opvaryn.local` đã có sẵn role đó; nếu bạn tự tạo tài khoản khác thì gán thêm bằng
+  `make useradm ARGS="-add-role -email <email> -roles process_designer"`.
+- **Bản ghi được lọc theo bộ phận**: đăng nhập `lan@opvaryn.local` (Kỹ thuật) sẽ thấy 2 đề nghị của
+  Kỹ thuật, `bao@opvaryn.local` (Kế toán) thấy 0, còn `admin@opvaryn.local` thấy cả 5. Đó là D09b
+  chạy thật, không phải ẩn trên giao diện. Muốn tạo dữ liệu mẫu đúng bộ phận: `make seed-demo`.
 
 Gọi API bằng session:
 

@@ -28,8 +28,10 @@ Các màn hình theo kế hoạch 8 tuần của bản demo đã dựng xong, m�
   bản bất biến, instance gắn với phiên bản lúc start, human task duyệt theo role với
   compare-and-swap, reject terminal, return reset attempt, event log append-only (ADR 0005/0007).
 - **Live (MVP)**: identity local — đăng nhập bằng mật khẩu argon2id, session cookie httpOnly (chỉ
-  lưu hash của token), role và bộ phận trên user; các endpoint runtime yêu cầu đăng nhập và actor
-  của mọi transition là user thật (ADR 0008). Tài khoản tạo bằng `make useradm`.
+  lưu hash của token), role và bộ phận trên user. **Mọi endpoint đều cần đăng nhập** (trừ health,
+  meta và auth); tạo/publish định nghĩa cần `admin` hoặc `process_designer`; đọc bản ghi theo bộ
+  phận mình + việc mình đang giữ; `GET /api/v1/tasks` là inbox theo người dùng. Tài khoản tạo bằng
+  `make useradm` (ADR 0008).
 - **Concept**: điều kiện hiển thị và calculated field của Form Builder, tab Cấu hình của Application
   Builder, escalation, template library, và nội dung Roadmap — các phần phụ thuộc quyết định còn mở.
 

@@ -34,13 +34,24 @@
   bước này; chúng được ghi rõ là chưa bảo vệ trong tài liệu cho tới khi ma trận quyền được áp đủ.
   Luật: không được thêm endpoint mới nào *không* xác thực, trừ khi ADR này được cập nhật.
 
-### Phân quyền (D09b)
+### Phân quyền (D09b) — đã áp dụng
 
 - Model: `users.department_key` + `user_roles`. Quyền suy ra từ role; phạm vi dữ liệu suy ra từ bộ phận.
-- Thứ tự áp dụng: (1) chặn theo role cho hành động, (2) lọc theo bộ phận cho truy vấn dữ liệu, (3)
-  kiểm tra ở tầng service/store chứ không chỉ ẩn trên UI (bất biến 4 của playbook).
-- Bộ phận được nhập từ dữ liệu thật của tổ chức khi pilot bắt đầu; bảng `departments` là danh mục
-  đóng, không phải chuỗi tự do.
+- **Ma trận đang chạy**: mọi endpoint đều cần session, trừ `/healthz`, `/readyz`, `/api/v1/meta` và
+  `/api/v1/auth/*`. Đọc định nghĩa (business object, process definition) mở cho mọi user đã đăng
+  nhập vì form được sinh từ đó; **tạo/publish định nghĩa cần `admin` hoặc `process_designer`**;
+  tạo bản ghi mở cho mọi user đã đăng nhập (bản ghi được đóng dấu người tạo + bộ phận từ session,
+  không từ payload).
+- **Phạm vi đọc bản ghi**: admin thấy tất cả; còn lại thấy bản ghi của bộ phận mình, bản ghi mình
+  tạo, và bản ghi mà instance đang có task mở thuộc role mình giữ — điều kiện cuối là thứ giữ cho
+  duyệt chéo bộ phận hoạt động. Instance có độ hiện bằng bản ghi của nó: không thấy thì API trả
+  **404**, không xác nhận là nó tồn tại.
+- **Inbox theo người dùng**: `GET /api/v1/tasks` trả task mở của đúng các role mà session đang giữ.
+- Kiểm tra nằm ở tầng service (`internal/service/authz.go` và các service), không phải ở UI —
+  bất biến 4 của playbook. Một quy tắc cố ý **không** có: admin không được duyệt thay task của role
+  khác, vì phê duyệt là hành vi nghiệp vụ thuộc đúng role đó.
+- Bộ phận là danh mục đóng (`departments`), và bản ghi tạo trước khi có phạm vi được backfill từ
+  giá trị `department` của chính nó khi giá trị đó khớp một bộ phận có thật.
 
 ### Pilot (D07)
 
@@ -64,9 +75,9 @@
 
 ## Việc chưa làm ở bước này (để không tự lừa mình)
 
-- Ma trận quyền đầy đủ cho mọi endpoint (đọc/ghi định nghĩa, business object, process definition)
-  và bộ lọc theo bộ phận trên tất cả truy vấn.
-- Inbox theo người dùng thật (`GET /tasks` lọc theo role + bộ phận của session) và giao diện web
-  dùng session cho các màn hình demo.
-- OIDC: chỉ có interface, chưa có provider nào cắm vào.
-- Reset mật khẩu tự phục vụ (email): hiện là thao tác của admin qua CLI.
+- **Giao diện Tasks vẫn dùng fixture**: endpoint inbox đã có, màn hình chưa đọc nó.
+- Màn hình Workflows vẫn là preview thiết kế; chưa có trình thiết kế đọc/ghi definition qua API.
+- OIDC: chỉ có interface (`service.Provider`), chưa có provider nào cắm vào.
+- Reset mật khẩu tự phục vụ (email), khoá tài khoản sau nhiều lần sai, và xoay session: hiện là
+  thao tác của admin qua `make useradm`.
+- Chưa có ScheduledJob dọn session hết hạn: chúng chỉ đơn giản là không tìm thấy khi đã hết hạn.

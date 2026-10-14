@@ -68,8 +68,11 @@ Working agreement for agents and contributors in this repository.
   an unknown email and a wrong password. The actor of a process transition is the signed-in user,
   never a value from the request body; a task is decided only with a role the user holds.
   Accounts and departments are created with `make useradm` (the first user cannot come from the
-  API). Endpoints that are *not* yet protected are listed in ADR 0008 — do not add new unprotected
-  endpoints without updating that ADR.
+  API). Every endpoint requires a session except `/healthz`, `/readyz`, `/api/v1/meta` and
+  `/api/v1/auth/*`; authorisation lives in `internal/service/authz.go` and each service, never in
+  the UI, and record visibility is the department rule of ADR 0008 (`RecordScope`). Adding an
+  unprotected endpoint, or one that reads records without a scope, means updating that ADR first.
+  There is deliberately no "admin may decide any task" rule: approvals belong to the role.
 
 ## Database and data safety
 

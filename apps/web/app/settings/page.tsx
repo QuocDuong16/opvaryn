@@ -9,6 +9,11 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
   { method: 'POST', path: '/api/v1/auth/login', purpose: 'Đăng nhập, mở session cookie' },
   { method: 'POST', path: '/api/v1/auth/logout', purpose: 'Kết thúc session hiện tại' },
   { method: 'GET', path: '/api/v1/me', purpose: 'Người dùng hiện tại kèm role và bộ phận' },
+  {
+    method: 'GET',
+    path: '/api/v1/tasks',
+    purpose: 'Inbox: task mở của các role mà người đang đăng nhập giữ',
+  },
   { method: 'GET', path: '/readyz', purpose: 'Readiness, kiểm tra database' },
   { method: 'GET', path: '/api/v1/meta', purpose: 'Tên, phiên bản và giai đoạn build' },
   { method: 'GET', path: '/api/v1/business-objects', purpose: 'Danh sách business object' },
