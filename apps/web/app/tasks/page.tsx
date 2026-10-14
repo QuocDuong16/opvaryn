@@ -5,22 +5,22 @@ import { TaskInbox } from '@/components/tasks/task-inbox';
 
 export const metadata = { title: 'Tasks' };
 
-const MVP_REQUIREMENTS: readonly { title: string; body: string }[] = [
+const RUNTIME_GAPS: readonly { title: string; body: string }[] = [
   {
-    title: 'Resolver người duyệt',
-    body: 'Ai nhận việc phải được xác định và đóng băng tại thời điểm tạo task — không tính lại theo org chart mỗi lần mở inbox.',
+    title: 'Đã có trong engine',
+    body: 'Resolver theo role (D08b), transition atomic bằng compare-and-swap, audit append-only kèm actor và lý do, từ chối terminal và trả về reset theo D08a.',
   },
   {
-    title: 'Transition atomic',
-    body: 'Duyệt hai lần trên hai tab chỉ được tạo một kết quả. Cần compare-and-swap hoặc khoá ở server, không xử lý ở UI.',
+    title: 'Còn thiếu: identity',
+    body: 'Engine tin actorRole do caller khai báo. Cần D09 (SSO hay local auth, phạm vi RBAC) trước khi inbox trở thành bề mặt thật.',
   },
   {
-    title: 'Audit đầy đủ',
-    body: 'Actor, thời điểm, trạng thái cũ/mới, lý do từ chối và correlation ID của lần chạy phải lưu cùng transition.',
+    title: 'Còn thiếu: đọc inbox',
+    body: 'API hiện trả task theo instance. Endpoint "task mở của tôi theo role" và giao diện tương ứng là bước nối tiếp theo sau D09.',
   },
   {
-    title: 'Kết quả terminal rõ ràng',
-    body: 'Rejected là terminal hay đưa về người lập; return có reset các bước đã duyệt hay không — chính là D08.',
+    title: 'Chưa có: SLA và escalation',
+    body: 'Timer và escalation thuộc V1.x; chưa có bảng hay cột nào cho chúng (ADR 0007 mục 12).',
   },
 ];
 
@@ -35,11 +35,15 @@ export default function TasksPage() {
       />
 
       <Card className="mb-6 border-warning/40">
-        <CardTitle className="text-warning">Mô phỏng — không có state machine thật</CardTitle>
+        <CardTitle className="text-warning">
+          Màn hình còn dùng fixture — engine đã chạy thật ở API
+        </CardTitle>
         <CardDescription>
           Duyệt, trả về và từ chối ở đây chỉ thay đổi state trong trình duyệt để minh hoạ trải
-          nghiệm; tải lại trang là mất. Runtime thật cần Process Execution Contract (D05/D08) trước,
-          vì thứ tự và tính duy nhất của transition phải được enforce ở server.
+          nghiệm; tải lại trang là mất. Ở phía API thì engine đã thật: một quyết định là một
+          transaction có compare-and-swap (người thứ hai nhận 409), từ chối là terminal, trả về tạo
+          attempt mới, và mọi bước nằm trong event log. Nối inbox này vào engine cần identity (D09)
+          để biết “bạn” là ai — đó là lý do màn hình còn ở dạng mô phỏng.
         </CardDescription>
       </Card>
 
@@ -47,10 +51,10 @@ export default function TasksPage() {
 
       <section className="mt-8">
         <h2 className="mb-3 text-lg font-semibold tracking-tight">
-          Điều kiện để inbox này trở thành thật
+          Engine đã có gì, inbox còn thiếu gì
         </h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          {MVP_REQUIREMENTS.map((item) => (
+          {RUNTIME_GAPS.map((item) => (
             <Card key={item.title}>
               <h3 className="text-sm font-semibold">{item.title}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-on-surface-muted">{item.body}</p>

@@ -386,8 +386,8 @@ check_surface() {
 
 check_surface "/" "overview" "Walkthrough bản demo" "Trạng thái nền tảng"
 check_surface "/forms?object=$object_key" "forms" "Preview form" 'name="priority"'
-check_surface "/workflows" "workflows" "Mô phỏng — chưa có workflow runtime" "Trưởng bộ phận duyệt"
-check_surface "/tasks" "tasks" "PR-2026-014" "Đang chờ bạn"
+check_surface "/workflows" "workflows" "Màn hình còn dùng fixture — runtime đã có ở API" "Trưởng bộ phận duyệt"
+check_surface "/tasks" "tasks" "PR-2026-014" "Đang chờ bạn" "engine đã chạy thật ở API"
 check_surface "/apps" "applications" "Kanban" "Cấu hình" "Tích hợp"
 check_surface "/roadmap" "roadmap" "Điều kiện nghiệm thu MVP V1" "Quyết định đang mở chặn tiến độ" "Concept"
 check_surface "/settings" "settings" "make seed-demo" "make smoke-api"

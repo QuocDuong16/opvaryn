@@ -52,13 +52,13 @@ const DEMO_TOUR: readonly {
     href: '/workflows',
     stage: 'mock',
     title: 'Workflow Designer',
-    body: 'Sơ đồ hai quy trình mẫu với nhánh điều kiện và inspector node — chưa có runtime.',
+    body: 'Sơ đồ hai quy trình mẫu với nhánh điều kiện — preview thiết kế; runtime thật nằm ở API.',
   },
   {
     href: '/tasks',
     stage: 'mock',
     title: 'Task Inbox',
-    body: 'Duyệt, trả về, từ chối trên dữ liệu mô phỏng kèm timeline và người giữ việc.',
+    body: 'Timeline và người giữ việc trên dữ liệu mô phỏng; engine duyệt thật đã có ở API.',
   },
   {
     href: '/analytics',

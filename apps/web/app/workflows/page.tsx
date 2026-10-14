@@ -46,13 +46,16 @@ export default function WorkflowsPage() {
       <Card className="mb-6 border-warning/40">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle className="text-warning">Mô phỏng — chưa có workflow runtime</CardTitle>
+            <CardTitle className="text-warning">
+              Màn hình còn dùng fixture — runtime đã có ở API
+            </CardTitle>
             <CardDescription>
-              Node, nhánh và version đều là dữ liệu mẫu đọc từ fixture, không có state machine chạy
-              thật và không ghi vào database. Runtime chỉ được viết sau khi chốt Process Execution
-              Contract (quyết định D05/D08 trong{' '}
-              <code className="font-mono text-xs">operations-playbook/decisions.html</code>), vì
-              lifecycle, concurrency và reject/return chưa có quy ước.
+              Hai sơ đồ dưới đây vẫn là dữ liệu mẫu đọc từ fixture: chúng minh hoạ trải nghiệm thiết
+              kế, không phải definition đang chạy. Nhưng runtime thật đã tồn tại: process definition
+              được publish theo phiên bản bất biến, instance gắn với phiên bản lúc start, task duyệt
+              theo role với compare-and-swap và một event log append-only (hợp đồng ở{' '}
+              <code className="font-mono text-xs">docs/adr/0007</code>, quyết định ở ADR 0005). Nối
+              màn hình này vào API là bước tiếp theo, và nó cần identity (D09) để biết ai đang mở.
             </CardDescription>
           </div>
           <StatusBadge kind="mock" />

@@ -35,6 +35,37 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
     path: '/api/v1/business-objects/{key}/records',
     purpose: 'Tạo bản ghi, validate theo schema của phiên bản đang dùng',
   },
+  { method: 'GET', path: '/api/v1/process-definitions', purpose: 'Danh sách process definition' },
+  {
+    method: 'POST',
+    path: '/api/v1/process-definitions',
+    purpose: 'Tạo process definition, validate graph và publish v1',
+  },
+  {
+    method: 'PUT',
+    path: '/api/v1/process-definitions/{key}',
+    purpose: 'Publish phiên bản mới của quy trình (instance đang chạy giữ phiên bản cũ)',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/process-definitions/{key}/versions',
+    purpose: 'Lịch sử phiên bản của quy trình',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/process-instances',
+    purpose: 'Khởi tạo instance từ một bản ghi đã lưu',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/process-instances/{id}',
+    purpose: 'Instance kèm task và event log append-only',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/process-instances/{id}/tasks/{taskId}/decisions',
+    purpose: 'Duyệt / trả về / từ chối, CAS trên task, một transaction',
+  },
 ];
 
 export default function SettingsPage() {
