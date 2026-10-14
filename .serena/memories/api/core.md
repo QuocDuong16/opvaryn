@@ -5,10 +5,13 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
 
 ## HTTP surface (`internal/httpapi`)
 
-- `NewRouter(cfg, store, httpapi.Services{BusinessObjects, ObjectRecords}, logger)` wires
-  middleware: chi RequestID, custom `requestLogger` (structured, request-id correlated),
-  Recoverer, CORS from `CORS_ALLOWED_ORIGINS`. `middleware.RealIP` is intentionally NOT used
-  (spoofing advisories) — do not add it back without a trusted-proxy design.
+- `NewRouter(cfg, store, httpapi.Services{BusinessObjects, ObjectRecords, ProcessDefinitions,
+  ProcessRuntime, Identity}, logger)` wires middleware: chi RequestID, custom `requestLogger`
+  (structured, request-id correlated), `sessionMiddleware`, Recoverer, CORS from
+  `CORS_ALLOWED_ORIGINS`. `middleware.RealIP` is intentionally NOT used (spoofing advisories) —
+  do not add it back without a trusted-proxy design. Every route except `/healthz`, `/readyz`,
+  `/api/v1/meta` and `/api/v1/auth/*` calls `requireUser`; the contract declares the
+  `sessionCookie` security scheme (apiKey in cookie `opvaryn.session`).
 - `respond.go` owns the error envelope, the `code*` constants, and `decodeJSON` (1 MiB cap,
   DisallowUnknownFields, rejects trailing content). Unknown routes/methods also return the JSON
   envelope.
@@ -27,6 +30,10 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   once per request into the request context; `requireUser` answers 401. The runtime endpoints
   (start instance, decide task, read instance) require a session, and the decision's actor and
   roles come from the authenticated user — `actorRole`/`actor` are gone from the request bodies.
+- Inbox (ADR 0008): `GET /api/v1/tasks` returns the open tasks of the roles the session holds,
+  oldest first, each with its instance (`ListOpenTasksForRoles`). It is what the web `/tasks`
+  screen reads; there is no "list instances" endpoint yet, so a finished instance is only
+  reachable by id.
 - Error mapping lives in `writeStoreError`: `ValidationError` → 400, `store.ErrNotFound` → 404,
   `store.ErrConflict`/`ErrTaskClosed`/`service.ErrStateConflict` → 409, `service.ErrForbidden` → 403
   (the user does not hold the role, D08b), `service.ErrUnauthorized` → 401 `unauthorized`,
@@ -74,6 +81,14 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   `ErrInvalidCredentials`. `CreateUser` validates email shape, department existence and role keys;
   `SetPassword`/`ListUsers` never expose hashes. Accounts come from `cmd/useradm`
   (`make useradm ARGS="-create ..."`), because the first user cannot be created through the API.
+- Authorisation lives in `internal/service/authz.go` (`requireAuthenticated`, `requireDesigner`)
+  and in each service, never in the UI (playbook invariant 4). Matrix: reading definitions is open
+  to any signed-in user (forms are generated from them); creating/publishing a definition needs
+  `admin` or `process_designer`; creating a record is open, and the record is stamped with the
+  caller's user id and department **from the session, never from the payload**. `domain.Principal`
+  carries user/department/roles; `domain.RecordScopeFor(principal)` builds the read scope. A
+  deliberate non-rule: admin cannot decide a task assigned to another role (approval belongs to
+  that role). An instance is visible exactly when its record is; hidden means 404, never 403.
 - `ObjectRecords` wraps `recordStore` (look up definition → validate values → insert). Validation
   (`validateRecordValues` → `validateFieldValue`) rejects unknown keys, missing required fields,
   wrong types per field type (text/file string ≤4000, number, date `YYYY-MM-DD`, select must be a
@@ -113,7 +128,15 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   `process_tasks` with a partial unique index on one open task per node+attempt and a CHECK that
   returned/rejected tasks carry a reason, `process_events`), `0005_identity.sql` (`departments` as a
   closed catalogue, `users` with lower-cased emails and a NOT NULL department, `user_roles`,
-  `sessions` storing only the token hash).
+  `sessions` storing only the token hash), `0006_record_scope.sql` (adds
+  `business_object_records.created_by` + `department_key`, backfills `department_key` from the
+  record's own `values.department` when it matches a real department, and indexes
+  `(department_key, created_by)`).
+- `store/objectrecord.go` applies `recordVisibleToScope` to every read and write-back lookup: admin
+  (`$2`) sees all, otherwise the record's department (`$3`), the caller's own records (`$4`), or a
+  record whose instance has an open task for a role the caller holds — that last clause is what
+  keeps cross-department approval working. `FindObjectRecord` returns the object key and the scope
+  columns the service needs to stamp and check.
 - `store/process.go` owns the atomic writes: `StartProcessInstance` (instance + tasks + events in
   one transaction) and `CompleteProcessTask` (task CAS then instance CAS then cancels/creates/events;
   a failed CAS returns `ErrTaskClosed` or `ErrConflict`, and `explainTaskMiss` tells a missing task
@@ -126,15 +149,23 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   with `chi.URLParam`, no params structs exist). Regenerate via `make contract-generate`; never
   edit.
 - Tests: `internal/service/businessobject_test.go` (table-driven validation + normalization,
-  including option rules) and `internal/service/objectrecord_test.go` (value validation per field
-  type, normalization, `ErrNotFound` propagation); fake stores assert invalid input never reaches
-  persistence.
+  including option rules), `internal/service/objectrecord_test.go` (value validation per field
+  type, normalization, `ErrNotFound` propagation), `internal/service/processruntime_test.go` (graph
+  rejection table + engine transitions) and `internal/service/authz_test.go` / `identity_test.go`
+  (anonymous refused, designer-only definitions, scope carried, records stamped from the principal,
+  hidden instance → 404, inbox per roles, `-add-role` is additive); fake stores assert invalid
+  input never reaches persistence.
 - `scripts/smoke-api.sh` (`make smoke-api`) exercises every endpoint against real PostgreSQL,
   including record creation, the unknown-key/option/required/duplicate branches, the 404 envelope,
   publishing a definition version, the version history order, that records keep the version they
   were created under, and the whole identity + runtime path (it bootstraps a department and two
   users with `useradm`, logs in, asserts 401 without a session, 403 for a task the user does not
   hold, 409 on a second decision and that the audit is attributed to the signed-in user);
-  `scripts/seed-demo.sh` (`make seed-demo`) seeds demo data through the API.
+  `scripts/seed-demo.sh` (`make seed-demo`) seeds demo data through the API — departments, one
+  account per role, three objects (`purchase_request`, `it_incident`, `hr_onboarding`), the three
+  pilot definitions (`purchase_approval`, `incident_triage`, `hr_onboarding_flow`) and one instance
+  per process resting on the role that must act next. `jar_for` caches cookie jars by email and
+  `inbox_has_task` makes instance seeding idempotent (start only when the role that should hold the
+  task has nothing open for that definition) — a demo seeder, not a data synchroniser.
 - Adding an endpoint: `openapi/openapi.yaml` → `make contract-generate` → service rule + test →
   store method (+ new migration when schema changes) → handler mapping → `make api-check`.

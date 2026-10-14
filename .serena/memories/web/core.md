@@ -32,10 +32,17 @@
   inspector) over `demo-definitions.ts`; read-only by design. The page must keep saying the canvas
   is a design preview while the engine lives in the API — claiming "no runtime exists" is now as
   wrong as claiming the canvas is live.
-- `/tasks` **mock**: `TaskInbox` reduces `demo-tasks.ts` through the pure `inbox-reducer.ts`
-  (approve/reject/return/reset, reason required, only pending tasks can transition); no server
-  call. The page lists what the engine already provides and that wiring the inbox needs identity
-  (D09).
+- `/tasks` **live**: the inbox is `GET /api/v1/tasks` read through `createServerApiClient()` (open
+  tasks of the roles the signed-in user holds; no session → a sign-in card). `/tasks/[instanceId]`
+  shows the instance, its tasks and its event log, and renders the record with the definition
+  version it carries (fetched via `listBusinessObjectVersions` + `listObjectRecords`). The fixture
+  inbox (`demo-tasks.ts`, `inbox-reducer.ts`, `task-inbox.tsx`) was deleted with the mock; SLA and
+  escalation stay as a labelled `concept` note on the page. `components/tasks/task-timeline.ts` is
+  the pure, tested module (event labels + `describeEvent` detail extraction, `openTasksForUser`,
+  `nextTasks`); `decision-form.tsx` (client) posts `app/tasks/actions.ts`
+  (`decideProcessTaskAction`). Each submit button carries its own `name="decision"` value, which
+  both a JS submit and a plain HTML POST include — the role, reason requirement and
+  compare-and-swap stay in the Go service.
 - `/analytics` **mock numbers + live layout**: `DashboardStudio` renders a widget grid over
   `demo-metrics.ts` (`seriesFor`, `formatMetricValue`, `deltaBetween`) arranged with the pure
   `dashboard-layout.ts` module (add/remove/move/resize via drag-and-drop and ↑↓ buttons). The
@@ -47,7 +54,9 @@
   every control is disabled and the copy says nothing is stored), integration panel lists mock
   connectors. Status badges are per view, not per page.
 - `/roadmap` **concept**: the playbook roadmap as a screen (four phases, MVP acceptance criteria,
-  non-goals, open decisions D04–D10, resourcing estimates). Content only, no behavior.
+  non-goals, resourcing estimates). `OPEN_DECISIONS` lists only what is still open (D06 analytics,
+  D10 deployment) and `DECIDED` maps the closed ones (D04/D05/D07/D08/D09) to their ADRs — keep both
+  in step with `docs/adr/`; the MVP-acceptance note states which criteria are met (3 and 4).
 - `/settings` **live**: endpoint table (kept in sync with the OpenAPI paths), ports, toolchain
   pins and the demo-data commands.
 
@@ -117,15 +126,21 @@
   (`.next/dev/types/...`) and the build variant (`.next/types/...`) depending on the last command
   run, so `next dev` leaves it dirty. Revert it before committing; never hand-edit it.
 - Tests in `apps/web/__tests__/`: `shell.test.tsx` (badge labels, nav integrity and numbering),
-  `inbox-reducer.test.ts` (task transitions, no fixture mutation),
-  `record-values.test.ts` (FormData → API values), `field-draft.test.ts` (editor serialization and
-  round trip), `dashboard-layout.test.ts` (lenient read vs strict write validation, every
-  transition), `record-grouping.test.ts` (per-version grouping, orphan buckets).
+  `task-timeline.test.ts` (event labels incl. unknown types, condition detail, per-role task
+  selection), `record-values.test.ts` (FormData → API values), `field-draft.test.ts` (editor
+  serialization and round trip), `dashboard-layout.test.ts` (lenient read vs strict write
+  validation, every transition), `record-grouping.test.ts` (per-version grouping, orphan buckets).
   Vitest aliases `@` → app root and sets `environment: 'jsdom'`; coverage has no thresholds yet.
 - There is no browser backend in this environment, so interactive flows are verified by
   `make smoke-demo-flows` (`scripts/smoke-demo-flows.sh`): it builds and starts both servers,
   renders a page, replays the form's progressive-enhancement POST and checks the result through
-  the API and the re-rendered page. Two gotchas that script encodes: the page has more than one
-  server-action form (the theme toggle is one), so forms are selected by a marker input; and a
-  hidden input rendered by the server (e.g. `fields`, `layout`) must be excluded from the replay,
-  because `formData.get` returns the first value.
+  the API and the re-rendered page. Four gotchas that script encodes: the page has more than one
+  server-action form (the theme toggle is one), so forms are selected by a marker input; a hidden
+  input rendered by the server (e.g. `fields`, `layout`) must be excluded from the replay, because
+  `formData.get` returns the first value; server-action forms are posted as
+  `multipart/form-data`, so a manual replay must use `curl --form-string` (not
+  `--data-urlencode`, which silently skips the action); and React splits interpolated text into
+  separate nodes (`attempt {n}` renders as `attempt <!-- -->2`), so page assertions need literals
+  or template-literal children. `sign_in_through_form <jar> <email> <password> <label>` and
+  `web_get_as`/`web_post_as` let a flow act as two people in turn (flow G does: approver →
+  director → return → attempt 2).

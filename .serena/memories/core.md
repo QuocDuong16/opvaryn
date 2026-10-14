@@ -1,7 +1,9 @@
 # OPVARYN — top-level map
 
 Business Operations Platform. This repository implements the **interactive demo** (8-week plan,
-playbook page `demo-mvp.html`), not MVP V1.
+playbook page `demo-mvp.html`) and then **MVP V1** on the same codebase (ADR 0005–0008). The demo
+screens all exist; the MVP work in progress is the rest of the pilot scope: workflow designer UI,
+OIDC, an instance list, analytics read models, deployment.
 
 ## Layout
 
@@ -47,8 +49,9 @@ playbook page `demo-mvp.html`), not MVP V1.
   (simulated), `concept` (vision). ADR 0002; where a screen mixes live and simulated parts,
   each part is labeled (ADR 0003).
 - Live slices are business object definitions and their records (schema → generated form →
-  service validation → JSONB). Workflow/Task/Analytics screens and kanban/connector panels are
-  typed fixtures with no runtime and no process/task/event tables (ADR 0003).
+  service validation → JSONB), sign-in/permissions (ADR 0008) and the task inbox with its
+  approve/return/reject decisions (ADR 0007). Still fixtures: the workflow designer screen,
+  Analytics numbers and the kanban/connector panels (ADR 0003, updated 2026-10-14).
 - Applied migrations are immutable: the runner verifies sha256 per version and refuses a changed
   file. A feature adds a new migration; it never edits an applied one.
 - Local ports are fixed in the 21xxx range — web 21500, API 21501, PostgreSQL 21532 — chosen to
