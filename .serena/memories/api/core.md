@@ -32,8 +32,13 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   roles come from the authenticated user — `actorRole`/`actor` are gone from the request bodies.
 - Inbox (ADR 0008): `GET /api/v1/tasks` returns the open tasks of the roles the session holds,
   oldest first, each with its instance (`ListOpenTasksForRoles`). It is what the web `/tasks`
-  screen reads; there is no "list instances" endpoint yet, so a finished instance is only
-  reachable by id.
+  screen reads.
+- `GET /api/v1/process-instances?objectKey=&definitionKey=` lists the instances the caller may see,
+  newest first, capped at `maxInstanceList` (200) in the service, each row with its still-open tasks
+  (`ListVisibleProcessInstances`, two queries: the instances, then the open tasks of those ids).
+  Filters are trimmed and must match `KeyPattern` (400 otherwise); visibility is the record's, so a
+  hidden record yields an empty list rather than a 403. Both screens that need it (object detail,
+  workflow detail) pass one filter.
 - Error mapping lives in `writeStoreError`: `ValidationError` → 400, `store.ErrNotFound` → 404,
   `store.ErrConflict`/`ErrTaskClosed`/`service.ErrStateConflict` → 409, `service.ErrForbidden` → 403
   (the user does not hold the role, D08b), `service.ErrUnauthorized` → 401 `unauthorized`,

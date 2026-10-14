@@ -28,10 +28,21 @@
   Promise; a missing key calls `notFound()` (custom `not-found.tsx` in that segment).
 - `/forms` **live** + concept list: object picker via `?object=key` (defaults to the first
   object), the same entry form as a preview, schema table, and the not-yet-built capabilities.
-- `/workflows` **mock**: `WorkflowCanvas` (SVG graph, clickable/keyboard-selectable nodes,
-  inspector) over `demo-definitions.ts`; read-only by design. The page must keep saying the canvas
-  is a design preview while the engine lives in the API — claiming "no runtime exists" is now as
-  wrong as claiming the canvas is live.
+- `/workflows` **live**: lists definitions from the API and creates new ones (`CreateDefinitionForm`);
+  `/workflows/[key]` draws the published graph with `ProcessCanvas`, shows the version history
+  (`?version=n` inspects an older version), the instances of that definition, and publishes the next
+  version (`PublishDefinitionForm`). The fixture (`demo-definitions.ts`, `workflow-canvas.tsx`) is
+  gone. Pure, tested modules: `components/workflows/definition-layout.ts` (column layout by distance
+  from start, `conditionSummary`, `nodeSubtitle`, `outgoingEdges`) and `definition-draft.ts` (node/edge
+  rows ↔ API graph, condition literal typed by the bound object's field, `serializeGraph`/`parseGraph`
+  for the hidden input). The canvas is read-only on purpose: a published version is immutable, so the
+  editor is a form and publishing is the only write; keep it that way instead of adding drag-and-drop
+  that would need an unpublished draft model.
+- `/objects/[key]` also carries `StartInstanceForm` (only definitions bound to that object are
+  offered — conditions read its fields) and `InstanceList` for its records, backed by
+  `listProcessInstances({objectKey})`; `/workflows/[key]` reuses `InstanceList` with
+  `{definitionKey}`. `components/process/instance-list.tsx` is the shared row view (state, version ·
+  attempt, current node, who holds it up).
 - `/tasks` **live**: the inbox is `GET /api/v1/tasks` read through `createServerApiClient()` (open
   tasks of the roles the signed-in user holds; no session → a sign-in card). `/tasks/[instanceId]`
   shows the instance, its tasks and its event log, and renders the record with the definition
