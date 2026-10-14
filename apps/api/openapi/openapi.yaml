@@ -25,6 +25,8 @@ tags:
     description: Records stored against a business object definition
   - name: identity
     description: Sign in, sign out and the current user
+  - name: task-inbox
+    description: The open tasks of the signed-in user
 paths:
   /healthz:
     get:
@@ -283,6 +285,27 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/Me'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/tasks:
+    get:
+      operationId: listInboxTasks
+      tags: [task-inbox]
+      summary: Open tasks of the signed-in user
+      description: |
+        Every open task whose role the signed-in user holds, oldest first, together with
+        the instance it belongs to. This is the inbox the Tasks screen will render.
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Open tasks, oldest first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/InboxList'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '503':
@@ -1057,6 +1080,23 @@ components:
         updatedAt:
           type: string
           format: date-time
+    InboxItem:
+      type: object
+      required: [task, instance]
+      properties:
+        task:
+          $ref: '#/components/schemas/ProcessTask'
+        instance:
+          $ref: '#/components/schemas/ProcessInstance'
+    InboxList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          description: Open tasks of the signed-in user, oldest first.
+          items:
+            $ref: '#/components/schemas/InboxItem'
     ProcessInstanceView:
       type: object
       required: [instance, tasks, events]

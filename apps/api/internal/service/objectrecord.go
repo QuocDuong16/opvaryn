@@ -22,7 +22,7 @@ const (
 // recordStore is the slice of the persistence layer this service needs.
 type recordStore interface {
 	GetBusinessObjectByKey(ctx context.Context, key string) (domain.BusinessObject, error)
-	ListObjectRecords(ctx context.Context, objectID uuid.UUID) ([]domain.ObjectRecord, error)
+	ListObjectRecords(ctx context.Context, objectID uuid.UUID, scope domain.RecordScope) ([]domain.ObjectRecord, error)
 	CreateObjectRecord(ctx context.Context, record domain.ObjectRecord) (domain.ObjectRecord, error)
 }
 
@@ -40,14 +40,18 @@ func NewObjectRecords(st recordStore) *ObjectRecords {
 	return &ObjectRecords{store: st}
 }
 
-// List returns the records of the addressed object, newest first.
-func (s *ObjectRecords) List(ctx context.Context, objectKey string) ([]domain.ObjectRecord, error) {
+// List returns the records of the addressed object that the caller may see, newest
+// first: the department rule of ADR 0008 is applied in the query, not in the UI.
+func (s *ObjectRecords) List(ctx context.Context, objectKey string, principal domain.Principal) ([]domain.ObjectRecord, error) {
+	if err := requireAuthenticated(principal); err != nil {
+		return nil, err
+	}
 	object, err := s.lookup(ctx, objectKey)
 	if err != nil {
 		return nil, err
 	}
 
-	records, err := s.store.ListObjectRecords(ctx, object.ID)
+	records, err := s.store.ListObjectRecords(ctx, object.ID, domain.RecordScopeFor(principal))
 	if err != nil {
 		return nil, err
 	}
@@ -58,7 +62,10 @@ func (s *ObjectRecords) List(ctx context.Context, objectKey string) ([]domain.Ob
 }
 
 // Create validates values against the addressed definition and stores one record.
-func (s *ObjectRecords) Create(ctx context.Context, objectKey string, values map[string]any) (domain.ObjectRecord, error) {
+func (s *ObjectRecords) Create(ctx context.Context, objectKey string, values map[string]any, principal domain.Principal) (domain.ObjectRecord, error) {
+	if err := requireAuthenticated(principal); err != nil {
+		return domain.ObjectRecord{}, err
+	}
 	object, err := s.lookup(ctx, objectKey)
 	if err != nil {
 		return domain.ObjectRecord{}, err
@@ -75,6 +82,10 @@ func (s *ObjectRecords) Create(ctx context.Context, objectKey string, values map
 		ObjectVersionID: object.VersionID,
 		ObjectVersion:   object.Version,
 		Values:          normalizeRecordValues(object, values),
+		// Stamped from the session: the payload cannot choose who entered a record
+		// or which department it counts for.
+		CreatedBy:     principal.UserID,
+		DepartmentKey: principal.DepartmentKey,
 	}
 
 	created, err := s.store.CreateObjectRecord(ctx, record)

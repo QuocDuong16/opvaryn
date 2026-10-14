@@ -17,6 +17,10 @@ const maxDecisionReason = 500
 // Sentinels the HTTP layer maps to stable codes. They live here (not in store)
 // because they are rules, not persistence failures.
 var (
+	// ErrNotFound reports that the addressed thing does not exist, or that the
+	// caller may not see it: an invisible instance answers 404 rather than
+	// confirming that it exists.
+	ErrNotFound = errors.New("service: not found")
 	// ErrForbidden reports that the actor may not perform the action: a task can
 	// only be decided with the role it was assigned to.
 	ErrForbidden = errors.New("service: forbidden")
@@ -43,6 +47,8 @@ type processRuntimeStore interface {
 	StartProcessInstance(ctx context.Context, in domain.StartInstanceWrite) error
 	CompleteProcessTask(ctx context.Context, in domain.CompleteTaskWrite) error
 	GetProcessInstance(ctx context.Context, id uuid.UUID) (domain.ProcessInstance, error)
+	FindVisibleProcessInstance(ctx context.Context, id uuid.UUID, scope domain.RecordScope) (domain.ProcessInstance, bool, error)
+	ListOpenTasksForRoles(ctx context.Context, userID uuid.UUID) ([]domain.InboxItem, error)
 	ListProcessTasks(ctx context.Context, instanceID uuid.UUID) ([]domain.ProcessTask, error)
 	ListProcessEvents(ctx context.Context, instanceID uuid.UUID) ([]domain.ProcessEvent, error)
 }
@@ -66,31 +72,30 @@ type InstanceView struct {
 	Events   []domain.ProcessEvent
 }
 
-// StartDecisionInput identifies one decision a caller wants to apply.
+// StartInput is the request to start an instance for the signed-in user.
 type StartInput struct {
 	DefinitionKey string
 	RecordID      uuid.UUID
-	// Actor is whoever started the process; until identity exists (D09) it is the
-	// caller-supplied role or name and is only written to the audit log.
-	Actor string
+	Principal     domain.Principal
 }
 
-// DecideInput is one decision on one task.
+// DecideInput is one decision on one task, made by the signed-in user. The task
+// role is checked against the roles that user holds (D08b), never against a value
+// the caller could simply claim.
 type DecideInput struct {
 	InstanceID uuid.UUID
 	TaskID     uuid.UUID
 	Decision   Decision
 	Reason     string
-	// Actor is the authenticated user and ActorRoles the roles that user holds:
-	// the task role is checked against them (D08b), never against a value the
-	// caller could simply claim.
-	Actor      string
-	ActorRoles []string
+	Principal  domain.Principal
 }
 
 // Start creates an instance from the newest published version of the definition
 // and walks it to its first waiting point (or straight to the end).
 func (r *ProcessRuntime) Start(ctx context.Context, in StartInput) (InstanceView, error) {
+	if err := requireAuthenticated(in.Principal); err != nil {
+		return InstanceView{}, err
+	}
 	definition, err := r.store.GetProcessDefinitionByKey(ctx, in.DefinitionKey)
 	if err != nil {
 		return InstanceView{}, fmt.Errorf("look up process definition %q: %w", in.DefinitionKey, err)
@@ -122,7 +127,7 @@ func (r *ProcessRuntime) Start(ctx context.Context, in StartInput) (InstanceView
 	}
 
 	instanceID := uuid.New()
-	actor := actorOrSystem(in.Actor)
+	actor := actorOrSystem(in.Principal.Email)
 	walk, err := graph.advanceFromEntry(record.Values)
 	if err != nil {
 		return InstanceView{}, err
@@ -167,12 +172,15 @@ func (r *ProcessRuntime) Start(ctx context.Context, in StartInput) (InstanceView
 	}); err != nil {
 		return InstanceView{}, err
 	}
-	return r.Get(ctx, instanceID)
+	return r.Get(ctx, instanceID, in.Principal)
 }
 
 // Decide applies one decision. Reject is terminal, return resets the instance and
 // starts a new attempt, approve advances along the graph (D08a).
 func (r *ProcessRuntime) Decide(ctx context.Context, in DecideInput) (InstanceView, error) {
+	if err := requireAuthenticated(in.Principal); err != nil {
+		return InstanceView{}, err
+	}
 	instance, err := r.store.GetProcessInstance(ctx, in.InstanceID)
 	if err != nil {
 		return InstanceView{}, fmt.Errorf("look up process instance %s: %w", in.InstanceID, err)
@@ -194,8 +202,8 @@ func (r *ProcessRuntime) Decide(ctx context.Context, in DecideInput) (InstanceVi
 	if instance.State != domain.ProcessRunning {
 		return InstanceView{}, fmt.Errorf("%w: instance %s is %s", ErrStateConflict, instance.ID, instance.State)
 	}
-	actor := actorOrSystem(in.Actor)
-	if !hasRole(in.ActorRoles, task.AssigneeRole) {
+	actor := actorOrSystem(in.Principal.Email)
+	if !in.Principal.HasRole(task.AssigneeRole) {
 		return InstanceView{}, fmt.Errorf("%w: task %s is assigned to role %q and %s does not hold it",
 			ErrForbidden, task.ID, task.AssigneeRole, actor)
 	}
@@ -325,14 +333,36 @@ func (r *ProcessRuntime) Decide(ctx context.Context, in DecideInput) (InstanceVi
 	if err := r.store.CompleteProcessTask(ctx, write); err != nil {
 		return InstanceView{}, err
 	}
-	return r.Get(ctx, instance.ID)
+	return r.Get(ctx, instance.ID, in.Principal)
 }
 
-// Get returns the instance with its tasks and its log.
-func (r *ProcessRuntime) Get(ctx context.Context, id uuid.UUID) (InstanceView, error) {
-	instance, err := r.store.GetProcessInstance(ctx, id)
+// Inbox returns the open tasks of the signed-in user: the tasks of every role they
+// hold, oldest first (ADR 0008). It is the per-user view the demo's Tasks screen
+// will read once it is wired to the engine.
+func (r *ProcessRuntime) Inbox(ctx context.Context, principal domain.Principal) ([]domain.InboxItem, error) {
+	if err := requireAuthenticated(principal); err != nil {
+		return nil, err
+	}
+	items, err := r.store.ListOpenTasksForRoles(ctx, principal.UserID)
+	if err != nil {
+		return nil, err
+	}
+	return items, nil
+}
+
+// Get returns the instance with its tasks and its log, if the caller may see the
+// record it runs on: an instance is as visible as its record (ADR 0008). An
+// invisible instance answers not-found rather than confirming that it exists.
+func (r *ProcessRuntime) Get(ctx context.Context, id uuid.UUID, principal domain.Principal) (InstanceView, error) {
+	if err := requireAuthenticated(principal); err != nil {
+		return InstanceView{}, err
+	}
+	instance, found, err := r.store.FindVisibleProcessInstance(ctx, id, domain.RecordScopeFor(principal))
 	if err != nil {
 		return InstanceView{}, fmt.Errorf("look up process instance %s: %w", id, err)
+	}
+	if !found {
+		return InstanceView{}, fmt.Errorf("%w: process instance %s", ErrNotFound, id)
 	}
 	tasks, err := r.store.ListProcessTasks(ctx, id)
 	if err != nil {
@@ -362,15 +392,6 @@ func openTaskIDs(tasks []domain.ProcessTask, exclude uuid.UUID) []uuid.UUID {
 		}
 	}
 	return ids
-}
-
-func hasRole(roles []string, role string) bool {
-	for _, held := range roles {
-		if held == role {
-			return true
-		}
-	}
-	return false
 }
 
 func actorOrSystem(actor string) string {

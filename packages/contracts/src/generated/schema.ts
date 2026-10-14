@@ -218,6 +218,27 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/tasks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Open tasks of the signed-in user
+         * @description Every open task whose role the signed-in user holds, oldest first, together with
+         *     the instance it belongs to. This is the inbox the Tasks screen will render.
+         */
+        get: operations["listInboxTasks"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/process-definitions": {
         parameters: {
             query?: never;
@@ -627,6 +648,14 @@ export interface components {
             finishedAt?: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        InboxItem: {
+            task: components["schemas"]["ProcessTask"];
+            instance: components["schemas"]["ProcessInstance"];
+        };
+        InboxList: {
+            /** @description Open tasks of the signed-in user, oldest first. */
+            data: components["schemas"]["InboxItem"][];
         };
         ProcessInstanceView: {
             instance: components["schemas"]["ProcessInstance"];
@@ -1045,6 +1074,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Me"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listInboxTasks: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Open tasks, oldest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["InboxList"];
                 };
             };
             401: components["responses"]["Unauthorized"];

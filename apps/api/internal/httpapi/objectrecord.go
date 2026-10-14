@@ -13,7 +13,11 @@ import (
 
 func handleListObjectRecords(records *service.ObjectRecords, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		list, err := records.List(r.Context(), chi.URLParam(r, "key"))
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
+		list, err := records.List(r.Context(), chi.URLParam(r, "key"), domain.NewPrincipal(user))
 		if err != nil {
 			writeStoreError(w, log, err, "list object records")
 			return
@@ -24,6 +28,10 @@ func handleListObjectRecords(records *service.ObjectRecords, log *slog.Logger) h
 
 func handleCreateObjectRecord(records *service.ObjectRecords, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
 		var body apiv1.CreateObjectRecordJSONRequestBody
 		if err := decodeJSON(w, r, &body); err != nil {
 			log.Warn("rejected request body", "error", err)
@@ -32,7 +40,7 @@ func handleCreateObjectRecord(records *service.ObjectRecords, log *slog.Logger) 
 			return
 		}
 
-		created, err := records.Create(r.Context(), chi.URLParam(r, "key"), body.Values)
+		created, err := records.Create(r.Context(), chi.URLParam(r, "key"), body.Values, domain.NewPrincipal(user))
 		if err != nil {
 			writeStoreError(w, log, err, "create object record")
 			return

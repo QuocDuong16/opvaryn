@@ -327,6 +327,10 @@ type fakeRuntimeStore struct {
 	recordFound bool
 	writeErr    error
 	lastWrite   domain.CompleteTaskWrite
+	// hidden makes the scoped instance read answer "not visible".
+	hidden bool
+	// scope remembers what visibility the service asked for.
+	scope domain.RecordScope
 }
 
 func newFakeRuntimeStore(t *testing.T, values map[string]any) *fakeRuntimeStore {
@@ -420,6 +424,28 @@ func (f *fakeRuntimeStore) ListProcessEvents(context.Context, uuid.UUID) ([]doma
 	return f.events, nil
 }
 
+func (f *fakeRuntimeStore) FindVisibleProcessInstance(
+	_ context.Context,
+	id uuid.UUID,
+	scope domain.RecordScope,
+) (domain.ProcessInstance, bool, error) {
+	f.scope = scope
+	if f.instance.ID == uuid.Nil || f.instance.ID != id || f.hidden {
+		return domain.ProcessInstance{}, false, nil
+	}
+	return f.instance, true, nil
+}
+
+func (f *fakeRuntimeStore) ListOpenTasksForRoles(context.Context, uuid.UUID) ([]domain.InboxItem, error) {
+	items := make([]domain.InboxItem, 0, len(f.tasks))
+	for _, task := range f.tasks {
+		if task.Status == domain.TaskOpen {
+			items = append(items, domain.InboxItem{Task: task, Instance: f.instance})
+		}
+	}
+	return items, nil
+}
+
 func openTaskFor(t *testing.T, store *fakeRuntimeStore, nodeKey string) domain.ProcessTask {
 	t.Helper()
 	for _, task := range store.tasks {
@@ -446,7 +472,7 @@ func TestStartWalksToTheFirstHumanTask(t *testing.T) {
 	view, err := NewProcessRuntime(store).Start(context.Background(), StartInput{
 		DefinitionKey: "purchase_approval",
 		RecordID:      store.record.ID,
-		Actor:         "nhan_vien",
+		Principal:     testPrincipal(),
 	})
 	if err != nil {
 		t.Fatalf("Start returned error: %v", err)
@@ -480,6 +506,7 @@ func TestStartRejectsARecordOfAnotherObject(t *testing.T) {
 	_, err := NewProcessRuntime(store).Start(context.Background(), StartInput{
 		DefinitionKey: "purchase_approval",
 		RecordID:      store.record.ID,
+		Principal:     testPrincipal(),
 	})
 
 	var validation *ValidationError
@@ -497,6 +524,7 @@ func TestStartRejectsAMissingRecord(t *testing.T) {
 	_, err := NewProcessRuntime(store).Start(context.Background(), StartInput{
 		DefinitionKey: "purchase_approval",
 		RecordID:      uuid.New(),
+		Principal:     testPrincipal(),
 	})
 
 	var validation *ValidationError
@@ -517,8 +545,7 @@ func TestApproveAboveThresholdWaitsForTheDirector(t *testing.T) {
 		InstanceID: view.Instance.ID,
 		TaskID:     manager.ID,
 		Decision:   DecisionApprove,
-		Actor:      "lan@example.com",
-		ActorRoles: []string{managerRole},
+		Principal:  approverPrincipal(),
 	})
 	if err != nil {
 		t.Fatalf("Decide returned error: %v", err)
@@ -553,8 +580,7 @@ func TestApproveBelowThresholdCompletesTheInstance(t *testing.T) {
 		InstanceID: view.Instance.ID,
 		TaskID:     manager.ID,
 		Decision:   DecisionApprove,
-		Actor:      "lan@example.com",
-		ActorRoles: []string{managerRole},
+		Principal:  approverPrincipal(),
 	})
 	if err != nil {
 		t.Fatalf("Decide returned error: %v", err)
@@ -585,8 +611,7 @@ func TestReturnResetsToANewAttempt(t *testing.T) {
 		TaskID:     manager.ID,
 		Decision:   DecisionReturn,
 		Reason:     "Bổ sung báo giá",
-		Actor:      "lan@example.com",
-		ActorRoles: []string{managerRole},
+		Principal:  approverPrincipal(),
 	})
 	if err != nil {
 		t.Fatalf("Decide returned error: %v", err)
@@ -626,8 +651,7 @@ func TestRejectIsTerminal(t *testing.T) {
 		TaskID:     manager.ID,
 		Decision:   DecisionReject,
 		Reason:     "Ngoài ngân sách quý",
-		Actor:      "lan@example.com",
-		ActorRoles: []string{managerRole},
+		Principal:  approverPrincipal(),
 	})
 	if err != nil {
 		t.Fatalf("Decide returned error: %v", err)
@@ -655,8 +679,10 @@ func TestDecideGuards(t *testing.T) {
 			InstanceID: view.Instance.ID,
 			TaskID:     openTaskFor(t, store, "manager_approval").ID,
 			Decision:   DecisionApprove,
-			Actor:      "bao@example.com",
-			ActorRoles: []string{directorRole},
+			Principal: domain.Principal{
+				UserID: uuid.New(), Email: "bao@example.com", DepartmentKey: "ke_toan",
+				Roles: []string{directorRole},
+			},
 		})
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("expected ErrForbidden, got %v", err)
@@ -673,8 +699,7 @@ func TestDecideGuards(t *testing.T) {
 			InstanceID: view.Instance.ID,
 			TaskID:     openTaskFor(t, store, "manager_approval").ID,
 			Decision:   DecisionReturn,
-			Actor:      "lan@example.com",
-			ActorRoles: []string{managerRole},
+			Principal:  approverPrincipal(),
 		})
 		var validation *ValidationError
 		if !asValidationError(err, &validation) || !strings.Contains(validation.Error(), "must carry a reason") {
@@ -690,13 +715,13 @@ func TestDecideGuards(t *testing.T) {
 
 		task := openTaskFor(t, store, "manager_approval")
 		if _, err := runtime.Decide(context.Background(), DecideInput{
-			InstanceID: view.Instance.ID, TaskID: task.ID, Decision: DecisionApprove, Actor: "lan@example.com", ActorRoles: []string{managerRole},
+			InstanceID: view.Instance.ID, TaskID: task.ID, Decision: DecisionApprove, Principal: approverPrincipal(),
 		}); err != nil {
 			t.Fatalf("first decision failed: %v", err)
 		}
 
 		_, err := runtime.Decide(context.Background(), DecideInput{
-			InstanceID: view.Instance.ID, TaskID: task.ID, Decision: DecisionApprove, Actor: "lan@example.com", ActorRoles: []string{managerRole},
+			InstanceID: view.Instance.ID, TaskID: task.ID, Decision: DecisionApprove, Principal: approverPrincipal(),
 		})
 		if !errors.Is(err, ErrStateConflict) {
 			t.Fatalf("expected ErrStateConflict for the second decision, got %v", err)
@@ -713,8 +738,7 @@ func TestDecideGuards(t *testing.T) {
 			InstanceID: view.Instance.ID,
 			TaskID:     openTaskFor(t, store, "manager_approval").ID,
 			Decision:   Decision("delegate"),
-			Actor:      "lan@example.com",
-			ActorRoles: []string{managerRole},
+			Principal:  approverPrincipal(),
 		})
 		var validation *ValidationError
 		if !asValidationError(err, &validation) {
@@ -728,7 +752,7 @@ func startInstance(t *testing.T, runtime *ProcessRuntime, store *fakeRuntimeStor
 	view, err := runtime.Start(context.Background(), StartInput{
 		DefinitionKey: "purchase_approval",
 		RecordID:      store.record.ID,
-		Actor:         "nhan_vien",
+		Principal:     testPrincipal(),
 	})
 	if err != nil {
 		t.Fatalf("Start returned error: %v", err)
@@ -746,5 +770,16 @@ func assertEventTrail(t *testing.T, store *fakeRuntimeStore, want []string) {
 		if got[i] != want[i] {
 			t.Fatalf("event trail mismatch at %d:\n got %v\nwant %v", i, got, want)
 		}
+	}
+}
+
+// approverPrincipal holds the manager role the story flow assigns to its first task.
+func approverPrincipal() domain.Principal {
+	return domain.Principal{
+		UserID:        uuid.New(),
+		Email:         "lan@example.com",
+		Name:          "Nguyễn Lan",
+		DepartmentKey: "ky_thuat",
+		Roles:         []string{managerRole},
 	}
 }

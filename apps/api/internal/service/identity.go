@@ -55,6 +55,7 @@ type identityStore interface {
 	CreateUser(ctx context.Context, user domain.User, passwordHash string) (domain.User, error)
 	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
 	FindDepartment(ctx context.Context, key string) (domain.Department, bool, error)
+	AddUserRoles(ctx context.Context, userID uuid.UUID, roles []string) (domain.User, error)
 	EnsureDepartment(ctx context.Context, key string, name string) (domain.Department, error)
 	CreateSession(ctx context.Context, session domain.Session) error
 	FindSession(ctx context.Context, tokenHash []byte, now time.Time) (domain.Session, bool, error)
@@ -296,6 +297,39 @@ func (s *Identity) SetPassword(ctx context.Context, email string, password strin
 	}
 	user.PasswordHash = ""
 	return user, nil
+}
+
+// AddRoles grants roles to an existing user and returns the updated user. Roles are
+// additive: a user keeps what they had, which keeps operations (grant a design role
+// to someone who already approves) a single command.
+func (s *Identity) AddRoles(ctx context.Context, email string, roles []string) (domain.User, error) {
+	problems := make([]string, 0, len(roles))
+	seen := make(map[string]struct{}, len(roles))
+	for _, role := range roles {
+		if !KeyPattern.MatchString(role) {
+			problems = append(problems, fmt.Sprintf("roles: %q must match %s", role, KeyPattern))
+			continue
+		}
+		if _, duplicate := seen[role]; duplicate {
+			problems = append(problems, fmt.Sprintf("roles: duplicate role %q", role))
+		}
+		seen[role] = struct{}{}
+	}
+	if len(roles) == 0 {
+		problems = append(problems, "roles: name at least one role")
+	}
+	if len(problems) > 0 {
+		return domain.User{}, &ValidationError{Problems: problems}
+	}
+
+	user, found, err := s.store.FindUserByEmail(ctx, NormalizeEmail(email))
+	if err != nil {
+		return domain.User{}, fmt.Errorf("look up user: %w", err)
+	}
+	if !found {
+		return domain.User{}, fmt.Errorf("user %q: %w", email, ErrUserNotFound)
+	}
+	return s.store.AddUserRoles(ctx, user.ID, roles)
 }
 
 // ListUsers returns every user ordered by email, without password hashes.

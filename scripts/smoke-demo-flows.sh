@@ -94,9 +94,10 @@ count_occurrences() {
   grep -oF -- "$2" "$1" | wc -l | tr -d ' '
 }
 
-# web_get <path> <outfile> -> status code
+# web_get <path> <outfile> -> status code; keeps cookies, because since ADR 0008 the
+# demo screens need a session like any other caller.
 web_get() {
-  curl -sS -o "$2" -w '%{http_code}' "${web_base}$1"
+  curl -sS -o "$2" -w '%{http_code}' "${web_base}$1" -b "$cookie_jar" -c "$cookie_jar"
 }
 
 # web_post <path> <outfile> [--form-string ...] -> status code; keeps cookies so
@@ -190,6 +191,40 @@ stamp="$(date +%s)"
 object_key="flow_$stamp"
 web_object_key="flow_web_$stamp"
 
+# ------------------------------------------------------------------ flow 0: sign in ----
+# Since ADR 0008 the API needs a session, and the web app keeps it in its own
+# httpOnly cookie. This flow bootstraps a designer account and signs in through the
+# real form, so everything after it runs as a person.
+
+echo "flows: [0] bootstrapping a designer and signing in through the form"
+designer_email="flow_designer_$stamp@example.com"
+designer_password="flow-test-password"
+department="flow_dept_$stamp"
+
+(cd "$api_dir" && go build -o bin/useradm ./cmd/useradm) || fail "building the useradm CLI failed"
+(cd "$api_dir" && ./bin/useradm -create-department -key "$department" -department-name "Flow $stamp") >/dev/null ||
+  fail "creating the flow department failed"
+(cd "$api_dir" && ./bin/useradm -create -email "$designer_email" -name "Flow designer" \
+  -password "$designer_password" -department "$department" -roles process_designer) >/dev/null ||
+  fail "creating the flow designer failed"
+
+status="$(web_get "/login" "$tmp_dir/login.html")"
+assert_status "$status" "200" "login page"
+mapfile -t login_args < <(form_args "$tmp_dir/login.html" password)
+[[ ${#login_args[@]} -ge 4 ]] || fail "[0] the login form has no server-action fields"
+status="$(web_post "/login" "$tmp_dir/signed-in.html" \
+  "${login_args[@]}" \
+  --form-string "email=$designer_email" \
+  --form-string "password=$designer_password")"
+# The action answers 303 back to the shell after storing the session cookie; curl
+# does not follow redirects, so the redirect itself is the success signal.
+assert_status "$status" "303" "sign in"
+grep -q 'opvaryn.session' "$cookie_jar" || fail "[0] the web app did not set a session cookie"
+
+status="$(web_get "/" "$tmp_dir/home.html")"
+assert_status "$status" "200" "home after signing in"
+assert_contains "$tmp_dir/home.html" "Flow designer" "the shell shows who is signed in"
+
 # ------------------------------------------- flow A: schema-driven entry form ----
 
 echo "flows: [A] the record form is generated from the definition"
@@ -204,7 +239,7 @@ schema='{"key":"'"$object_key"'","name":"Luồng demo","description":"created by
   {"key":"priority","label":"Mức ưu tiên","type":"select","required":true,"options":[
     {"value":"normal","label":"Bình thường"},{"value":"urgent","label":"Gấp"}]},
   {"key":"items","label":"Danh mục","type":"rows"}]}'
-status="$(curl -sS -o "$tmp_dir/object-created.json" -w '%{http_code}' -X POST \
+status="$(curl -sS -b "$cookie_jar" -o "$tmp_dir/object-created.json" -w '%{http_code}' -X POST \
   "$api_base/api/v1/business-objects" -H 'Content-Type: application/json' -d "$schema")"
 assert_status "$status" "201" "creating the flow object through the API"
 
@@ -237,7 +272,7 @@ Mực in')"
 assert_status "$status" "200" "record submission"
 assert_contains "$tmp_dir/record-created.html" "Đã lưu bản ghi" "record submission"
 
-curl -sS -o "$tmp_dir/records.json" "$api_base/api/v1/business-objects/$object_key/records"
+curl -sS -b "$cookie_jar" -o "$tmp_dir/records.json" "$api_base/api/v1/business-objects/$object_key/records"
 python3 - "$tmp_dir/records.json" <<'PY' || fail "[A] the stored record does not match what was submitted"
 import json, sys
 
@@ -280,7 +315,7 @@ status="$(web_post "/objects/$object_key" "$tmp_dir/record-tampered.html" \
 assert_status "$status" "200" "tampered option submission"
 assert_contains "$tmp_dir/record-tampered.html" 'role="alert"' "tampered option submission"
 
-curl -sS -o "$tmp_dir/records-after.json" "$api_base/api/v1/business-objects/$object_key/records"
+curl -sS -b "$cookie_jar" -o "$tmp_dir/records-after.json" "$api_base/api/v1/business-objects/$object_key/records"
 python3 - "$tmp_dir/records-after.json" <<'PY' || fail "[B] rejected input must not create a record"
 import json, sys
 
@@ -309,7 +344,7 @@ assert_status "$status" "200" "object builder submission"
 assert_contains "$tmp_dir/object-built.html" "Đã tạo" "object builder submission"
 assert_contains "$tmp_dir/object-built.html" "/objects/$web_object_key" "object builder link"
 
-curl -sS -o "$tmp_dir/built-object.json" "$api_base/api/v1/business-objects/$web_object_key"
+curl -sS -b "$cookie_jar" -o "$tmp_dir/built-object.json" "$api_base/api/v1/business-objects/$web_object_key"
 python3 - "$tmp_dir/built-object.json" <<'PY' || fail "[C] the stored schema does not match the editor"
 import json, sys
 
@@ -400,7 +435,7 @@ assert_status "$status" "200" "object detail page before the edit"
 assert_contains "$tmp_dir/detail-v1.html" "phiên bản đang dùng" "version badge before the edit"
 assert_contains "$tmp_dir/detail-v1.html" "Lịch sử phiên bản" "version history"
 
-curl -sS -o "$tmp_dir/versions-before.json" "$api_base/api/v1/business-objects/$object_key/versions"
+curl -sS -b "$cookie_jar" -o "$tmp_dir/versions-before.json" "$api_base/api/v1/business-objects/$object_key/versions"
 python3 - "$tmp_dir/versions-before.json" <<'PY' || fail "[F] the object should start with exactly one published version"
 import json, sys
 
@@ -424,7 +459,7 @@ status="$(web_post "/objects/$object_key" "$tmp_dir/published.html" \
 assert_status "$status" "200" "definition publish"
 assert_contains "$tmp_dir/published.html" "Đã publish phiên bản v2" "definition publish"
 
-curl -sS -o "$tmp_dir/versions.json" "$api_base/api/v1/business-objects/$object_key/versions"
+curl -sS -b "$cookie_jar" -o "$tmp_dir/versions.json" "$api_base/api/v1/business-objects/$object_key/versions"
 python3 - "$tmp_dir/versions.json" <<'PY' || fail "[F] the published version history is wrong"
 import json, sys
 

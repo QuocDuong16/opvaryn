@@ -262,36 +262,6 @@ func (s *Store) FindBusinessObject(ctx context.Context, key string) (domain.Busi
 	return object, true, nil
 }
 
-// FindObjectRecord reads one stored record with the object key it belongs to.
-func (s *Store) FindObjectRecord(ctx context.Context, id uuid.UUID) (domain.ObjectRecord, bool, error) {
-	row := s.pool.QueryRow(ctx, `
-		SELECT r.id, r.object_id, r.object_version_id, v.version, o.key,
-		       r.values, r.created_at, r.updated_at
-		  FROM business_object_records r
-		  JOIN business_object_versions v ON v.id = r.object_version_id
-		  JOIN business_objects o ON o.id = r.object_id
-		 WHERE r.id = $1`, id)
-
-	var (
-		record domain.ObjectRecord
-		values []byte
-	)
-	err := row.Scan(
-		&record.ID, &record.ObjectID, &record.ObjectVersionID, &record.ObjectVersion,
-		&record.ObjectKey, &values, &record.CreatedAt, &record.UpdatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.ObjectRecord{}, false, nil
-		}
-		return domain.ObjectRecord{}, false, classify(err)
-	}
-	if err := json.Unmarshal(values, &record.Values); err != nil {
-		return domain.ObjectRecord{}, false, fmt.Errorf("decode values: %w", err)
-	}
-	return record, true, nil
-}
-
 // --------------------------------------------------------------- instance runs ----
 
 // StartProcessInstance writes the instance, its first tasks and its events in one
@@ -422,10 +392,46 @@ func insertProcessEvents(ctx context.Context, tx pgx.Tx, events []domain.Process
 	return nil
 }
 
-// GetProcessInstance returns one instance row.
+// GetProcessInstance returns one instance row. It is used by the engine, which has
+// already established that the caller may touch this instance.
 func (s *Store) GetProcessInstance(ctx context.Context, id uuid.UUID) (domain.ProcessInstance, error) {
 	row := s.pool.QueryRow(ctx, processInstanceSelect+` WHERE i.id = $1`, id)
 
+	instance, err := scanProcessInstance(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ProcessInstance{}, fmt.Errorf("%w: process instance %s", ErrNotFound, id)
+		}
+		return domain.ProcessInstance{}, classify(err)
+	}
+	return instance, nil
+}
+
+// FindVisibleProcessInstance reads one instance only when the scope may see the
+// record it runs on: an instance is as visible as its record (ADR 0008). A caller
+// who may not see it gets found=false, which the API answers as 404 rather than
+// confirming that the instance exists.
+func (s *Store) FindVisibleProcessInstance(
+	ctx context.Context,
+	id uuid.UUID,
+	scope domain.RecordScope,
+) (domain.ProcessInstance, bool, error) {
+	row := s.pool.QueryRow(ctx, processInstanceSelect+`
+		  JOIN business_object_records r ON r.id = i.record_id
+		 WHERE i.id = $1 AND `+recordVisibleToScope,
+		id, scope.All, scope.DepartmentKey, scope.UserID)
+
+	instance, err := scanProcessInstance(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ProcessInstance{}, false, nil
+		}
+		return domain.ProcessInstance{}, false, classify(err)
+	}
+	return instance, true, nil
+}
+
+func scanProcessInstance(row rowScanner) (domain.ProcessInstance, error) {
 	var (
 		instance domain.ProcessInstance
 		state    string
@@ -437,10 +443,7 @@ func (s *Store) GetProcessInstance(ctx context.Context, id uuid.UUID) (domain.Pr
 		&instance.Attempt, &instance.StartedAt, &instance.FinishedAt, &instance.UpdatedAt,
 	)
 	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.ProcessInstance{}, fmt.Errorf("%w: process instance %s", ErrNotFound, id)
-		}
-		return domain.ProcessInstance{}, classify(err)
+		return domain.ProcessInstance{}, fmt.Errorf("scan process instance: %w", err)
 	}
 	instance.State = domain.ProcessInstanceState(state)
 	return instance, nil

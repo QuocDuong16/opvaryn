@@ -358,6 +358,18 @@ type HealthStatus struct {
 // HealthStatusStatus defines model for HealthStatus.Status.
 type HealthStatusStatus string
 
+// InboxItem defines model for InboxItem.
+type InboxItem struct {
+	Instance ProcessInstance `json:"instance"`
+	Task     ProcessTask     `json:"task"`
+}
+
+// InboxList defines model for InboxList.
+type InboxList struct {
+	// Data Open tasks of the signed-in user, oldest first.
+	Data []InboxItem `json:"data"`
+}
+
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
 	// Email Example: lan@example.com

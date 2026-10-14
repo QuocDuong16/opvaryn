@@ -176,6 +176,13 @@ type ProcessEvent struct {
 	CreatedAt  time.Time
 }
 
+// InboxItem is one open task together with the instance it belongs to: what the
+// per-user inbox shows.
+type InboxItem struct {
+	Task     ProcessTask
+	Instance ProcessInstance
+}
+
 // StartInstanceWrite is the whole write of starting one instance: the row, the
 // tasks the first nodes created and the matching events. The store applies it in
 // one transaction or not at all.

@@ -90,6 +90,31 @@ func (s *Store) CreateUser(ctx context.Context, user domain.User, passwordHash s
 	return created, nil
 }
 
+// AddUserRoles grants roles without removing the ones already held.
+func (s *Store) AddUserRoles(ctx context.Context, userID uuid.UUID, roles []string) (domain.User, error) {
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		for _, role := range roles {
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO user_roles (user_id, role) VALUES ($1, $2)
+				ON CONFLICT (user_id, role) DO NOTHING`, userID, role); err != nil {
+				return fmt.Errorf("grant role: %w", err)
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return domain.User{}, classify(err)
+	}
+	user, found, err := s.FindUserByID(ctx, userID)
+	if err != nil {
+		return domain.User{}, err
+	}
+	if !found {
+		return domain.User{}, fmt.Errorf("%w: user %s", ErrNotFound, userID)
+	}
+	return user, nil
+}
+
 // UpdatePassword replaces one user's password hash.
 func (s *Store) UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error {
 	tag, err := s.pool.Exec(ctx, `

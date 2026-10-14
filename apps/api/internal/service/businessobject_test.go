@@ -163,7 +163,7 @@ func TestCreateRejectsInvalidInput(t *testing.T) {
 			test.mutate(&input)
 
 			st := &fakeStore{}
-			_, err := NewBusinessObjects(st).Create(context.Background(), input)
+			_, err := NewBusinessObjects(st).Create(context.Background(), input, testPrincipal())
 
 			var validation *ValidationError
 			if !asValidationError(err, &validation) {
@@ -195,7 +195,7 @@ func TestCreateNormalizesAndPersists(t *testing.T) {
 	})
 
 	st := &fakeStore{}
-	created, err := NewBusinessObjects(st).Create(context.Background(), input)
+	created, err := NewBusinessObjects(st).Create(context.Background(), input, testPrincipal())
 	if err != nil {
 		t.Fatalf("Create returned error: %v", err)
 	}
@@ -259,7 +259,7 @@ func TestUpdateRejectsInvalidInput(t *testing.T) {
 			test.mutate(&input)
 
 			st := &fakeStore{}
-			_, err := NewBusinessObjects(st).Update(context.Background(), "purchase_request", input)
+			_, err := NewBusinessObjects(st).Update(context.Background(), "purchase_request", input, testPrincipal())
 
 			var validation *ValidationError
 			if !asValidationError(err, &validation) {
@@ -285,7 +285,7 @@ func TestUpdateNormalizesAndPublishes(t *testing.T) {
 		Fields: []domain.FieldDefinition{
 			{Key: "amount", Label: "  Số tiền  ", Type: domain.FieldTypeNumber},
 		},
-	})
+	}, testPrincipal())
 	if err != nil {
 		t.Fatalf("Update returned error: %v", err)
 	}
@@ -307,7 +307,7 @@ func TestUpdateReportsMissingObject(t *testing.T) {
 	st := &fakeStore{err: store.ErrNotFound}
 	_, err := NewBusinessObjects(st).Update(context.Background(), "unknown", UpdateBusinessObjectInput{
 		Name: "Không tồn tại",
-	})
+	}, testPrincipal())
 
 	if !errors.Is(err, store.ErrNotFound) {
 		t.Fatalf("expected the store's ErrNotFound to stay in the chain, got %v", err)
@@ -326,7 +326,7 @@ func TestListVersionsLooksUpTheObjectFirst(t *testing.T) {
 		},
 	}
 
-	versions, err := NewBusinessObjects(st).ListVersions(context.Background(), object.Key)
+	versions, err := NewBusinessObjects(st).ListVersions(context.Background(), object.Key, testPrincipal())
 	if err != nil {
 		t.Fatalf("ListVersions returned error: %v", err)
 	}
@@ -343,4 +343,15 @@ func asValidationError(err error, target **ValidationError) bool {
 		*target = validation
 	}
 	return ok
+}
+
+// testPrincipal is a signed-in process designer used by the service tests.
+func testPrincipal() domain.Principal {
+	return domain.Principal{
+		UserID:        uuid.New(),
+		Email:         "designer@example.com",
+		Name:          "Nhà thiết kế",
+		DepartmentKey: "ky_thuat",
+		Roles:         []string{domain.RoleProcessDesigner},
+	}
 }

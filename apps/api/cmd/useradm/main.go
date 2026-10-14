@@ -8,6 +8,7 @@
 //
 //	useradm -create-department -key ky_thuat -name "Kỹ thuật"
 //	useradm -create -email lan@example.com -name "Lan" -password '...' -department ky_thuat -roles truong_bo_phan
+//	useradm -add-role -email lan@example.com -roles process_designer
 //	useradm -set-password -email lan@example.com -password '...'
 //	useradm -list
 package main
@@ -37,6 +38,7 @@ func run() error {
 		createDepartment = flag.Bool("create-department", false, "create or rename a department")
 		create           = flag.Bool("create", false, "create a user")
 		setPassword      = flag.Bool("set-password", false, "replace a user's password")
+		addRole          = flag.Bool("add-role", false, "grant roles to an existing user")
 		list             = flag.Bool("list", false, "list users")
 
 		email      = flag.String("email", "", "user email (normalised to lower case)")
@@ -91,6 +93,14 @@ func run() error {
 			user.Email, user.Name, user.DepartmentKey, strings.Join(user.Roles, ", "))
 		return nil
 
+	case *addRole:
+		user, err := identity.AddRoles(ctx, *email, splitRoles(*roles))
+		if err != nil {
+			return err
+		}
+		fmt.Printf("%s now holds roles %s\n", user.Email, strings.Join(user.Roles, ", "))
+		return nil
+
 	case *setPassword:
 		user, err := identity.SetPassword(ctx, *email, *password)
 		if err != nil {
@@ -112,7 +122,7 @@ func run() error {
 
 	default:
 		flag.Usage()
-		return fmt.Errorf("nothing to do: pass -create, -set-password, -create-department or -list")
+		return fmt.Errorf("nothing to do: pass -create, -add-role, -set-password, -create-department or -list")
 	}
 }
 

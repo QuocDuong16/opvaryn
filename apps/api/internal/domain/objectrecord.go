@@ -23,6 +23,11 @@ type ObjectRecord struct {
 	// ObjectVersion is the published version number the record belongs to.
 	ObjectVersion int
 	Values        map[string]any
+	// CreatedBy and DepartmentKey drive department scoping (ADR 0008): who entered
+	// the record and which department it counts for. Rows written before scoping
+	// existed may have neither. Set from the session, never from the payload.
+	CreatedBy     uuid.UUID
+	DepartmentKey string
 	CreatedAt     time.Time
 	UpdatedAt     time.Time
 }

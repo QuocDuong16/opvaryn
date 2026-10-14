@@ -63,6 +63,21 @@ func (f *fakeIdentityStore) CreateUser(_ context.Context, user domain.User, pass
 	return user, nil
 }
 
+func (f *fakeIdentityStore) AddUserRoles(_ context.Context, userID uuid.UUID, roles []string) (domain.User, error) {
+	for i := range f.users {
+		if f.users[i].ID != userID {
+			continue
+		}
+		for _, role := range roles {
+			if !f.users[i].HasRole(role) {
+				f.users[i].Roles = append(f.users[i].Roles, role)
+			}
+		}
+		return f.users[i], nil
+	}
+	return domain.User{}, ErrUserNotFound
+}
+
 func (f *fakeIdentityStore) UpdatePassword(_ context.Context, userID uuid.UUID, passwordHash string) error {
 	f.hashes[userID] = passwordHash
 	return nil
@@ -407,4 +422,27 @@ func createTestUser(t *testing.T, identity *Identity, email string, roles []stri
 		t.Fatalf("CreateUser returned error: %v", err)
 	}
 	return user
+}
+
+func TestAddRolesIsAdditive(t *testing.T) {
+	t.Parallel()
+
+	store := newFakeIdentityStore()
+	identity := NewIdentity(store)
+	createTestUser(t, identity, "lan@example.com", []string{managerRole})
+
+	updated, err := identity.AddRoles(context.Background(), "LAN@example.com", []string{domain.RoleProcessDesigner})
+	if err != nil {
+		t.Fatalf("AddRoles returned error: %v", err)
+	}
+	if !updated.HasRole(domain.RoleProcessDesigner) || !updated.HasRole(managerRole) {
+		t.Fatalf("granting a role must keep the existing ones: %+v", updated.Roles)
+	}
+
+	if _, err := identity.AddRoles(context.Background(), "lan@example.com", []string{"Không hợp lệ"}); !asValidationError(err, new(*ValidationError)) {
+		t.Fatalf("expected a validation error for a bad role, got %v", err)
+	}
+	if _, err := identity.AddRoles(context.Background(), "nobody@example.com", []string{managerRole}); !errors.Is(err, ErrUserNotFound) {
+		t.Fatalf("expected ErrUserNotFound, got %v", err)
+	}
 }

@@ -15,7 +15,11 @@ import (
 
 func handleListBusinessObjects(objects *service.BusinessObjects, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		list, err := objects.List(r.Context())
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
+		list, err := objects.List(r.Context(), domain.NewPrincipal(user))
 		if err != nil {
 			writeStoreError(w, log, err, "list business objects")
 			return
@@ -26,6 +30,10 @@ func handleListBusinessObjects(objects *service.BusinessObjects, log *slog.Logge
 
 func handleCreateBusinessObject(objects *service.BusinessObjects, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
 		var body apiv1.CreateBusinessObjectJSONRequestBody
 		if err := decodeJSON(w, r, &body); err != nil {
 			log.Warn("rejected request body", "error", err)
@@ -39,7 +47,7 @@ func handleCreateBusinessObject(objects *service.BusinessObjects, log *slog.Logg
 			Name:        body.Name,
 			Description: stringValue(body.Description),
 			Fields:      toDomainFields(body.Fields),
-		})
+		}, domain.NewPrincipal(user))
 		if err != nil {
 			writeStoreError(w, log, err, "create business object")
 			return
@@ -50,7 +58,11 @@ func handleCreateBusinessObject(objects *service.BusinessObjects, log *slog.Logg
 
 func handleGetBusinessObject(objects *service.BusinessObjects, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		object, err := objects.Get(r.Context(), chi.URLParam(r, "key"))
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
+		object, err := objects.Get(r.Context(), chi.URLParam(r, "key"), domain.NewPrincipal(user))
 		if err != nil {
 			writeStoreError(w, log, err, "get business object")
 			return
@@ -61,6 +73,10 @@ func handleGetBusinessObject(objects *service.BusinessObjects, log *slog.Logger)
 
 func handleUpdateBusinessObject(objects *service.BusinessObjects, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
 		var body apiv1.UpdateBusinessObjectJSONRequestBody
 		if err := decodeJSON(w, r, &body); err != nil {
 			log.Warn("rejected request body", "error", err)
@@ -73,7 +89,7 @@ func handleUpdateBusinessObject(objects *service.BusinessObjects, log *slog.Logg
 			Name:        body.Name,
 			Description: stringValue(body.Description),
 			Fields:      toDomainFields(body.Fields),
-		})
+		}, domain.NewPrincipal(user))
 		if err != nil {
 			writeStoreError(w, log, err, "update business object")
 			return
@@ -84,7 +100,11 @@ func handleUpdateBusinessObject(objects *service.BusinessObjects, log *slog.Logg
 
 func handleListBusinessObjectVersions(objects *service.BusinessObjects, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		versions, err := objects.ListVersions(r.Context(), chi.URLParam(r, "key"))
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
+		versions, err := objects.ListVersions(r.Context(), chi.URLParam(r, "key"), domain.NewPrincipal(user))
 		if err != nil {
 			writeStoreError(w, log, err, "list definition versions")
 			return
@@ -100,7 +120,10 @@ func writeStoreError(w http.ResponseWriter, log *slog.Logger, err error, action 
 	switch {
 	case errors.As(err, &validation):
 		writeError(w, log, http.StatusBadRequest, codeInvalidRequest, validation.Error())
-	case errors.Is(err, store.ErrNotFound):
+	case errors.Is(err, store.ErrNotFound), errors.Is(err, service.ErrNotFound):
+		// The service uses its own sentinel for things it hides on purpose: an
+		// instance the caller may not see answers 404, not 403, so the API does not
+		// confirm that it exists.
 		writeError(w, log, http.StatusNotFound, codeNotFound, "the requested resource does not exist")
 	case errors.Is(err, store.ErrConflict):
 		writeError(w, log, http.StatusConflict, codeConflict, "a business object with this key already exists")

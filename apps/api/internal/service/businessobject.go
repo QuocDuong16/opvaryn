@@ -75,14 +75,21 @@ type UpdateBusinessObjectInput struct {
 	Fields      []domain.FieldDefinition
 }
 
-// List returns every business object definition ordered by key.
-func (s *BusinessObjects) List(ctx context.Context) ([]domain.BusinessObject, error) {
+// List returns every business object definition ordered by key. Definitions are
+// readable by any signed-in user: the forms are generated from them.
+func (s *BusinessObjects) List(ctx context.Context, principal domain.Principal) ([]domain.BusinessObject, error) {
+	if err := requireAuthenticated(principal); err != nil {
+		return nil, err
+	}
 	return s.store.ListBusinessObjects(ctx)
 }
 
 // Get returns one definition. A missing key surfaces as the store's ErrNotFound,
 // which the HTTP layer maps to a 404 envelope.
-func (s *BusinessObjects) Get(ctx context.Context, key string) (domain.BusinessObject, error) {
+func (s *BusinessObjects) Get(ctx context.Context, key string, principal domain.Principal) (domain.BusinessObject, error) {
+	if err := requireAuthenticated(principal); err != nil {
+		return domain.BusinessObject{}, err
+	}
 	object, err := s.store.GetBusinessObjectByKey(ctx, key)
 	if err != nil {
 		return domain.BusinessObject{}, fmt.Errorf("look up business object %q: %w", key, err)
@@ -92,7 +99,10 @@ func (s *BusinessObjects) Get(ctx context.Context, key string) (domain.BusinessO
 
 // Create validates the input and stores a new business object definition together
 // with its first published version.
-func (s *BusinessObjects) Create(ctx context.Context, in NewBusinessObjectInput) (domain.BusinessObject, error) {
+func (s *BusinessObjects) Create(ctx context.Context, in NewBusinessObjectInput, principal domain.Principal) (domain.BusinessObject, error) {
+	if err := requireDesigner(principal); err != nil {
+		return domain.BusinessObject{}, err
+	}
 	if problems := validateNewBusinessObject(in); len(problems) > 0 {
 		return domain.BusinessObject{}, &ValidationError{Problems: problems}
 	}
@@ -111,7 +121,10 @@ func (s *BusinessObjects) Create(ctx context.Context, in NewBusinessObjectInput)
 // Records created under earlier versions keep their schema; that is the point of
 // versioning (playbook invariant 1), so an edit may freely add, rename or remove
 // fields without rewriting history.
-func (s *BusinessObjects) Update(ctx context.Context, key string, in UpdateBusinessObjectInput) (domain.BusinessObject, error) {
+func (s *BusinessObjects) Update(ctx context.Context, key string, in UpdateBusinessObjectInput, principal domain.Principal) (domain.BusinessObject, error) {
+	if err := requireDesigner(principal); err != nil {
+		return domain.BusinessObject{}, err
+	}
 	if problems := validateDefinition(in.Name, in.Description, in.Fields); len(problems) > 0 {
 		return domain.BusinessObject{}, &ValidationError{Problems: problems}
 	}
@@ -130,8 +143,8 @@ func (s *BusinessObjects) Update(ctx context.Context, key string, in UpdateBusin
 }
 
 // ListVersions returns the published snapshots of one definition, newest first.
-func (s *BusinessObjects) ListVersions(ctx context.Context, key string) ([]domain.BusinessObjectVersion, error) {
-	object, err := s.Get(ctx, key)
+func (s *BusinessObjects) ListVersions(ctx context.Context, key string, principal domain.Principal) ([]domain.BusinessObjectVersion, error) {
+	object, err := s.Get(ctx, key, principal)
 	if err != nil {
 		return nil, err
 	}

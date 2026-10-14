@@ -15,7 +15,11 @@ import (
 
 func handleListProcessDefinitions(definitions *service.ProcessDefinitions, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		list, err := definitions.List(r.Context())
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
+		list, err := definitions.List(r.Context(), domain.NewPrincipal(user))
 		if err != nil {
 			writeStoreError(w, log, err, "list process definitions")
 			return
@@ -26,6 +30,10 @@ func handleListProcessDefinitions(definitions *service.ProcessDefinitions, log *
 
 func handleCreateProcessDefinition(definitions *service.ProcessDefinitions, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
 		var body apiv1.CreateProcessDefinitionJSONRequestBody
 		if err := decodeJSON(w, r, &body); err != nil {
 			log.Warn("rejected request body", "error", err)
@@ -41,7 +49,7 @@ func handleCreateProcessDefinition(definitions *service.ProcessDefinitions, log 
 			ObjectKey:   body.ObjectKey,
 			Nodes:       toDomainProcessNodes(body.Nodes),
 			Edges:       toDomainProcessEdges(body.Edges),
-		})
+		}, domain.NewPrincipal(user))
 		if err != nil {
 			writeStoreError(w, log, err, "create process definition")
 			return
@@ -52,7 +60,11 @@ func handleCreateProcessDefinition(definitions *service.ProcessDefinitions, log 
 
 func handleGetProcessDefinition(definitions *service.ProcessDefinitions, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		definition, err := definitions.Get(r.Context(), chi.URLParam(r, "key"))
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
+		definition, err := definitions.Get(r.Context(), chi.URLParam(r, "key"), domain.NewPrincipal(user))
 		if err != nil {
 			writeStoreError(w, log, err, "get process definition")
 			return
@@ -63,6 +75,10 @@ func handleGetProcessDefinition(definitions *service.ProcessDefinitions, log *sl
 
 func handleUpdateProcessDefinition(definitions *service.ProcessDefinitions, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
 		var body apiv1.UpdateProcessDefinitionJSONRequestBody
 		if err := decodeJSON(w, r, &body); err != nil {
 			log.Warn("rejected request body", "error", err)
@@ -77,7 +93,7 @@ func handleUpdateProcessDefinition(definitions *service.ProcessDefinitions, log 
 			ObjectKey:   body.ObjectKey,
 			Nodes:       toDomainProcessNodes(body.Nodes),
 			Edges:       toDomainProcessEdges(body.Edges),
-		})
+		}, domain.NewPrincipal(user))
 		if err != nil {
 			writeStoreError(w, log, err, "update process definition")
 			return
@@ -88,7 +104,11 @@ func handleUpdateProcessDefinition(definitions *service.ProcessDefinitions, log 
 
 func handleListProcessDefinitionVersions(definitions *service.ProcessDefinitions, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		versions, err := definitions.ListVersions(r.Context(), chi.URLParam(r, "key"))
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
+		versions, err := definitions.ListVersions(r.Context(), chi.URLParam(r, "key"), domain.NewPrincipal(user))
 		if err != nil {
 			writeStoreError(w, log, err, "list process definition versions")
 			return
@@ -121,7 +141,7 @@ func handleStartProcessInstance(runtime *service.ProcessRuntime, log *slog.Logge
 		view, err := runtime.Start(r.Context(), service.StartInput{
 			DefinitionKey: body.DefinitionKey,
 			RecordID:      body.RecordId,
-			Actor:         user.Email,
+			Principal:     domain.NewPrincipal(user),
 		})
 		if err != nil {
 			writeStoreError(w, log, err, "start process instance")
@@ -133,14 +153,15 @@ func handleStartProcessInstance(runtime *service.ProcessRuntime, log *slog.Logge
 
 func handleGetProcessInstance(runtime *service.ProcessRuntime, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		if _, ok := requireUser(w, log, r); !ok {
+		user, ok := requireUser(w, log, r)
+		if !ok {
 			return
 		}
 		instanceID, ok := parseUUIDParam(w, log, r, "instanceId", "process instance id")
 		if !ok {
 			return
 		}
-		view, err := runtime.Get(r.Context(), instanceID)
+		view, err := runtime.Get(r.Context(), instanceID, domain.NewPrincipal(user))
 		if err != nil {
 			writeStoreError(w, log, err, "get process instance")
 			return
@@ -177,14 +198,28 @@ func handleDecideProcessTask(runtime *service.ProcessRuntime, log *slog.Logger) 
 			TaskID:     taskID,
 			Decision:   service.Decision(body.Decision),
 			Reason:     stringValue(body.Reason),
-			Actor:      user.Email,
-			ActorRoles: user.Roles,
+			Principal:  domain.NewPrincipal(user),
 		})
 		if err != nil {
 			writeStoreError(w, log, err, "decide process task")
 			return
 		}
 		writeJSON(w, log, http.StatusOK, toAPIInstanceView(view))
+	}
+}
+
+func handleInbox(runtime *service.ProcessRuntime, log *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
+		items, err := runtime.Inbox(r.Context(), domain.NewPrincipal(user))
+		if err != nil {
+			writeStoreError(w, log, err, "read inbox")
+			return
+		}
+		writeJSON(w, log, http.StatusOK, apiv1.InboxList{Data: toAPIInboxItems(items)})
 	}
 }
 
@@ -293,6 +328,17 @@ func toDomainProcessEdges(edges []apiv1.ProcessEdge) []domain.ProcessEdge {
 			converted.When = string(*edge.When)
 		}
 		result[i] = converted
+	}
+	return result
+}
+
+func toAPIInboxItems(items []domain.InboxItem) []apiv1.InboxItem {
+	result := make([]apiv1.InboxItem, len(items))
+	for i, item := range items {
+		result[i] = apiv1.InboxItem{
+			Task:     toAPIInstanceView(service.InstanceView{Tasks: []domain.ProcessTask{item.Task}}).Tasks[0],
+			Instance: toAPIInstanceView(service.InstanceView{Instance: item.Instance}).Instance,
+		}
 	}
 	return result
 }

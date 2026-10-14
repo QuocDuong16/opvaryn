@@ -17,7 +17,10 @@ type fakeRecordStore struct {
 	object  domain.BusinessObject
 	records []domain.ObjectRecord
 	created domain.ObjectRecord
-	err     error
+	// scope remembers what the service asked for, so the department rule can be
+	// asserted without a database.
+	scope domain.RecordScope
+	err   error
 }
 
 func (f *fakeRecordStore) GetBusinessObjectByKey(context.Context, string) (domain.BusinessObject, error) {
@@ -27,7 +30,8 @@ func (f *fakeRecordStore) GetBusinessObjectByKey(context.Context, string) (domai
 	return f.object, nil
 }
 
-func (f *fakeRecordStore) ListObjectRecords(context.Context, uuid.UUID) ([]domain.ObjectRecord, error) {
+func (f *fakeRecordStore) ListObjectRecords(_ context.Context, _ uuid.UUID, scope domain.RecordScope) ([]domain.ObjectRecord, error) {
+	f.scope = scope
 	if f.err != nil {
 		return nil, f.err
 	}
@@ -133,7 +137,7 @@ func TestCreateRecordRejectsInvalidValues(t *testing.T) {
 			test.mutate(values)
 
 			st := &fakeRecordStore{object: recordObject()}
-			_, err := NewObjectRecords(st).Create(context.Background(), "purchase_request", values)
+			_, err := NewObjectRecords(st).Create(context.Background(), "purchase_request", values, testPrincipal())
 
 			var validation *ValidationError
 			if !asValidationError(err, &validation) {
@@ -160,7 +164,7 @@ func TestCreateRecordNormalizesAndPersists(t *testing.T) {
 	values["items"] = []any{" MacBook Pro 14 ", "  "}
 	values["needed_by"] = "" // an untouched optional input must be dropped
 
-	created, err := NewObjectRecords(st).Create(context.Background(), object.Key, values)
+	created, err := NewObjectRecords(st).Create(context.Background(), object.Key, values, testPrincipal())
 	if err != nil {
 		t.Fatalf("Create returned error: %v", err)
 	}
@@ -190,7 +194,7 @@ func TestCreateRecordReportsMissingObject(t *testing.T) {
 	t.Parallel()
 
 	st := &fakeRecordStore{err: store.ErrNotFound}
-	_, err := NewObjectRecords(st).Create(context.Background(), "unknown", validRecordValues())
+	_, err := NewObjectRecords(st).Create(context.Background(), "unknown", validRecordValues(), testPrincipal())
 
 	if err == nil || !strings.Contains(err.Error(), "look up business object") {
 		t.Fatalf("expected a lookup error, got %v", err)
@@ -209,7 +213,7 @@ func TestListRecordsAttachesObjectKey(t *testing.T) {
 		records: []domain.ObjectRecord{{ID: uuid.New(), ObjectID: object.ID}},
 	}
 
-	records, err := NewObjectRecords(st).List(context.Background(), object.Key)
+	records, err := NewObjectRecords(st).List(context.Background(), object.Key, testPrincipal())
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
 	}

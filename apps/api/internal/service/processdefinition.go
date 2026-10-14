@@ -75,13 +75,20 @@ type UpdateProcessDefinitionInput struct {
 	Edges       []domain.ProcessEdge
 }
 
-// List returns every process definition ordered by key.
-func (s *ProcessDefinitions) List(ctx context.Context) ([]domain.ProcessDefinition, error) {
+// List returns every process definition ordered by key. Readable by any signed-in
+// user; changing one needs a designer role.
+func (s *ProcessDefinitions) List(ctx context.Context, principal domain.Principal) ([]domain.ProcessDefinition, error) {
+	if err := requireAuthenticated(principal); err != nil {
+		return nil, err
+	}
 	return s.store.ListProcessDefinitions(ctx)
 }
 
 // Get returns one definition with its newest published version.
-func (s *ProcessDefinitions) Get(ctx context.Context, key string) (domain.ProcessDefinition, error) {
+func (s *ProcessDefinitions) Get(ctx context.Context, key string, principal domain.Principal) (domain.ProcessDefinition, error) {
+	if err := requireAuthenticated(principal); err != nil {
+		return domain.ProcessDefinition{}, err
+	}
 	definition, err := s.store.GetProcessDefinitionByKey(ctx, key)
 	if err != nil {
 		return domain.ProcessDefinition{}, fmt.Errorf("look up process definition %q: %w", key, err)
@@ -90,8 +97,8 @@ func (s *ProcessDefinitions) Get(ctx context.Context, key string) (domain.Proces
 }
 
 // ListVersions returns the published snapshots of one definition, newest first.
-func (s *ProcessDefinitions) ListVersions(ctx context.Context, key string) ([]domain.ProcessDefinitionVersion, error) {
-	definition, err := s.Get(ctx, key)
+func (s *ProcessDefinitions) ListVersions(ctx context.Context, key string, principal domain.Principal) ([]domain.ProcessDefinitionVersion, error) {
+	definition, err := s.Get(ctx, key, principal)
 	if err != nil {
 		return nil, err
 	}
@@ -99,7 +106,10 @@ func (s *ProcessDefinitions) ListVersions(ctx context.Context, key string) ([]do
 }
 
 // Create validates the graph and publishes version 1.
-func (s *ProcessDefinitions) Create(ctx context.Context, in NewProcessDefinitionInput) (domain.ProcessDefinition, error) {
+func (s *ProcessDefinitions) Create(ctx context.Context, in NewProcessDefinitionInput, principal domain.Principal) (domain.ProcessDefinition, error) {
+	if err := requireDesigner(principal); err != nil {
+		return domain.ProcessDefinition{}, err
+	}
 	problems := make([]string, 0, 4)
 	if !KeyPattern.MatchString(in.Key) {
 		problems = append(problems,
@@ -132,7 +142,10 @@ func (s *ProcessDefinitions) Create(ctx context.Context, in NewProcessDefinition
 }
 
 // Update validates the graph and publishes the next version.
-func (s *ProcessDefinitions) Update(ctx context.Context, key string, in UpdateProcessDefinitionInput) (domain.ProcessDefinition, error) {
+func (s *ProcessDefinitions) Update(ctx context.Context, key string, in UpdateProcessDefinitionInput, principal domain.Principal) (domain.ProcessDefinition, error) {
+	if err := requireDesigner(principal); err != nil {
+		return domain.ProcessDefinition{}, err
+	}
 	problems := validateDefinitionMeta(in.Name, in.Description)
 
 	object, found, err := s.objects.FindBusinessObject(ctx, in.ObjectKey)
