@@ -28,6 +28,15 @@
   Promise; a missing key calls `notFound()` (custom `not-found.tsx` in that segment).
 - `/forms` **live** + concept list: object picker via `?object=key` (defaults to the first
   object), the same entry form as a preview, schema table, and the not-yet-built capabilities.
+- `/workflows/[key]` is a **drag-and-drop canvas editor** over a browser-local draft (ADR 0013):
+  `components/workflows/workflow-editor.tsx` (client) moves nodes by pointer, connects by dragging the
+  handle, deletes edges by clicking them, and offers keyboard paths (arrows nudge, Delete removes, the
+  inspector's "Nối tới node khác" connects). `definition-draft-model.ts` is the pure, tested model
+  (`draftFromGraph`, `moveNode`, `addNode`, `connectNodes`, `removeNode`, `draftGraph` — positions are
+  dropped at publish, so dragging is not an unpublished change). The draft lives in the cookie
+  `opvaryn.workflow_draft.<key>` behind `saveWorkflowDraftAction` (`lib/workflow-draft.ts`); publishing
+  clears it. **Never** let a draft reach the engine: the API only knows published versions, and
+  smoke-demo-flows flow H asserts the published definition is byte-identical while a draft exists.
 - `/workflows` **live**: lists definitions from the API and creates new ones (`CreateDefinitionForm`);
   `/workflows/[key]` draws the published graph with `ProcessCanvas`, shows the version history
   (`?version=n` inspects an older version), the instances of that definition, and publishes the next
