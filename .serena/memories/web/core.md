@@ -57,6 +57,13 @@
   `NEXT_PUBLIC_API_BASE_URL` ?? `http://localhost:21501`) and `describeApiError()` mapping stable
   error codes to Vietnamese user messages. The client and all API types come from
   `@opvaryn/contracts` (generated; regenerate via `make contract-generate`).
+- Sign-in is a BFF: the form (`app/login/page.tsx` + `components/auth/login-form.tsx`) posts
+  `loginAction`, which calls the API and stores the returned token in the web app's own httpOnly
+  cookie (`lib/session.ts`, `SESSION_COOKIE = 'opvaryn.session'`). `createServerApiClient` forwards
+  that token as a Cookie header, so the browser never holds it and no component fetches the API
+  directly. `components/auth/session-summary.tsx` is the topbar widget and fails soft.
+  Useful for scripts: the cookie name matches the API's, and cookies ignore ports, so a session
+  obtained from the API on :21501 is also accepted by the web app on :21500.
 - Server actions live in `app/**/actions.ts`. `app/objects/actions.ts` holds
   `createBusinessObjectAction` (parses the `fields` JSON hidden input the editor submits) and
   `createObjectRecordAction` (fetches the object, converts form strings via
