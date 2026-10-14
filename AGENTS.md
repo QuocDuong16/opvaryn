@@ -6,20 +6,21 @@ Working agreement for agents and contributors in this repository.
 
 - OPVARYN is a business operations platform: organizations define their own data,
   workflows, applications and reports instead of buying a separate tool per process.
-- This repository currently targets the **interactive demo** described in
-  `operations-playbook/demo-mvp.html` (8 week plan), not the MVP V1. Demo screens may
-  simulate future functionality but must be labeled `live`, `mock`, or `concept`.
+- This repository targets the **interactive demo** described in
+  `operations-playbook/demo-mvp.html` (8 week plan) and then the **MVP V1** that builds on it
+  (ADR 0005–0008). Demo screens may simulate future functionality but must be labeled `live`,
+  `mock`, or `concept`.
 - The operations playbook (`operations-playbook/`) is the requirements source. Read the
   relevant page before implementing scope. It is a strategy document: treat its estimates
   as provisional, its principles as binding.
 - Product and technical decisions still open are tracked in
   `operations-playbook/decisions.html` (D01–D10). Do not silently pick a direction that
   contradicts an open decision; ask instead.
-- Demo surfaces and their status are fixed by ADR 0002 and ADR 0003: business object
-  definitions and records are `live`; form entry is generated from the schema and validated
-  by the Go service; workflow, task inbox, analytics and kanban/connector panels are
-  `mock` fixtures with no runtime; conditional visibility, calculated fields and escalation
-  are `concept`.
+- Demo surfaces and their status follow ADR 0002 and ADR 0003, extended by ADR 0007 and
+  ADR 0008: business object definitions, records, sign-in/permissions and the task inbox with
+  its approve/return/reject decisions are `live` against PostgreSQL and the Go service; the
+  workflow designer screen, analytics and kanban/connector panels are `mock` fixtures;
+  conditional visibility, calculated fields and SLA/escalation are `concept`.
 
 ## Working agreement
 

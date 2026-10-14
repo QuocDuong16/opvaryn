@@ -1,7 +1,9 @@
 # 0003 — Lát cắt dữ liệu của demo: bản ghi business object và phân chia live/mock
 
 - **Ngày**: 2026-10-13
-- **Trạng thái**: Accepted (phạm vi bản demo)
+- **Trạng thái**: Accepted (phạm vi bản demo); **mục 4 đã được thay thế** — Task Inbox giờ là `live`
+  trên workflow runtime thật (ADR 0005/0007) và đăng nhập theo người (ADR 0008). Workflow designer
+  và Analytics vẫn là màn hình mô phỏng như mục 4 mô tả.
 - **Liên quan**: [0002](0002-demo-scope-and-labels.md), playbook `demo-mvp.html` (kế hoạch 8 tuần),
   `modules.html` mục 01–07, `architecture.html` mục 04
 
@@ -33,6 +35,9 @@ Giới hạn đã biết: Process Execution Contract (D05/D08) cùng Rule DSL (D
    đọc từ fixture trong mã nguồn web; thao tác duyệt/trả về/từ chối chỉ đổi state trong trình duyệt
    (reducer thuần, có unit test). Không có bảng process/task/event, không có state machine — đúng
    giới hạn ADR 0002.
+   *Cập nhật 2026-10-14*: sau khi D05/D08/D09 được chốt, Task Inbox và thao tác quyết định đã thành
+   `live` (engine + identity thật, fixture inbox đã bị xoá); Workflow designer và Analytics vẫn theo
+   đúng mục này.
 5. **Application showcase trộn hai loại**: view danh sách và chi tiết đọc bản ghi thật; kanban và
    panel connector là mô phỏng, gắn nhãn theo từng view. Nhãn trạng thái đặt ở cấp view, không chỉ
    cấp trang.

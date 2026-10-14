@@ -89,40 +89,31 @@ const OUT_OF_MVP: readonly { title: string; body: string }[] = [
 
 const OPEN_DECISIONS: readonly { id: string; topic: string; blocked: string }[] = [
   {
-    id: 'D04',
-    topic: 'Rule DSL — cú pháp biểu thức không cho thực thi code tùy ý',
-    blocked: 'Điều kiện hiển thị field và nhánh điều kiện thật',
-  },
-  {
-    id: 'D05',
-    topic: 'Workflow runtime — engine tự xây tối giản hay tích hợp orchestrator sẵn có',
-    blocked: 'Toàn bộ runtime quy trình',
-  },
-  {
     id: 'D06',
     topic: 'Analytics — embedded BI hay query builder giới hạn tự viết',
     blocked: 'Dashboard có số liệu thật',
-  },
-  {
-    id: 'D07',
-    topic: 'Pilot use cases — quy trình có pain point, owner và dữ liệu đo được',
-    blocked: 'Dữ liệu vận hành thật',
-  },
-  {
-    id: 'D08',
-    topic: 'Approval semantics — resolver người duyệt, reject/return, trạng thái terminal',
-    blocked: 'Inbox và duyệt thật',
-  },
-  {
-    id: 'D09',
-    topic: 'Identity & authorization — SSO hay local auth, phạm vi RBAC/ABAC',
-    blocked: 'Phân quyền, lưu bố cục theo người dùng',
   },
   {
     id: 'D10',
     topic: 'Deployment & backup — hạ tầng, monitoring, khôi phục, staging',
     blocked: 'Chạy ngoài môi trường local',
   },
+];
+
+/**
+ * DECIDED mirrors the ADRs that closed a playbook decision, so the page does not
+ * keep listing a settled question as a blocker.
+ */
+const DECIDED: readonly { id: string; topic: string; adr: string }[] = [
+  { id: 'D04', topic: 'Rule DSL: condition JSON có allowlist', adr: 'ADR 0007' },
+  { id: 'D05', topic: 'Workflow runtime tự xây trên PostgreSQL', adr: 'ADR 0005' },
+  { id: 'D07', topic: 'Ba quy trình pilot (mua hàng, sự cố IT, onboarding)', adr: 'ADR 0008' },
+  {
+    id: 'D08',
+    topic: 'Approval semantics: reject terminal, return reset, resolver theo role',
+    adr: 'ADR 0005',
+  },
+  { id: 'D09', topic: 'Local auth + RBAC theo role và bộ phận', adr: 'ADR 0008' },
 ];
 
 const PLANS: readonly { resource: string; demo: string; mvp: string }[] = [
@@ -147,7 +138,8 @@ export default function RoadmapPage() {
           <div>
             <CardTitle>Bản demo đang ở đâu</CardTitle>
             <CardDescription>
-              Mốc 1 của lộ trình — kế hoạch 8 tuần — đã dựng xong trong repo này.
+              Mốc 1 của lộ trình — kế hoạch 8 tuần — đã dựng xong trong repo này, và phần MVP V1
+              đang được triển khai tiếp trên cùng nền đó.
             </CardDescription>
           </div>
           <StatusBadge kind="live" />
@@ -159,7 +151,8 @@ export default function RoadmapPage() {
             </dt>
             <dd className="mt-1 text-sm">
               Business object và bản ghi: schema, form sinh từ schema, validate ở server, lưu
-              PostgreSQL. Bố cục dashboard lưu trong cookie.
+              PostgreSQL. Đăng nhập và phân quyền theo role + bộ phận. Inbox theo người, duyệt / trả
+              về / từ chối qua engine có event log. Bố cục dashboard lưu trong cookie.
             </dd>
           </div>
           <div>
@@ -167,15 +160,15 @@ export default function RoadmapPage() {
               Mô phỏng (mock)
             </dt>
             <dd className="mt-1 text-sm">
-              Sơ đồ workflow, task inbox, số liệu analytics, kanban và connector — giao diện thật,
-              dữ liệu fixture.
+              Trình thiết kế workflow trong web (định nghĩa hiện publish qua API), số liệu
+              analytics, kanban và connector — giao diện thật, dữ liệu fixture.
             </dd>
           </div>
           <div>
             <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Chưa có</dt>
             <dd className="mt-1 text-sm">
-              Workflow runtime, phân quyền, tích hợp thật, read model analytics, deployment — tức
-              toàn bộ MVP V1.
+              Trình thiết kế quy trình trong web, OIDC, read model analytics, tích hợp thật, SLA và
+              escalation, deployment — phần còn lại của MVP V1 và V1.x.
             </dd>
           </div>
         </dl>
@@ -209,7 +202,9 @@ export default function RoadmapPage() {
         <Card>
           <CardDescription>
             Danh sách tiêu chí từ playbook để một bản phát hành được coi là dùng được — khác với
-            tiêu chuẩn của bản demo. Bản demo hiện chưa đáp ứng mục 3–7.
+            tiêu chuẩn của bản demo. Hiện đã đáp ứng mục 3 (approval, nhánh điều kiện, reject /
+            return) và mục 4 (kiểm tra quyền ở server, có audit); mục 1–2 đúng nhưng thao tác qua
+            API chứ chưa có trình thiết kế trong web; mục 5–7 còn thiếu.
           </CardDescription>
           <ol className="mt-4 space-y-2.5">
             {MVP_ACCEPTANCE.map((item, index) => (
@@ -271,6 +266,24 @@ export default function RoadmapPage() {
           <code className="font-mono">operations-playbook/decisions.html</code>; repo này không tự
           chọn hướng thay cho bạn.
         </p>
+
+        <h3 className="mt-6 mb-3 text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
+          Đã chốt và đang chạy
+        </h3>
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {DECIDED.map((decision) => (
+            <li
+              key={decision.id}
+              className="rounded-lg border border-border bg-surface-raised/40 px-3 py-2.5"
+            >
+              <p className="text-sm">
+                <span className="mr-2 font-mono text-xs text-on-surface-muted">{decision.id}</span>
+                {decision.topic}
+              </p>
+              <p className="mt-1 text-xs text-on-surface-muted">{decision.adr}</p>
+            </li>
+          ))}
+        </ul>
       </section>
 
       <section className="mb-8">

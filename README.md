@@ -12,7 +12,8 @@ trong playbook; [docs/README.md](docs/README.md) giải thích quan hệ giữa 
 
 ## Trạng thái hiện tại
 
-Các màn hình theo kế hoạch 8 tuần của bản demo đã dựng xong, mỗi màn hình gắn nhãn trạng thái:
+Các màn hình theo kế hoạch 8 tuần của bản demo đã dựng xong và phần MVP V1 đang được triển khai
+tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
 
 - **Live**: Business Objects và bản ghi — khai schema, tạo định nghĩa, nhập bản ghi bằng form sinh
   từ schema; dữ liệu đi qua API Go và lưu trong PostgreSQL. **Sửa định nghĩa sẽ publish một phiên
@@ -20,27 +21,32 @@ Các màn hình theo kế hoạch 8 tuần của bản demo đã dựng xong, m�
   Builder preview dùng đúng component nhập liệu đó. Overview đọc trạng thái API/database thật.
   Application showcase đọc danh sách và chi tiết từ bản ghi thật. Bố cục dashboard ở Analytics lưu
   thật (cookie trình duyệt).
-- **Mock**: Workflows (sơ đồ quy trình đọc từ fixture), Tasks (inbox duyệt/trả về/từ chối đổi state
-  trong trình duyệt), số liệu Analytics (metric catalog trên fixture), kanban và connector trong
-  Application showcase. Hai màn hình Workflows/Tasks đang là **preview thiết kế**: engine quy trình
-  đã chạy thật ở API (xem dưới) nhưng UI chưa nối vào, vì cần identity (D09).
+- **Live**: Tasks — inbox đọc từ engine theo đúng role người đang đăng nhập, mở một việc để xem bản
+  ghi (theo phiên bản định nghĩa của nó), event log append-only, và duyệt / trả về / từ chối qua
+  đúng một transaction có compare-and-swap.
+- **Mock**: Workflows (sơ đồ quy trình đọc từ fixture — trình thiết kế trong web chưa nối API),
+  số liệu Analytics (metric catalog trên fixture), kanban và connector trong Application showcase.
 - **Live (MVP)**: workflow runtime tự xây trên PostgreSQL — process definition publish theo phiên
   bản bất biến, instance gắn với phiên bản lúc start, human task duyệt theo role với
   compare-and-swap, reject terminal, return reset attempt, event log append-only (ADR 0005/0007).
+  Ba quy trình pilot của D07 (`purchase_approval`, `incident_triage`, `hr_onboarding_flow`) được
+  publish và seed sẵn việc đang chờ bằng `make seed-demo`.
 - **Live (MVP)**: identity local — đăng nhập bằng mật khẩu argon2id, session cookie httpOnly (chỉ
   lưu hash của token), role và bộ phận trên user. **Mọi endpoint đều cần đăng nhập** (trừ health,
   meta và auth); tạo/publish định nghĩa cần `admin` hoặc `process_designer`; đọc bản ghi theo bộ
   phận mình + việc mình đang giữ; `GET /api/v1/tasks` là inbox theo người dùng. Tài khoản tạo bằng
   `make useradm` (ADR 0008).
 - **Concept**: điều kiện hiển thị và calculated field của Form Builder, tab Cấu hình của Application
-  Builder, escalation, template library, và nội dung Roadmap — các phần phụ thuộc quyết định còn mở.
+  Builder, SLA/escalation, template library, và nội dung Roadmap — các phần phụ thuộc quyết định
+  còn mở hoặc thuộc V1.x.
 
-Workflow runtime chưa được viết vì Process Execution Contract (D05/D08 trong playbook) chưa chốt;
-bản đề xuất để chốt nằm ở [ADR 0005](docs/adr/0005-runtime-decisions-proposal.md). Chi tiết phạm vi
-demo ở [ADR 0002](docs/adr/0002-demo-scope-and-labels.md),
+Quyết định D04/D05/D07/D08/D09 đã chốt và đang chạy trong code (ADR 0005–0008); D06 (analytics) và
+D10 (deployment) còn mở. Chi tiết phạm vi demo ở
+[ADR 0002](docs/adr/0002-demo-scope-and-labels.md),
 [ADR 0003](docs/adr/0003-demo-data-slice-and-mock-surfaces.md),
 [ADR 0004](docs/adr/0004-dashboard-layout-storage-and-demo-flow-tests.md) và hạng mục MVP đã làm ở
-[ADR 0006](docs/adr/0006-definition-versioning.md).
+[ADR 0006](docs/adr/0006-definition-versioning.md), [ADR 0007](docs/adr/0007-process-execution-contract.md),
+[ADR 0008](docs/adr/0008-identity-permissions-pilot-and-deployment.md).
 
 ## Bắt đầu nhanh
 

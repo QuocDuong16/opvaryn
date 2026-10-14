@@ -18,6 +18,18 @@ export type BusinessObjectVersion = components['schemas']['BusinessObjectVersion
 export type ObjectRecord = components['schemas']['ObjectRecord'];
 /** Request body for creating a business object record. */
 export type CreateObjectRecordRequest = components['schemas']['CreateObjectRecordRequest'];
+/** One instance of a process definition, bound to the version it started with. */
+export type ProcessInstance = components['schemas']['ProcessInstance'];
+/** One human task of an instance. */
+export type ProcessTask = components['schemas']['ProcessTask'];
+/** One append-only audit event of an instance. */
+export type ProcessEvent = components['schemas']['ProcessEvent'];
+/** An instance together with its tasks and its event log. */
+export type ProcessInstanceView = components['schemas']['ProcessInstanceView'];
+/** One open task with the instance it belongs to. */
+export type InboxItem = components['schemas']['InboxItem'];
+/** Request body for deciding one human task. */
+export type DecideProcessTaskRequest = components['schemas']['DecideProcessTaskRequest'];
 /** Stable error envelope returned by every failing endpoint. */
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 /** The signed-in user with roles and department. */
@@ -38,6 +50,13 @@ export interface ApiClient {
   listBusinessObjectVersions(key: string): Promise<BusinessObjectVersion[]>;
   listObjectRecords(key: string): Promise<ObjectRecord[]>;
   createObjectRecord(key: string, input: CreateObjectRecordRequest): Promise<ObjectRecord>;
+  listInboxTasks(): Promise<InboxItem[]>;
+  getProcessInstance(instanceId: string): Promise<ProcessInstanceView>;
+  decideProcessTask(
+    instanceId: string,
+    taskId: string,
+    input: DecideProcessTaskRequest,
+  ): Promise<ProcessInstanceView>;
 }
 
 /** ApiError carries the HTTP status and the stable machine-readable error code. */
@@ -142,5 +161,19 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
         method: 'POST',
         body: input,
       }),
+
+    async listInboxTasks() {
+      const payload = await request<{ data: InboxItem[] }>('/api/v1/tasks');
+      return payload.data;
+    },
+
+    getProcessInstance: (instanceId) =>
+      request<ProcessInstanceView>(`/api/v1/process-instances/${encodeURIComponent(instanceId)}`),
+
+    decideProcessTask: (instanceId, taskId, input) =>
+      request<ProcessInstanceView>(
+        `/api/v1/process-instances/${encodeURIComponent(instanceId)}/tasks/${encodeURIComponent(taskId)}/decisions`,
+        { method: 'POST', body: input },
+      ),
   };
 }

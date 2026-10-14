@@ -89,6 +89,13 @@ assert_status() {
   [[ "$1" == "$2" ]] || fail "$3: expected HTTP $2, got $1"
 }
 
+# assert_not_contains <file> <text> <label> -> fails when the literal is present
+assert_not_contains() {
+  if grep -qF -- "$2" "$1"; then
+    fail "$3: did not expect to find \"$2\" in ${1##*/}"
+  fi
+}
+
 # count_occurrences <file> <text> -> prints how many times a literal appears
 count_occurrences() {
   grep -oF -- "$2" "$1" | wc -l | tr -d ' '
@@ -97,7 +104,12 @@ count_occurrences() {
 # web_get <path> <outfile> -> status code; keeps cookies, because since ADR 0008 the
 # demo screens need a session like any other caller.
 web_get() {
-  curl -sS -o "$2" -w '%{http_code}' "${web_base}$1" -b "$cookie_jar" -c "$cookie_jar"
+  web_get_as "$cookie_jar" "$1" "$2"
+}
+
+# web_get_as <jar> <path> <outfile> -> status code; a second person needs a second jar.
+web_get_as() {
+  curl -sS -o "$3" -w '%{http_code}' "${web_base}$2" -b "$1" -c "$1"
 }
 
 # web_post <path> <outfile> [--form-string ...] -> status code; keeps cookies so
@@ -105,8 +117,35 @@ web_get() {
 web_post() {
   local path="$1" out="$2"
   shift 2
+  web_post_as "$cookie_jar" "$path" "$out" "$@"
+}
+
+# web_post_as <jar> <path> <outfile> [--form-string ...] -> status code
+web_post_as() {
+  local jar="$1" path="$2" out="$3"
+  shift 3
   curl -sS -o "$out" -w '%{http_code}' -X POST "${web_base}${path}" \
-    -H "Origin: $web_base" -c "$cookie_jar" -b "$cookie_jar" "$@"
+    -H "Origin: $web_base" -c "$jar" -b "$jar" "$@"
+}
+
+# sign_in_through_form <jar> <email> <password> <label> -> signs in as a person by
+# replaying the real login form, exactly like a browser without JavaScript.
+sign_in_through_form() {
+  local jar="$1" email="$2" password="$3" label="$4"
+  local page="$tmp_dir/login-$label.html" response="$tmp_dir/signed-in-$label.html"
+  local status args
+  status="$(web_get_as "$jar" "/login" "$page")"
+  assert_status "$status" "200" "$label login page"
+  mapfile -t args < <(form_args "$page" password)
+  [[ ${#args[@]} -ge 4 ]] || fail "[$label] the login form has no server-action fields"
+  status="$(web_post_as "$jar" "/login" "$response" \
+    "${args[@]}" \
+    --form-string "email=$email" \
+    --form-string "password=$password")"
+  # The action answers 303 back to the shell after storing the session cookie; curl
+  # does not follow redirects, so the redirect itself is the success signal.
+  assert_status "$status" "303" "$label sign in"
+  grep -q 'opvaryn.session' "$jar" || fail "[$label] the web app did not set a session cookie"
 }
 
 # form_fields <html-file> <marker-input> [exclude...] -> "name\tvalue" per hidden field
@@ -190,6 +229,9 @@ wait_for_http "$web_base/" 60 "the web app"
 stamp="$(date +%s)"
 object_key="flow_$stamp"
 web_object_key="flow_web_$stamp"
+# Role names carry the stamp so a rerun never picks up tasks of an earlier run.
+approver_role="flow_approver_$stamp"
+director_role="flow_director_$stamp"
 
 # ------------------------------------------------------------------ flow 0: sign in ----
 # Since ADR 0008 the API needs a session, and the web app keeps it in its own
@@ -204,22 +246,14 @@ department="flow_dept_$stamp"
 (cd "$api_dir" && go build -o bin/useradm ./cmd/useradm) || fail "building the useradm CLI failed"
 (cd "$api_dir" && ./bin/useradm -create-department -key "$department" -department-name "Flow $stamp") >/dev/null ||
   fail "creating the flow department failed"
+# The designer also holds the first approval role, so the inbox flow can be driven
+# by the same person who publishes the definition.
 (cd "$api_dir" && ./bin/useradm -create -email "$designer_email" -name "Flow designer" \
-  -password "$designer_password" -department "$department" -roles process_designer) >/dev/null ||
+  -password "$designer_password" -department "$department" \
+  -roles "process_designer,$approver_role") >/dev/null ||
   fail "creating the flow designer failed"
 
-status="$(web_get "/login" "$tmp_dir/login.html")"
-assert_status "$status" "200" "login page"
-mapfile -t login_args < <(form_args "$tmp_dir/login.html" password)
-[[ ${#login_args[@]} -ge 4 ]] || fail "[0] the login form has no server-action fields"
-status="$(web_post "/login" "$tmp_dir/signed-in.html" \
-  "${login_args[@]}" \
-  --form-string "email=$designer_email" \
-  --form-string "password=$designer_password")"
-# The action answers 303 back to the shell after storing the session cookie; curl
-# does not follow redirects, so the redirect itself is the success signal.
-assert_status "$status" "303" "sign in"
-grep -q 'opvaryn.session' "$cookie_jar" || fail "[0] the web app did not set a session cookie"
+sign_in_through_form "$cookie_jar" "$designer_email" "$designer_password" "designer"
 
 status="$(web_get "/" "$tmp_dir/home.html")"
 assert_status "$status" "200" "home after signing in"
@@ -422,10 +456,17 @@ check_surface() {
 check_surface "/" "overview" "Walkthrough bản demo" "Trạng thái nền tảng"
 check_surface "/forms?object=$object_key" "forms" "Preview form" 'name="priority"'
 check_surface "/workflows" "workflows" "Màn hình còn dùng fixture — runtime đã có ở API" "Trưởng bộ phận duyệt"
-check_surface "/tasks" "tasks" "PR-2026-014" "Đang chờ bạn" "engine đã chạy thật ở API"
+# No process was started yet, so the live inbox is empty for this role — and it says so.
+check_surface "/tasks" "tasks" "Không có việc nào đang chờ bạn" "Engine đã có gì, inbox còn thiếu gì"
 check_surface "/apps" "applications" "Kanban" "Cấu hình" "Tích hợp"
 check_surface "/roadmap" "roadmap" "Điều kiện nghiệm thu MVP V1" "Quyết định đang mở chặn tiến độ" "Concept"
 check_surface "/settings" "settings" "make seed-demo" "make smoke-api"
+
+# The inbox is per person: without a session the screen asks for a sign-in instead
+# of rendering anything.
+status="$(curl -sS -o "$tmp_dir/tasks-anonymous.html" -w '%{http_code}' "${web_base}/tasks")"
+assert_status "$status" "200" "tasks page without a session"
+assert_contains "$tmp_dir/tasks-anonymous.html" "Cần đăng nhập để đọc inbox" "tasks page without a session"
 
 # --------------------------------- flow F: publishing a new definition version ----
 
@@ -480,5 +521,158 @@ assert_contains "$tmp_dir/detail-v2.html" "phiên bản đang dùng" "version ba
 assert_contains "$tmp_dir/detail-v2.html" "Nội dung (v2)" "the new schema is rendered"
 assert_contains "$tmp_dir/detail-v2.html" "phiên bản cũ — bản ghi giữ nguyên schema" "old records keep their version"
 assert_contains "$tmp_dir/detail-v2.html" "Kiểm thử luồng demo" "the v1 record is still listed"
+
+# ------------------------------- flow G: the live inbox and its decisions ----
+
+echo "flows: [G] a started process reaches the inbox and is decided through the forms"
+
+# The escalation approver is a second person, so the handoff between roles is a real
+# one: the approver must not be able to decide the director's task, and vice versa.
+director_email="flow_director_$stamp@example.com"
+director_jar="$tmp_dir/director.cookies"
+(cd "$api_dir" && ./bin/useradm -create -email "$director_email" -name "Flow director" \
+  -password "$designer_password" -department "$department" -roles "$director_role") >/dev/null ||
+  fail "[G] creating the flow director failed"
+
+process_key="flow_approval_$stamp"
+process_body="$(printf '{"key":"%s","name":"Luồng duyệt demo","description":"created by scripts/smoke-demo-flows.sh","objectKey":"%s","nodes":[{"key":"start","type":"start","title":"Nhận đề nghị"},{"key":"approve","type":"human_task","title":"Trưởng bộ phận duyệt","assigneeRole":"%s"},{"key":"gate","type":"condition","title":"Trên 1 triệu?","condition":{"field":"amount","op":"gte","value":1000000}},{"key":"escalate","type":"human_task","title":"Giám đốc duyệt","assigneeRole":"%s"},{"key":"end","type":"end","title":"Kết thúc"}],"edges":[{"from":"start","to":"approve"},{"from":"approve","to":"gate"},{"from":"gate","to":"escalate","when":"true"},{"from":"gate","to":"end","when":"false"},{"from":"escalate","to":"end"}]}' \
+  "$process_key" "$object_key" "$approver_role" "$director_role")"
+status="$(curl -sS -b "$cookie_jar" -o "$tmp_dir/process-created.json" -w '%{http_code}' -X POST \
+  "$api_base/api/v1/process-definitions" -H 'Content-Type: application/json' -d "$process_body")"
+assert_status "$status" "201" "creating the approval process"
+
+# Start on the record flow A created: amount 1.500.000 sits above the gate, so the
+# approval must escalate to the second role.
+curl -sS -b "$cookie_jar" -o "$tmp_dir/records.json" "$api_base/api/v1/business-objects/$object_key/records"
+record_id="$(python3 - "$tmp_dir/records.json" <<'PY'
+import json, sys
+
+records = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+match = next((r for r in records if r["values"].get("title") == "Kiểm thử luồng demo"), None)
+if match is None:
+    sys.exit("flows: the record created in flow A is missing")
+print(match["id"])
+PY
+)"
+status="$(curl -sS -b "$cookie_jar" -o "$tmp_dir/instance.json" -w '%{http_code}' -X POST \
+  "$api_base/api/v1/process-instances" -H 'Content-Type: application/json' \
+  -d "$(printf '{"definitionKey":"%s","recordId":"%s"}' "$process_key" "$record_id")")"
+assert_status "$status" "201" "starting the approval process"
+instance_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["instance"]["id"])' "$tmp_dir/instance.json")"
+
+echo "flows: [G] the inbox lists the task the engine just created"
+status="$(web_get "/tasks" "$tmp_dir/inbox.html")"
+assert_status "$status" "200" "tasks page"
+assert_contains "$tmp_dir/inbox.html" "Trưởng bộ phận duyệt" "the inbox lists the open task"
+assert_contains "$tmp_dir/inbox.html" "Đang chờ bạn" "the inbox summary counts it"
+assert_contains "$tmp_dir/inbox.html" "$process_key" "the inbox names the definition"
+assert_not_contains "$tmp_dir/inbox.html" "Giám đốc duyệt" "the escalation task does not exist yet"
+
+echo "flows: [G] the instance screen shows the record with its own definition version"
+status="$(web_get "/tasks/$instance_id" "$tmp_dir/instance-page.html")"
+assert_status "$status" "200" "instance page"
+assert_contains "$tmp_dir/instance-page.html" "Kiểm thử luồng demo" "the record is rendered"
+assert_contains "$tmp_dir/instance-page.html" "Mức ưu tiên" "the record uses its v1 schema, not the newest"
+assert_contains "$tmp_dir/instance-page.html" "Khởi tạo quy trình" "the event log is shown"
+assert_contains "$tmp_dir/instance-page.html" "Lý do (bắt buộc khi trả về hoặc từ chối)" "the decision form is offered"
+
+mapfile -t decision_args < <(form_args "$tmp_dir/instance-page.html" decision)
+[[ ${#decision_args[@]} -ge 4 ]] || fail "[G] the decision form has no server-action fields"
+
+echo "flows: [G] approving advances the process and evaluates the condition"
+status="$(web_post "/tasks/$instance_id" "$tmp_dir/approved.html" \
+  "${decision_args[@]}" --form-string 'decision=approve')"
+assert_status "$status" "200" "approve decision"
+assert_contains "$tmp_dir/approved.html" "Đã duyệt — quy trình chuyển tới node" "the approve is confirmed"
+assert_contains "$tmp_dir/approved.html" "việc tiếp theo thuộc role $director_role" "the next role is named"
+assert_contains "$tmp_dir/approved.html" "amount gte 1000000" "what the condition saw is in the log"
+assert_not_contains "$tmp_dir/approved.html" "Kết thúc quy trình" "the branch not taken did not run"
+
+curl -sS -b "$cookie_jar" -o "$tmp_dir/instance-after.json" "$api_base/api/v1/process-instances/$instance_id"
+python3 - "$tmp_dir/instance-after.json" "$director_role" "$designer_email" <<'PY' || fail "[G] the engine did not advance as the screen reported"
+import json, sys
+
+view = json.load(open(sys.argv[1], encoding="utf-8"))
+director_role, designer_email = sys.argv[2], sys.argv[3]
+instance = view["instance"]
+if instance["state"] != "running" or instance["currentNode"] != "escalate":
+    sys.exit(f'expected running at "escalate", got {instance["state"]} at "{instance["currentNode"]}"')
+open_roles = [task["assigneeRole"] for task in view["tasks"] if task["status"] == "open"]
+if open_roles != [director_role]:
+    sys.exit(f"expected one open task for {director_role}, got {open_roles}")
+decided = [task for task in view["tasks"] if task["status"] == "approved"]
+if len(decided) != 1 or decided[0]["decidedBy"] != designer_email:
+    sys.exit(f"the approval is not attributed to the designer: {decided}")
+print("flows: the engine advanced to the escalation role and attributed the approval")
+PY
+
+echo "flows: [G] the task belongs to the other person, not to the approver"
+status="$(web_get "/tasks/$instance_id" "$tmp_dir/instance-other-role.html")"
+assert_status "$status" "200" "instance page as the approver"
+assert_contains "$tmp_dir/instance-other-role.html" "bạn không giữ role đó nên không quyết định được" \
+  "a role the viewer does not hold is not decidable"
+assert_not_contains "$tmp_dir/instance-other-role.html" 'name="decision"' \
+  "no decision form is offered for another role"
+
+status="$(web_get "/tasks" "$tmp_dir/inbox-after.html")"
+assert_status "$status" "200" "inbox after approving"
+assert_contains "$tmp_dir/inbox-after.html" "Không có việc nào đang chờ bạn" \
+  "the approver's inbox is empty again"
+
+sign_in_through_form "$director_jar" "$director_email" "$designer_password" "director"
+status="$(web_get_as "$director_jar" "/tasks" "$tmp_dir/director-inbox.html")"
+assert_status "$status" "200" "director inbox"
+assert_contains "$tmp_dir/director-inbox.html" "Giám đốc duyệt" "the escalation task reaches the director"
+
+echo "flows: [G] a return without a reason is rejected by the service"
+status="$(web_get_as "$director_jar" "/tasks/$instance_id" "$tmp_dir/director-instance.html")"
+assert_status "$status" "200" "instance page as the director"
+mapfile -t director_args < <(form_args "$tmp_dir/director-instance.html" decision)
+[[ ${#director_args[@]} -ge 4 ]] || fail "[G] the director has no decision form"
+status="$(web_post_as "$director_jar" "/tasks/$instance_id" "$tmp_dir/returned-no-reason.html" \
+  "${director_args[@]}" --form-string 'decision=return')"
+assert_status "$status" "200" "return without a reason"
+assert_contains "$tmp_dir/returned-no-reason.html" "Dữ liệu chưa hợp lệ" \
+  "the service rejects a return without a reason"
+
+echo "flows: [G] returning resets the process to a new attempt for the first approver"
+status="$(web_post_as "$director_jar" "/tasks/$instance_id" "$tmp_dir/returned.html" \
+  "${director_args[@]}" --form-string 'decision=return' \
+  --form-string 'reason=Bổ sung báo giá của hai nhà cung cấp')"
+assert_status "$status" "200" "return decision"
+assert_contains "$tmp_dir/returned.html" "Đã trả về người đề nghị — quy trình chạy lại từ đầu với attempt 2" \
+  "the return is confirmed with the new attempt"
+
+status="$(web_get "/tasks" "$tmp_dir/inbox-attempt2.html")"
+assert_status "$status" "200" "inbox after the return"
+assert_contains "$tmp_dir/inbox-attempt2.html" "attempt 2" "the reopened task carries its attempt"
+
+status="$(web_get "/tasks/$instance_id" "$tmp_dir/instance-attempt2.html")"
+assert_status "$status" "200" "instance page after the return"
+assert_contains "$tmp_dir/instance-attempt2.html" "Bổ sung báo giá của hai nhà cung cấp" \
+  "the reason reaches the first approver"
+assert_contains "$tmp_dir/instance-attempt2.html" "Reset về điểm bắt đầu" "the reset is in the event log"
+assert_contains "$tmp_dir/instance-attempt2.html" 'name="decision"' "the first approver can decide again"
+
+curl -sS -b "$cookie_jar" -o "$tmp_dir/instance-attempt2.json" "$api_base/api/v1/process-instances/$instance_id"
+python3 - "$tmp_dir/instance-attempt2.json" "$approver_role" "$director_email" <<'PY' || fail "[G] the returned instance is not in a clean attempt 2"
+import json, sys
+
+view = json.load(open(sys.argv[1], encoding="utf-8"))
+approver_role, director_email = sys.argv[2], sys.argv[3]
+instance = view["instance"]
+if instance["state"] != "running" or instance["attempt"] != 2 or instance["currentNode"] != "approve":
+    sys.exit(f'expected running at "approve" on attempt 2, got {instance["state"]} at "{instance["currentNode"]}" attempt {instance["attempt"]}')
+open_tasks = [(task["nodeKey"], task["assigneeRole"], task["attempt"]) for task in view["tasks"] if task["status"] == "open"]
+if open_tasks != [("approve", approver_role, 2)]:
+    sys.exit(f"expected one open approver task on attempt 2, got {open_tasks}")
+returned = [task for task in view["tasks"] if task["status"] == "returned"]
+if len(returned) != 1 or returned[0]["decidedBy"] != director_email or not returned[0].get("reason"):
+    sys.exit(f"the return is not recorded with its actor and reason: {returned}")
+events = [event["type"] for event in view["events"]]
+if events.count("instance_returned") != 1 or events[-1] != "task_created":
+    sys.exit(f"unexpected event trail after the reset: {events}")
+print("flows: the reset created a clean attempt 2 and kept the audit trail")
+PY
 
 echo "flows: PASS"

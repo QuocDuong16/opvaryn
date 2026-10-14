@@ -28,10 +28,11 @@ make dev                     # terminal 1: API :21501 + web :21500
 Đợi tới khi terminal 1 báo API đang nghe và web ready, rồi ở **terminal 2**:
 
 ```bash
-make seed-demo               # 2 business object mẫu + 9 bản ghi, nạp qua chính API
+make seed-demo               # 3 business object, 3 quy trình pilot + việc đang chờ, nạp qua chính API
 ```
 
-Mở http://localhost:21500. `make seed-demo` idempotent: chạy lại không tạo trùng.
+Mở http://localhost:21500. `make seed-demo` idempotent: chạy lại không tạo trùng; các instance
+pilot chỉ được tạo khi role nhận việc chưa có việc nào của quy trình đó đang mở.
 
 ## 3. Chạy lại những lần sau (giữ dữ liệu)
 
@@ -54,8 +55,8 @@ curl -s localhost:21501/api/v1/meta   # tên, phiên bản, stage
 Hai bài kiểm thử tự động (chúng tự build và tự khởi động server riêng, nên **tắt `make dev` trước**):
 
 ```bash
-make smoke-api           # API + PostgreSQL: tạo, trùng key, dữ liệu sai, 404
-make smoke-demo-flows    # build web, replay form của các luồng demo, kiểm chứng dữ liệu lưu
+make smoke-api           # API + PostgreSQL: tạo, trùng key, dữ liệu sai, 404, quyền, inbox, duyệt chéo role
+make smoke-demo-flows    # build web, replay form của các luồng demo (kể cả inbox → duyệt → trả về), kiểm chứng dữ liệu lưu
 ```
 
 ## 5. Walkthrough 9 màn hình
@@ -69,29 +70,50 @@ Thứ tự gợi ý, kèm phần cần nói rõ để không trình bày quá:
 | 3 | **Object detail** `/objects/<key>` | Form nhập liệu sinh từ schema vừa tạo; lưu một bản ghi; thử để trống field bắt buộc để thấy server chặn và báo lỗi | live |
 | 3b | **Publish phiên bản** (cùng trang) | Sửa schema rồi **Publish phiên bản v2**: bản ghi cũ vẫn nằm ở nhóm "phiên bản cũ" với đúng schema cũ, bản ghi mới dùng schema mới. Đây là bất biến #1 của playbook chạy thật | live |
 | 4 | **Forms** `/forms` | Đổi schema, thấy form đổi theo; danh sách "chưa có trong demo" | live + concept |
-| 5 | **Workflows** `/workflows` | Sơ đồ hai quy trình, click từng node xem cấu hình và nhánh điều kiện — preview thiết kế; engine thật nằm ở API | **mock** |
-| 6 | **Tasks** `/tasks` | Duyệt / trả về / từ chối, timeline đổi theo; người giữ việc — màn hình dùng fixture, engine duyệt thật đã có ở API | **mock** |
+| 5 | **Workflows** `/workflows` | Sơ đồ hai quy trình, click từng node xem cấu hình và nhánh điều kiện — preview thiết kế; định nghĩa thật publish qua API | **mock** |
+| 6 | **Tasks** `/tasks` | Inbox thật theo role của người đang đăng nhập; mở một việc để xem bản ghi, event log và **duyệt / trả về / từ chối**; thử bằng hai tài khoản khác role để thấy việc chuyển người | **live** |
 | 7 | **Analytics** `/analytics` | Kéo–thả sắp widget, đổi metric/dimension, **Lưu bố cục**, rồi F5 để thấy bố cục còn nguyên | số liệu **mock**, bố cục **live** |
 | 8 | **Applications** `/apps` | Danh sách và chi tiết đọc bản ghi thật; kanban; tab **Cấu hình** (các ô đều bị khoá); panel tích hợp | live + mock + concept |
-| 9 | **Roadmap** `/roadmap` | Bốn phase, điều kiện nghiệm thu MVP, các quyết định đang mở chặn tiến độ | concept |
+| 9 | **Roadmap** `/roadmap` | Bốn phase, điều kiện nghiệm thu MVP, quyết định đang mở chặn tiến độ và các quyết định đã chốt | concept |
 | 10 | **Cài đặt** `/settings` | Danh sách endpoint, cổng, lệnh seed/smoke — tiện để chứng minh dữ liệu thật bằng curl | live |
 
-Câu nên nói ở mục 5, 6, 7, 8: "phần này là mô phỏng vì workflow runtime chưa được viết — nó chờ
-quyết định D05/D08 trong playbook". Nhãn `Mock` / `Concept` đã hiện sẵn ở góc phải mỗi màn hình, nên
-người xem tự kiểm chứng được.
+Câu nên nói ở mục 5, 7, 8: "phần này là mô phỏng — trình thiết kế workflow, số liệu analytics,
+kanban và connector chưa chạy thật". Nhãn `Mock` / `Concept` đã hiện sẵn ở góc phải mỗi màn hình, nên
+người xem tự kiểm chứng được. Riêng mục 6 (Tasks) là **live**: mọi quyết định đi qua engine, ghi
+event log, và người thứ hai quyết định cùng một task sẽ nhận 409.
 
-## 5b. Đăng nhập (identity đã có, UI chưa nối)
+### Walkthrough màn hình Tasks (live)
 
-Runtime quy trình yêu cầu đăng nhập. Màn hình demo hiện **chưa** dùng session — chúng vẫn là
-fixture — nên buổi trình diễn UI không bị ảnh hưởng; phần cần session là API.
+1. Đăng nhập bằng một tài khoản có việc đang chờ (bảng tài khoản ở mục 5b). Inbox chỉ liệt kê việc
+   thuộc role bạn giữ — đổi tài khoản là đổi nội dung, không có bộ lọc nào trên giao diện.
+2. Mở một việc: trang instance hiện bản ghi **theo đúng phiên bản định nghĩa mà bản ghi mang**, các
+   task của quy trình, và event log append-only (kể cả điều kiện đã đánh giá và giá trị nó nhìn thấy).
+3. Bấm **Duyệt**: quy trình đi tiếp. Nếu nhánh điều kiện đúng, việc mới xuất hiện trong inbox của
+   người giữ role kế tiếp — mở cửa sổ ẩn danh, đăng nhập tài khoản đó để chứng minh.
+4. Ở bước sau, bấm **Trả về** kèm lý do: quy trình reset về điểm bắt đầu với `attempt 2`, lý do nằm
+   trong timeline của người đề nghị, và task cũ vẫn còn trong lịch sử với trạng thái "đã trả về".
+5. Bấm **Từ chối** (có lý do): quy trình kết thúc ở trạng thái `rejected` — terminal theo D08a.
 
-Tạo bộ phận và tài khoản (chạy một lần, sau khi đã migrate):
+## 5b. Đăng nhập và tài khoản demo
+
+Mọi màn hình dữ liệu đều cần đăng nhập: session nằm trong cookie httpOnly của web app, web app
+chuyển tiếp nó cho API (ADR 0008). `make seed-demo` tạo sẵn bộ tài khoản dưới đây (mật khẩu chung
+`demo-password-opvaryn`), mỗi tài khoản gắn với role mà quy trình pilot giao việc:
+
+| Tài khoản | Bộ phận | Role | Thấy gì ở `/tasks` |
+| --- | --- | --- | --- |
+| `seed_truong_ky_thuat@opvaryn.local` | Kỹ thuật | `nhan_vien`, `truong_bo_phan` | Đề nghị mua 9.800.000đ chờ duyệt (bước 1) |
+| `seed_giam_doc@opvaryn.local` | Ban giám đốc | `giam_doc` | Đề nghị mua 52.900.000đ đã qua trưởng bộ phận, trên ngưỡng 20 triệu |
+| `seed_it@opvaryn.local` | Kỹ thuật | `it_support` | Sự cố ERP nghiêm trọng chờ phân loại |
+| `seed_nhan_su@opvaryn.local` | Nhân sự | `nhan_vien`, `nhan_su` | Hồ sơ onboarding chờ HR chuẩn bị |
+| `seed_ke_toan@opvaryn.local` | Kế toán | `ke_toan` | (trống — chỉ nhận việc sau khi trưởng bộ phận duyệt đề nghị dưới ngưỡng) |
+| `seed@opvaryn.local` | Ban giám đốc | `admin` | Tất cả dữ liệu, dùng để chứng minh phạm vi |
+
+Tài khoản thủ công (nếu bạn tự tạo theo hướng dẫn cũ):
 
 ```bash
 make useradm ARGS="-create-department -key ky_thuat -department-name 'Kỹ thuật'"
-make useradm ARGS="-create-department -key ke_toan -department-name 'Kế toán'"
 make useradm ARGS="-create -email lan@opvaryn.local -name 'Nguyễn Lan' -password demo-password-opvaryn -department ky_thuat -roles truong_bo_phan"
-make useradm ARGS="-create -email bao@opvaryn.local -name 'Trần Bảo' -password demo-password-opvaryn -department ke_toan -roles ke_toan"
 make useradm ARGS="-list"
 ```
 
@@ -103,9 +125,12 @@ Hai điều cần biết khi trình diễn phần này:
 - **Màn hình tạo/publish định nghĩa cần role `process_designer`** (hoặc `admin`). Tài khoản
   `lan@opvaryn.local` đã có sẵn role đó; nếu bạn tự tạo tài khoản khác thì gán thêm bằng
   `make useradm ARGS="-add-role -email <email> -roles process_designer"`.
-- **Bản ghi được lọc theo bộ phận**: đăng nhập `lan@opvaryn.local` (Kỹ thuật) sẽ thấy 2 đề nghị của
-  Kỹ thuật, `bao@opvaryn.local` (Kế toán) thấy 0, còn `admin@opvaryn.local` thấy cả 5. Đó là D09b
-  chạy thật, không phải ẩn trên giao diện. Muốn tạo dữ liệu mẫu đúng bộ phận: `make seed-demo`.
+- **Bản ghi được lọc theo bộ phận**: đăng nhập `lan@opvaryn.local` (Kỹ thuật) sẽ thấy đề nghị của
+  Kỹ thuật, `bao@opvaryn.local` (Kế toán) thấy 0, còn `seed@opvaryn.local` (admin) thấy tất cả. Đó
+  là D09b chạy thật, không phải ẩn trên giao diện. Muốn nạp dữ liệu mẫu đúng bộ phận: `make seed-demo`.
+- **Quy trình pilot** (`purchase_approval`, `incident_triage`, `hr_onboarding_flow`) đã được publish
+  v1 và seed sẵn việc đang chờ; muốn xem định nghĩa thật:
+  `curl -s -b /tmp/opvaryn.cookies localhost:21501/api/v1/process-definitions/purchase_approval`.
 
 Gọi API bằng session:
 
