@@ -772,11 +772,12 @@ assert_contains "$tmp_dir/workflow-created.html" "Đã publish" "definition crea
 
 status="$(web_get "/workflows/$web_flow_key" "$tmp_dir/workflow-detail.html")"
 assert_status "$status" "200" "workflow detail page"
-assert_contains "$tmp_dir/workflow-detail.html" "Sơ đồ $web_flow_key v1" "the canvas draws the published graph"
+assert_contains "$tmp_dir/workflow-detail.html" "Trình soạn $web_flow_key v1" "the editor draws the published graph"
 assert_contains "$tmp_dir/workflow-detail.html" "Kiểm tra yêu cầu" "the canvas names the node"
 assert_contains "$tmp_dir/workflow-detail.html" "role $approver_role" "the node shows its role"
+assert_contains "$tmp_dir/workflow-detail.html" "Trùng bản đã publish" "a fresh editor reports nothing unpublished"
 assert_contains "$tmp_dir/workflow-detail.html" "Instance của quy trình này" "the instance section"
-assert_contains "$tmp_dir/workflow-detail.html" "Publish phiên bản mới" "the publish form"
+assert_contains "$tmp_dir/workflow-detail.html" "Publish phiên bản mới" "the publish button"
 assert_contains "$tmp_dir/workflow-detail.html" "Chưa có quy trình nào đang chạy" "no instance yet"
 
 # A definition the service rejects: the graph has no human task, and the message
@@ -858,6 +859,50 @@ assert_status "$status" "200" "detail page of the definition with an unheld role
 assert_contains "$tmp_dir/ghost-detail.html" "Role chưa có ai giữ" "the unheld role is flagged"
 assert_contains "$tmp_dir/ghost-detail.html" "$ghost_role" "the warning names the role"
 assert_contains "$tmp_dir/ghost-detail.html" "-add-role" "the warning says how to fix it"
+
+echo "flows: [H] a draft stays in the browser and never reaches the engine"
+curl -sS -b "$cookie_jar" -o "$tmp_dir/definition-before-draft.json" \
+  "$api_base/api/v1/process-definitions/$web_flow_key"
+# The save-draft form is on the page fetched at the start of this flow (the editor is the
+# same before and after a publish).
+mapfile -t draft_args < <(form_args "$tmp_dir/workflow-detail.html" draft draft)
+[[ ${#draft_args[@]} -ge 4 ]] || fail "[H] the draft form has no server-action fields"
+draft_payload='{"nodes":[{"key":"start","type":"start","title":"Nhận yêu cầu","x":24,"y":24},{"key":"check","type":"human_task","title":"Kiểm tra yêu cầu (v2)","assigneeRole":"'"$approver_role"'","x":238,"y":24},{"key":"extra","type":"human_task","title":"Bước nháp chưa publish","assigneeRole":"'"$approver_role"'","x":452,"y":24},{"key":"end","type":"end","title":"Kết thúc","x":666,"y":24}],"edges":[{"id":"e1","from":"start","to":"check"},{"id":"e2","from":"check","to":"extra"},{"id":"e3","from":"extra","to":"end"}]}'
+status="$(web_post "/workflows/$web_flow_key" "$tmp_dir/draft-saved.html" \
+  "${draft_args[@]}" --form-string "draft=$draft_payload")"
+assert_status "$status" "200" "saving a draft"
+assert_contains "$tmp_dir/draft-saved.html" "Đã lưu bản nháp" "saving a draft"
+
+status="$(web_get "/workflows/$web_flow_key" "$tmp_dir/draft-loaded.html")"
+assert_status "$status" "200" "the editor with a saved draft"
+assert_contains "$tmp_dir/draft-loaded.html" "Bản nháp khác bản đã publish" "the editor reports the draft"
+assert_contains "$tmp_dir/draft-loaded.html" "Bước nháp chưa publish" "the draft's own node is on the canvas"
+assert_contains "$tmp_dir/draft-loaded.html" "có bản nháp đã lưu cho trình duyệt này" "the editor says a draft is stored"
+
+# The engine must not know about the draft: the published definition is still v2 with its
+# three nodes, which is the whole point of keeping drafts out of the runtime (ADR 0013).
+curl -sS -b "$cookie_jar" -o "$tmp_dir/definition-with-draft.json" \
+  "$api_base/api/v1/process-definitions/$web_flow_key"
+python3 - "$tmp_dir/definition-before-draft.json" "$tmp_dir/definition-with-draft.json" <<'CHECK_DRAFT_ISOLATED'
+import json, sys
+
+before = json.load(open(sys.argv[1], encoding="utf-8"))
+after = json.load(open(sys.argv[2], encoding="utf-8"))
+if before != after:
+    sys.exit(f"the published definition changed while a draft existed: {before} -> {after}")
+if "extra" in [node["key"] for node in after["nodes"]]:
+    sys.exit("a draft node reached the published definition")
+print(f"flows: the published definition (v{after['version']}) is untouched while a draft exists")
+CHECK_DRAFT_ISOLATED
+
+status="$(web_post "/workflows/$web_flow_key" "$tmp_dir/draft-discarded.html" \
+  "${draft_args[@]}" --form-string 'draft=discard')"
+assert_status "$status" "200" "discarding a draft"
+assert_contains "$tmp_dir/draft-discarded.html" "Đã bỏ bản nháp" "discarding a draft"
+
+status="$(web_get "/workflows/$web_flow_key" "$tmp_dir/draft-gone.html")"
+assert_contains "$tmp_dir/draft-gone.html" "Trùng bản đã publish" "discarding returns to the published graph"
+assert_not_contains "$tmp_dir/draft-gone.html" "Bước nháp chưa publish" "the discarded node is gone"
 
 echo "flows: [H] publishing v2 leaves the running instance on v1"
 mapfile -t publish_args < <(form_args "$tmp_dir/workflow-instances.html" graph graph)

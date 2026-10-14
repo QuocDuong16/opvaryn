@@ -24,9 +24,10 @@ tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
 - **Live**: Tasks — inbox đọc từ engine theo đúng role người đang đăng nhập, mở một việc để xem bản
   ghi (theo phiên bản định nghĩa của nó), event log append-only, và duyệt / trả về / từ chối qua
   đúng một transaction có compare-and-swap.
-- **Live**: Workflows — danh sách định nghĩa, canvas vẽ graph của **phiên bản đã publish** (toạ độ
-  tính từ graph, không lưu), xem lại phiên bản cũ, tạo định nghĩa mới và publish phiên bản tiếp theo
-  bằng biểu mẫu; mọi kiểm tra graph nằm ở service Go. Trang bản ghi cũng có mục **chạy quy trình** và
+- **Live**: Workflows — danh sách định nghĩa, **trình soạn kéo thả**: kéo node, kéo chấm tròn để nối,
+  thêm/xoá node, sửa tiêu đề/role/điều kiện, **lưu nháp** trong cookie của trình duyệt (engine không
+  bao giờ thấy draft, ADR 0013), rồi **publish** — service kiểm tra graph và version đã publish là bất
+  biến; xem lại được phiên bản cũ. Bàn phím: mũi tên di chuyển node, Delete xoá, nối bằng chọn. Trang bản ghi cũng có mục **chạy quy trình** và
   danh sách instance theo bản ghi/định nghĩa (`GET /api/v1/process-instances`).
 - **Live**: Analytics — metric định nghĩa bằng field của business object (đếm / tổng / trung bình,
   lọc theo đúng ngôn ngữ điều kiện của quy trình, nhóm theo một field), chạy trên projection có kiểu
@@ -61,7 +62,8 @@ Toàn bộ D04–D10 đã chốt và đang chạy trong code (ADR 0005–0010). 
 [ADR 0009](docs/adr/0009-deployment-topology-and-backup.md),
 [ADR 0010](docs/adr/0010-analytics-query-builder.md),
 [ADR 0011](docs/adr/0011-process-operational-metrics.md),
-[ADR 0012](docs/adr/0012-outbound-webhook-integration.md).
+[ADR 0012](docs/adr/0012-outbound-webhook-integration.md),
+[ADR 0013](docs/adr/0013-canvas-draft-editing.md).
 
 ## Bắt đầu nhanh
 
@@ -108,7 +110,8 @@ bí mật, cập nhật phiên bản, phục hồi khi database hỏng, xử lý
 [ADR 0009](docs/adr/0009-deployment-topology-and-backup.md),
 [ADR 0010](docs/adr/0010-analytics-query-builder.md),
 [ADR 0011](docs/adr/0011-process-operational-metrics.md),
-[ADR 0012](docs/adr/0012-outbound-webhook-integration.md).
+[ADR 0012](docs/adr/0012-outbound-webhook-integration.md),
+[ADR 0013](docs/adr/0013-canvas-draft-editing.md).
 
 Các target thường dùng:
 

@@ -71,7 +71,7 @@ Thứ tự gợi ý, kèm phần cần nói rõ để không trình bày quá:
 | 3 | **Object detail** `/objects/<key>` | Form nhập liệu sinh từ schema vừa tạo; lưu một bản ghi; thử để trống field bắt buộc để thấy server chặn và báo lỗi | live |
 | 3b | **Publish phiên bản** (cùng trang) | Sửa schema rồi **Publish phiên bản v2**: bản ghi cũ vẫn nằm ở nhóm "phiên bản cũ" với đúng schema cũ, bản ghi mới dùng schema mới. Đây là bất biến #1 của playbook chạy thật | live |
 | 4 | **Forms** `/forms` | Đổi schema, thấy form đổi theo; danh sách "chưa có trong demo" | live + concept |
-| 5 | **Workflows** `/workflows` | Danh sách định nghĩa đọc từ API; mở một định nghĩa để xem canvas của phiên bản đã publish, xem lại phiên bản cũ, và publish phiên bản mới bằng biểu mẫu. Cần role `process_designer`/`admin` mới ghi được | **live** |
+| 5 | **Workflows** `/workflows` | Danh sách định nghĩa đọc từ API; mở một định nghĩa để **kéo thả trên canvas** (kéo node, kéo chấm tròn để nối, thêm/xoá, sửa role/điều kiện), lưu nháp rồi **Publish phiên bản mới**; xem lại phiên bản cũ. Cần role `process_designer`/`admin` mới publish được | **live** |
 | 5b | **Chạy quy trình** (trang bản ghi) | Chọn quy trình + bản ghi rồi **Chạy quy trình**: instance xuất hiện ngay trong danh sách instance của bản ghi và trong inbox của role đầu tiên | **live** |
 | 6 | **Tasks** `/tasks` | Inbox thật theo role của người đang đăng nhập; mở một việc để xem bản ghi, event log và **duyệt / trả về / từ chối**; thử bằng hai tài khoản khác role để thấy việc chuyển người | **live** |
 | 7 | **Analytics** `/analytics` | Metric thật trên dữ liệu thật: tạo metric từ field của object (đếm/tổng/trung bình, lọc, nhóm), thấy con số và phân rã ngay; kéo–thả sắp widget, **Lưu bố cục**, F5 để thấy còn nguyên | **live** |
@@ -108,12 +108,16 @@ con số trong dashboard là một truy vấn thật trên projection có kiểu
    tính từ graph nên sơ đồ luôn khớp với cái engine chạy; click từng node để xem role, điều kiện và
    các đường chuyển tiếp.
 2. Chọn `v1` ở dải phiên bản để thấy bản cũ vẫn xem lại được: instance đang chạy vẫn theo bản đó.
-3. Sửa graph trong biểu mẫu **Publish phiên bản mới** (thêm node, đổi role, đổi literal điều kiện)
-   rồi publish: bảng lịch sử có v2, canvas đổi theo, và **instance đang chạy vẫn ghi v1** — bất biến
-   version chạy thật trên màn hình.
-4. Graph sai (thiếu việc của người, chu trình, điều kiện sai kiểu) sẽ bị service từ chối kèm lý do
+3. Kéo thả trên canvas: di chuyển node, kéo chấm tròn ở cạnh phải để nối sang node khác, thêm node
+   mới, sửa role/điều kiện ở bảng bên phải. Bấm **Lưu nháp** rồi F5 — bản nháp còn nguyên, và badge
+   chuyển sang "Bản nháp khác bản đã publish". **Bản nháp chỉ nằm ở trình duyệt này: mở lại định nghĩa
+   qua API sẽ thấy engine vẫn đang chạy đúng bản cũ.**
+4. Bấm **Publish phiên bản mới**: bảng lịch sử có v2, canvas đổi theo, và **instance đang chạy vẫn ghi
+   v1** — bất biến version chạy thật trên màn hình. Nút **Bỏ nháp** đưa canvas về đúng bản engine đang
+   chạy.
+5. Graph sai (thiếu việc của người, chu trình, điều kiện sai kiểu) sẽ bị service từ chối kèm lý do
    cụ thể — thử xoá node việc của người rồi publish để thấy thông báo.
-5. Muốn chạy thử: mở một bản ghi của business object tương ứng, chọn quy trình ở khung **Chạy quy
+6. Muốn chạy thử: mở một bản ghi của business object tương ứng, chọn quy trình ở khung **Chạy quy
    trình** rồi bấm chạy; instance hiện ngay trong mục "Quy trình trên các bản ghi này" và việc đầu
    tiên rơi vào inbox của role tương ứng.
 

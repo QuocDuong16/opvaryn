@@ -39,3 +39,4 @@
 - [0010 — Analytics: query builder giới hạn tự viết trên projection có kiểu (D06)](adr/0010-analytics-query-builder.md)
 - [0011 — Metric vận hành quy trình: read model cố định trên cột có kiểu](adr/0011-process-operational-metrics.md)
 - [0012 — Tích hợp ra ngoài: webhook có hàng đợi, retry và nhật ký giao](adr/0012-outbound-webhook-integration.md)
+- [0013 — Kéo thả trên canvas: bản nháp nằm ở trình duyệt, engine không bao giờ thấy](adr/0013-canvas-draft-editing.md)

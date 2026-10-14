@@ -2,7 +2,6 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
   ApiError,
-  type BusinessObject,
   type ProcessDefinition,
   type ProcessDefinitionVersion,
   type ProcessInstanceSummary,
@@ -10,13 +9,15 @@ import {
 
 import { InstanceList } from '@/components/process/instance-list';
 import { recordLabels } from '@/components/objects/record-labels';
-import { PublishDefinitionForm } from '@/components/workflows/definition-editor';
 import { ProcessCanvas } from '@/components/workflows/process-canvas';
+import { WorkflowEditor } from '@/components/workflows/workflow-editor';
+import { draftFromGraph } from '@/components/workflows/definition-draft-model';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatTimestamp } from '@/lib/format';
+import { getWorkflowDraft } from '@/lib/workflow-draft';
 import { cn } from '@/lib/utils';
 
 interface PageProps {
@@ -36,7 +37,6 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
 
   let definition: ProcessDefinition | null = null;
   let versions: ProcessDefinitionVersion[] = [];
-  let objects: BusinessObject[] = [];
   let instances: ProcessInstanceSummary[] = [];
   let roleCatalogue: string[] = [];
   let labels: Record<string, string> = {};
@@ -44,9 +44,8 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
 
   try {
     definition = await api.getProcessDefinition(key);
-    [versions, objects, instances, roleCatalogue] = await Promise.all([
+    [versions, instances, roleCatalogue] = await Promise.all([
       api.listProcessDefinitionVersions(key),
-      api.listBusinessObjects(),
       api.listProcessInstances({ definitionKey: key }),
       api.listRoles(),
     ]);
@@ -111,6 +110,11 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
     ),
   ].sort();
   const knownRoles = [...new Set([...roleCatalogue, ...definitionRoles])].sort();
+
+  // The editor works on a draft (ADR 0013): the newest published graph is the baseline,
+  // and a saved draft from this browser takes its place when one exists.
+  const publishedDraft = draftFromGraph(definition.nodes, definition.edges);
+  const savedDraft = await getWorkflowDraft(definition.key);
   // A role nobody holds is a real hazard: the instance stops at that node and no
   // inbox shows the work. The definition is still valid, so this warns instead of
   // blocking — an administrator may be about to grant the role.
@@ -187,16 +191,37 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
 
       {shown ? (
         <div className="mb-8">
-          <ProcessCanvas
-            graph={{ nodes: shown.nodes, edges: shown.edges }}
-            version={shown.version}
-            label={`${definition.key} v${shown.version}`}
-          />
-          {!isNewest ? (
-            <p className="mt-3 rounded-lg border border-warning/40 px-3 py-2 text-sm text-warning">
-              {`Đang xem v${shown.version} — bản đang dùng là v${definition.version}. Instance cũ vẫn chạy theo phiên bản này.`}
-            </p>
-          ) : null}
+          {isNewest ? (
+            <>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+                <h2 className="text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
+                  Trình soạn graph — bản nháp của bạn
+                </h2>
+                <StatusBadge kind="live" />
+              </div>
+              <WorkflowEditor
+                definitionKey={definition.key}
+                definitionName={definition.name}
+                objectKey={definition.objectKey}
+                published={publishedDraft}
+                initialDraft={savedDraft ?? publishedDraft}
+                hasSavedDraft={savedDraft !== null}
+                knownRoles={knownRoles}
+                canvasLabel={`${definition.key} v${definition.version}`}
+              />
+            </>
+          ) : (
+            <>
+              <ProcessCanvas
+                graph={{ nodes: shown.nodes, edges: shown.edges }}
+                version={shown.version}
+                label={`${definition.key} v${shown.version}`}
+              />
+              <p className="mt-3 rounded-lg border border-warning/40 px-3 py-2 text-sm text-warning">
+                {`Đang xem v${shown.version} — bản đang dùng là v${definition.version}. Instance cũ vẫn chạy theo phiên bản này, nên bản cũ chỉ để xem: chọn v${definition.version} ở dải phiên bản để sửa.`}
+              </p>
+            </>
+          )}
         </div>
       ) : null}
 
@@ -277,20 +302,23 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
 
         <aside className="min-w-0">
           <Card>
-            <CardTitle>Publish phiên bản mới</CardTitle>
+            <CardTitle>Cách bản nháp hoạt động</CardTitle>
             <CardDescription>
-              Sửa node và đường chuyển rồi publish: version hiện tại giữ nguyên, instance đang chạy
-              không đổi hành vi. Cần role{' '}
-              <code className="font-mono text-xs">process_designer</code> hoặc{' '}
-              <code className="font-mono text-xs">admin</code>.
+              Canvas ở trên sửa một <strong>bản nháp</strong>: kéo node, nối đường chuyển, thêm hoặc
+              xoá node — tất cả nằm trong trình duyệt này và không bao giờ tới engine. Chỉ khi bấm
+              <strong> Publish phiên bản mới</strong> graph mới được gửi cho service kiểm tra;
+              version đã publish là bất biến và instance đang chạy giữ version của nó (ADR 0013).
             </CardDescription>
-            <div className="mt-5">
-              <PublishDefinitionForm
-                definition={definition}
-                objects={objects}
-                knownRoles={knownRoles}
-              />
-            </div>
+            <ul className="mt-4 space-y-2 text-xs text-on-surface-muted">
+              <li>
+                Lưu nháp giữ bản đang sửa cho lần mở sau (cookie httpOnly của trình duyệt này).
+              </li>
+              <li>Bỏ nháp đưa canvas về đúng bản engine đang chạy.</li>
+              <li>
+                Publish cần role <code className="font-mono">process_designer</code> hoặc{' '}
+                <code className="font-mono">admin</code>.
+              </li>
+            </ul>
           </Card>
         </aside>
       </div>

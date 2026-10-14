@@ -160,7 +160,8 @@ export default function RoadmapPage() {
               dashboard lưu trong cookie. Analytics: metric tự định nghĩa trên field của object
               (đếm/tổng/trung bình, lọc, nhóm) chạy trên projection có kiểu, cộng số liệu vận hành
               của engine (cycle time, thời gian một bước, tỉ lệ duyệt, tỉ lệ chạy lại) — tất cả theo
-              phạm vi đọc. Sản phẩm chạy trên một host bằng Docker Compose, có TLS, job backup và
+              phạm vi đọc. Trình thiết kế quy trình là canvas kéo thả trên bản nháp của trình duyệt
+              (ADR 0013). Sản phẩm chạy trên một host bằng Docker Compose, có TLS, job backup và
               diễn tập phục hồi (`make restore-drill`).
             </dd>
           </div>
@@ -175,9 +176,9 @@ export default function RoadmapPage() {
           <div>
             <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Chưa có</dt>
             <dd className="mt-1 text-sm">
-              Kéo thả trên canvas, OIDC (chờ IdP của tổ chức), SLA và escalation (cần chính sách
-              thời gian làm việc, V1.x), và Integration Hub đầy đủ (adapter, mapping) — phần còn lại
-              của V1.x/V2.
+              OIDC (chờ IdP của tổ chức), SLA và escalation (cần chính sách thời gian làm việc,
+              V1.x), Integration Hub đầy đủ (adapter, mapping), và các tiện ích của trình soạn
+              (undo/redo, nhiều người cùng sửa) — phần còn lại của V1.x/V2.
             </dd>
           </div>
         </dl>
