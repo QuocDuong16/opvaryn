@@ -52,6 +52,7 @@ type identityStore interface {
 	FindUserByEmail(ctx context.Context, email string) (domain.User, bool, error)
 	FindUserByID(ctx context.Context, id uuid.UUID) (domain.User, bool, error)
 	ListUsers(ctx context.Context) ([]domain.User, error)
+	ListRoles(ctx context.Context) ([]string, error)
 	CreateUser(ctx context.Context, user domain.User, passwordHash string) (domain.User, error)
 	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
 	FindDepartment(ctx context.Context, key string) (domain.Department, bool, error)
@@ -342,6 +343,18 @@ func (s *Identity) ListUsers(ctx context.Context) ([]domain.User, error) {
 		users[i].PasswordHash = ""
 	}
 	return users, nil
+}
+
+// ListRoles returns the role catalogue: every role at least one user holds. It is
+// what the workflow designer offers, because a definition that assigns a role nobody
+// holds would wait forever — an instance stops at that node until someone gets the
+// role. Any signed-in user may read it: role names already appear in every definition
+// they can read, so this adds no new information (ADR 0008).
+func (s *Identity) ListRoles(ctx context.Context, principal domain.Principal) ([]string, error) {
+	if err := requireAuthenticated(principal); err != nil {
+		return nil, err
+	}
+	return s.store.ListRoles(ctx)
 }
 
 // EnsureDepartment creates or renames one department (CLI/administration work).

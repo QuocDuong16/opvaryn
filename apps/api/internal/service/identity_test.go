@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"sort"
 	"strings"
 	"testing"
 	"time"
@@ -50,6 +51,22 @@ func (f *fakeIdentityStore) FindUserByID(_ context.Context, id uuid.UUID) (domai
 
 func (f *fakeIdentityStore) ListUsers(context.Context) ([]domain.User, error) {
 	return f.users, nil
+}
+
+// ListRoles mirrors the store's DISTINCT + ORDER BY over user_roles.
+func (f *fakeIdentityStore) ListRoles(context.Context) ([]string, error) {
+	seen := make(map[string]bool)
+	roles := make([]string, 0)
+	for _, user := range f.users {
+		for _, role := range user.Roles {
+			if !seen[role] {
+				seen[role] = true
+				roles = append(roles, role)
+			}
+		}
+	}
+	sort.Strings(roles)
+	return roles, nil
 }
 
 func (f *fakeIdentityStore) CreateUser(_ context.Context, user domain.User, passwordHash string) (domain.User, error) {
@@ -422,6 +439,29 @@ func createTestUser(t *testing.T, identity *Identity, email string, roles []stri
 		t.Fatalf("CreateUser returned error: %v", err)
 	}
 	return user
+}
+
+// TestListRolesIsTheRoleCatalogue pins what the workflow designer offers: the roles
+// that exist, and nothing to an anonymous caller.
+func TestListRolesIsTheRoleCatalogue(t *testing.T) {
+	t.Parallel()
+
+	store := newFakeIdentityStore()
+	identity := NewIdentity(store)
+	createTestUser(t, identity, "lan@example.com", []string{managerRole})
+	createTestUser(t, identity, "bao@example.com", []string{managerRole, "ke_toan"})
+
+	roles, err := identity.ListRoles(context.Background(), managerPrincipal())
+	if err != nil {
+		t.Fatalf("ListRoles returned error: %v", err)
+	}
+	if len(roles) != 2 || roles[0] != "ke_toan" || roles[1] != managerRole {
+		t.Fatalf("expected the distinct roles sorted, got %v", roles)
+	}
+
+	if _, err := identity.ListRoles(context.Background(), anonymous()); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("an anonymous caller must be refused, got %v", err)
+	}
 }
 
 func TestAddRolesIsAdditive(t *testing.T) {

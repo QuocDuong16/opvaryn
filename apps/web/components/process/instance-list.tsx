@@ -12,17 +12,24 @@ const STATE_STYLES: Record<string, string> = {
 };
 
 /**
- * InstanceList renders instances as rows: state, the definition version each one is
- * bound to, the node it waits at, and who holds it up. It is the answer to "what is
- * running on these records?" — the list the inbox alone could not give, because an
- * instance whose task was already decided never appears in anyone's inbox.
+ * InstanceList renders instances as rows: which record each one runs on, its state,
+ * the definition version it is bound to, the node it waits at, and who holds it up.
+ * It is the answer to "what is running on these records?" — the list the inbox alone
+ * could not give, because an instance whose task was already decided never appears in
+ * anyone's inbox.
+ *
+ * `recordLabels` maps a record id to the label that identifies it (the record screen
+ * builds it from each record's own definition version). A record the caller may not
+ * read has no label; the row still shows its instance id rather than pretending.
  */
 export function InstanceList({
   instances,
   emptyHint,
+  recordLabels = {},
 }: {
   instances: readonly ProcessInstanceSummary[];
   emptyHint: string;
+  recordLabels?: Record<string, string>;
 }) {
   if (instances.length === 0) {
     return (
@@ -39,7 +46,7 @@ export function InstanceList({
         <thead className="bg-surface-raised text-left text-xs tracking-wide text-on-surface-muted uppercase">
           <tr>
             <th scope="col" className="px-4 py-3 font-medium">
-              Quy trình
+              Bản ghi
             </th>
             <th scope="col" className="px-4 py-3 font-medium">
               Trạng thái
@@ -63,13 +70,11 @@ export function InstanceList({
                   href={`/tasks/${instance.id}`}
                   className="font-medium text-accent-strong hover:underline"
                 >
-                  {instance.definitionKey}
+                  {recordLabels[instance.recordId] ??
+                    `${instance.objectKey} · ${instance.recordId.slice(0, 8)}…`}
                 </Link>
-                <span className="ml-2 rounded-full border border-border px-2 py-0.5 font-mono text-[10px] text-on-surface-muted">
-                  {`v${instance.definitionVersion} · attempt ${instance.attempt}`}
-                </span>
                 <span className="mt-1 block font-mono text-[11px] text-on-surface-muted">
-                  {`instance ${instance.id.slice(0, 8)}…`}
+                  {`${instance.definitionKey} v${instance.definitionVersion} · attempt ${instance.attempt}`}
                 </span>
               </td>
               <td className="px-4 py-3 align-top">

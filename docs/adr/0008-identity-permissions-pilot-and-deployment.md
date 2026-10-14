@@ -47,6 +47,10 @@
   duyệt chéo bộ phận hoạt động. Instance có độ hiện bằng bản ghi của nó: không thấy thì API trả
   **404**, không xác nhận là nó tồn tại.
 - **Inbox theo người dùng**: `GET /api/v1/tasks` trả task mở của đúng các role mà session đang giữ.
+- **Danh mục role**: `GET /api/v1/roles` trả các role có ít nhất một người giữ (sắp xếp, không
+  trùng). Trình thiết kế quy trình dùng nó để gợi ý role và cảnh báo khi một định nghĩa giao việc cho
+  role chưa có ai giữ — vì instance sẽ dừng ở bước đó và không xuất hiện trong inbox của ai. Đọc được
+  bởi mọi user đã đăng nhập: tên role vốn đã nằm trong mọi định nghĩa họ đọc được.
 - Kiểm tra nằm ở tầng service (`internal/service/authz.go` và các service), không phải ở UI —
   bất biến 4 của playbook. Một quy tắc cố ý **không** có: admin không được duyệt thay task của role
   khác, vì phê duyệt là hành vi nghiệp vụ thuộc đúng role đó.

@@ -129,6 +129,22 @@ func handleMe(log *slog.Logger) http.HandlerFunc {
 	}
 }
 
+// handleListRoles serves the role catalogue the workflow designer offers.
+func handleListRoles(identity *service.Identity, log *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
+		roles, err := identity.ListRoles(r.Context(), domain.NewPrincipal(user))
+		if err != nil {
+			writeStoreError(w, log, err, "list roles")
+			return
+		}
+		writeJSON(w, log, http.StatusOK, apiv1.RoleList{Data: roles})
+	}
+}
+
 func toAPIMe(user domain.User) apiv1.Me {
 	roles := user.Roles
 	if roles == nil {

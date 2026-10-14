@@ -218,6 +218,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The role catalogue (every role at least one user holds)
+         * @description What the workflow designer offers when a human task needs a role: a definition
+         *     that assigns a role nobody holds would wait forever, because an instance stops
+         *     at that node until someone is granted the role. Role names already appear in
+         *     every definition the caller can read, so this exposes nothing new.
+         */
+        get: operations["listRoles"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks": {
         parameters: {
             query?: never;
@@ -699,6 +722,10 @@ export interface components {
             /** Format: uuid */
             recordId: string;
         };
+        RoleList: {
+            /** @description Role keys held by at least one user, sorted. */
+            data: string[];
+        };
         DecideProcessTaskRequest: {
             /** @enum {string} */
             decision: "approve" | "return" | "reject";
@@ -1090,6 +1117,28 @@ export interface operations {
                 };
                 content: {
                     "application/json": components["schemas"]["Me"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listRoles: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Role keys, sorted */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RoleList"];
                 };
             };
             401: components["responses"]["Unauthorized"];

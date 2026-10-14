@@ -90,6 +90,30 @@ func (s *Store) CreateUser(ctx context.Context, user domain.User, passwordHash s
 	return created, nil
 }
 
+// ListRoles returns every role at least one user holds, sorted. It is the catalogue
+// the workflow designer offers: a definition that assigns a role nobody holds would
+// wait forever, so the editor wants the roles that actually exist.
+func (s *Store) ListRoles(ctx context.Context) ([]string, error) {
+	rows, err := s.pool.Query(ctx, `SELECT DISTINCT role FROM user_roles ORDER BY role`)
+	if err != nil {
+		return nil, classify(fmt.Errorf("query roles: %w", err))
+	}
+	defer rows.Close()
+
+	roles := make([]string, 0)
+	for rows.Next() {
+		var role string
+		if err := rows.Scan(&role); err != nil {
+			return nil, classify(fmt.Errorf("scan role: %w", err))
+		}
+		roles = append(roles, role)
+	}
+	if err := rows.Err(); err != nil {
+		return nil, classify(fmt.Errorf("read roles: %w", err))
+	}
+	return roles, nil
+}
+
 // AddUserRoles grants roles without removing the ones already held.
 func (s *Store) AddUserRoles(ctx context.Context, userID uuid.UUID, roles []string) (domain.User, error) {
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {

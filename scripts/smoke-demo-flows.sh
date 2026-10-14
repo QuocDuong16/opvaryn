@@ -684,6 +684,9 @@ status="$(web_get "/workflows" "$tmp_dir/workflows.html")"
 assert_status "$status" "200" "workflows page"
 assert_contains "$tmp_dir/workflows.html" "Tạo quy trình mới" "workflows page"
 assert_contains "$tmp_dir/workflows.html" "$process_key" "the flow created in G is listed"
+# The role field suggests the roles that exist (GET /api/v1/roles), so a typo cannot
+# silently create a task nobody can decide.
+assert_contains "$tmp_dir/workflows.html" "value=\"$approver_role\"" "the role catalogue reaches the editor"
 
 # The create form carries its graph in one hidden input, whose SSR value must be
 # excluded: formData.get returns the first value of a name.
@@ -761,6 +764,7 @@ assert_contains "$tmp_dir/instance-started.html" "việc đầu tiên thuộc ro
 status="$(web_get "/objects/$object_key" "$tmp_dir/object-instances.html")"
 assert_status "$status" "200" "object page after the run"
 assert_contains "$tmp_dir/object-instances.html" "Quy trình trên các bản ghi này" "the instance section"
+assert_contains "$tmp_dir/object-instances.html" "Kiểm thử luồng demo" "the instance row names its record"
 assert_contains "$tmp_dir/object-instances.html" "v1 · attempt 1" "the instance is listed with its version"
 assert_contains "$tmp_dir/object-instances.html" "Kiểm tra yêu cầu" "the list names the waiting task"
 

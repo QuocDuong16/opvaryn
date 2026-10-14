@@ -437,6 +437,22 @@ grep -q 'object_key' "$body_file" || fail "the malformed filter did not name the
 status="$(request GET "/api/v1/process-instances?definitionKey=$process_key")"
 [[ "$status" == "401" ]] || fail "listing instances anonymously returned $status, expected 401"
 
+echo "smoke: GET /api/v1/roles (the catalogue the designer offers)"
+status="$(request_as "$designer_jar" GET /api/v1/roles)"
+[[ "$status" == "200" ]] || fail "listing roles returned $status, expected 200"
+grep -q "\"$designer_role\"" "$body_file" || fail "the role catalogue lost the designer's role"
+grep -q "\"$director_role\"" "$body_file" || fail "the role catalogue lost the director's role"
+python3 - "$body_file" <<'PY' || fail "the role catalogue is not sorted and distinct"
+import json, sys
+
+roles = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+if roles != sorted(set(roles)):
+    sys.exit(f"expected sorted distinct roles, got {roles}")
+print("smoke: the role catalogue is sorted and distinct")
+PY
+status="$(request GET /api/v1/roles)"
+[[ "$status" == "401" ]] || fail "listing roles anonymously returned $status, expected 401"
+
 echo "smoke: logout ends the session"
 status="$(request_as "$designer_jar" POST /api/v1/auth/logout)"
 [[ "$status" == "204" ]] || fail "logout returned $status, expected 204"

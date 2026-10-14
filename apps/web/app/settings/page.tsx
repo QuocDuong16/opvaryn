@@ -11,6 +11,11 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
   { method: 'GET', path: '/api/v1/me', purpose: 'Người dùng hiện tại kèm role và bộ phận' },
   {
     method: 'GET',
+    path: '/api/v1/roles',
+    purpose: 'Danh mục role có ít nhất một người giữ (trình thiết kế dùng để gợi ý)',
+  },
+  {
+    method: 'GET',
     path: '/api/v1/tasks',
     purpose: 'Inbox: task mở của các role mà người đang đăng nhập giữ',
   },

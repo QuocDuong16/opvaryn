@@ -289,6 +289,29 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/roles:
+    get:
+      operationId: listRoles
+      tags: [identity]
+      summary: The role catalogue (every role at least one user holds)
+      description: |
+        What the workflow designer offers when a human task needs a role: a definition
+        that assigns a role nobody holds would wait forever, because an instance stops
+        at that node until someone is granted the role. Role names already appear in
+        every definition the caller can read, so this exposes nothing new.
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Role keys, sorted
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RoleList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/tasks:
     get:
       operationId: listInboxTasks
@@ -1209,6 +1232,15 @@ components:
         recordId:
           type: string
           format: uuid
+    RoleList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          description: Role keys held by at least one user, sorted.
+          items:
+            type: string
     DecideProcessTaskRequest:
       type: object
       required: [decision]

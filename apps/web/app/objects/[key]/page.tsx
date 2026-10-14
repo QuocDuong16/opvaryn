@@ -11,6 +11,7 @@ import {
 
 import { ObjectForm } from '@/components/forms/object-form';
 import { FieldSchema } from '@/components/objects/field-schema';
+import { recordLabels } from '@/components/objects/record-labels';
 import { InstanceList } from '@/components/process/instance-list';
 import { StartInstanceForm } from '@/components/process/start-instance-form';
 import { RecordList } from '@/components/objects/record-list';
@@ -186,6 +187,7 @@ export default async function ObjectDetailPage({ params }: PageProps) {
             </p>
             <InstanceList
               instances={instances}
+              recordLabels={recordLabels(records, versions)}
               emptyHint="Chạy một quy trình ở biểu mẫu bên phải để thấy instance, bước đang chờ và người giữ việc."
             />
           </section>

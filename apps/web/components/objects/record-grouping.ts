@@ -61,3 +61,15 @@ export function groupRecordsByVersion(
 export function fieldsForVersion(group: RecordGroup): BusinessObjectVersion['fields'] {
   return group.version?.fields ?? [];
 }
+
+/**
+ * fieldsForVersionNumber returns the schema a single record was created under, so a
+ * screen that only has a record id (an instance list, a task) can label it the same
+ * way the record table does — with that record's own version, never the newest one.
+ */
+export function fieldsForVersionNumber(
+  versions: readonly BusinessObjectVersion[],
+  versionNumber: number,
+): BusinessObjectVersion['fields'] {
+  return versions.find((version) => version.version === versionNumber)?.fields ?? [];
+}

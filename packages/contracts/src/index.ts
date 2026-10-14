@@ -79,6 +79,8 @@ export interface ApiClient {
   ): Promise<ProcessDefinition>;
   listProcessDefinitionVersions(key: string): Promise<ProcessDefinitionVersion[]>;
   listInboxTasks(): Promise<InboxItem[]>;
+  /** Role keys held by at least one user: what the workflow designer offers. */
+  listRoles(): Promise<string[]>;
   getProcessInstance(instanceId: string): Promise<ProcessInstanceView>;
   listProcessInstances(filter?: {
     objectKey?: string;
@@ -197,6 +199,11 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
 
     async listInboxTasks() {
       const payload = await request<{ data: InboxItem[] }>('/api/v1/tasks');
+      return payload.data;
+    },
+
+    async listRoles() {
+      const payload = await request<{ data: string[] }>('/api/v1/roles');
       return payload.data;
     },
 

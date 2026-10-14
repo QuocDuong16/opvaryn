@@ -1,7 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { BusinessObjectVersion, ObjectRecord } from '@opvaryn/contracts';
 
-import { fieldsForVersion, groupRecordsByVersion } from '@/components/objects/record-grouping';
+import {
+  fieldsForVersion,
+  fieldsForVersionNumber,
+  groupRecordsByVersion,
+} from '@/components/objects/record-grouping';
+import { recordLabels } from '@/components/objects/record-labels';
 
 function version(number: number, id = `v${number}-id`): BusinessObjectVersion {
   return {
@@ -61,5 +66,31 @@ describe('groupRecordsByVersion', () => {
 
     expect(fieldsForVersion(groups[0]!).map((field) => field.key)).toEqual(['field_v2']);
     expect(fieldsForVersion(groups[1]!).map((field) => field.key)).toEqual(['field_v1']);
+  });
+});
+
+describe('recordLabels', () => {
+  it('labels each record with its own version schema, not the newest one', () => {
+    const versions = [version(2), version(1)];
+    const labels = recordLabels([record(1, 'old'), record(2, 'new')], versions);
+
+    // The label comes from the first text field of the record's own version, so an
+    // instance row says "giá trị v1" for a record created under v1.
+    expect(labels).toEqual({ old: 'giá trị v1', new: 'giá trị v2' });
+  });
+
+  it('falls back to the record id when the version or a text field is missing', () => {
+    const versions = [version(2)];
+    const orphan = { ...record(9, 'orphan'), values: {} };
+    const labels = recordLabels([orphan], versions);
+
+    expect(labels.orphan).toBe('orphan');
+  });
+
+  it('finds a version by number', () => {
+    expect(fieldsForVersionNumber([version(2), version(1)], 1).map((field) => field.key)).toEqual([
+      'field_v1',
+    ]);
+    expect(fieldsForVersionNumber([version(2)], 7)).toEqual([]);
   });
 });

@@ -591,6 +591,12 @@ type ProcessTask struct {
 // ProcessTaskStatus defines model for ProcessTaskStatus.
 type ProcessTaskStatus string
 
+// RoleList defines model for RoleList.
+type RoleList struct {
+	// Data Role keys held by at least one user, sorted.
+	Data []string `json:"data"`
+}
+
 // StartProcessInstanceRequest defines model for StartProcessInstanceRequest.
 type StartProcessInstanceRequest struct {
 	DefinitionKey string             `json:"definitionKey"`

@@ -50,13 +50,15 @@ export default async function WorkflowsPage() {
 
   let definitions: ProcessDefinition[] = [];
   let objects: BusinessObject[] = [];
+  let roleCatalogue: string[] = [];
   let error: string | null = null;
   let needsSignIn = false;
 
   try {
-    [definitions, objects] = await Promise.all([
+    [definitions, objects, roleCatalogue] = await Promise.all([
       api.listProcessDefinitions(),
       api.listBusinessObjects(),
+      api.listRoles(),
     ]);
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'unauthorized') {
@@ -66,14 +68,18 @@ export default async function WorkflowsPage() {
     }
   }
 
+  // Suggestions for the role field: the catalogue (roles someone holds) plus the roles
+  // existing definitions already name, so a definition that references a role nobody
+  // holds still shows it instead of looking like a typo.
   const knownRoles = [
-    ...new Set(
-      definitions.flatMap((definition) =>
+    ...new Set([
+      ...roleCatalogue,
+      ...definitions.flatMap((definition) =>
         definition.nodes
           .map((node) => node.assigneeRole)
           .filter((role): role is string => role !== undefined && role !== ''),
       ),
-    ),
+    ]),
   ].sort();
 
   return (

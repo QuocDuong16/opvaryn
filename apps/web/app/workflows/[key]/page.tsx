@@ -9,6 +9,7 @@ import {
 } from '@opvaryn/contracts';
 
 import { InstanceList } from '@/components/process/instance-list';
+import { recordLabels } from '@/components/objects/record-labels';
 import { PublishDefinitionForm } from '@/components/workflows/definition-editor';
 import { ProcessCanvas } from '@/components/workflows/process-canvas';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
@@ -37,15 +38,33 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
   let versions: ProcessDefinitionVersion[] = [];
   let objects: BusinessObject[] = [];
   let instances: ProcessInstanceSummary[] = [];
+  let roleCatalogue: string[] = [];
+  let labels: Record<string, string> = {};
   let error: string | null = null;
 
   try {
     definition = await api.getProcessDefinition(key);
-    [versions, objects, instances] = await Promise.all([
+    [versions, objects, instances, roleCatalogue] = await Promise.all([
       api.listProcessDefinitionVersions(key),
       api.listBusinessObjects(),
       api.listProcessInstances({ definitionKey: key }),
+      api.listRoles(),
     ]);
+
+    // An instance row should name the record it runs on. Records are read per object
+    // (the list is scoped like everything else), and the label uses each record's own
+    // definition version — the same rule as the record table (ADR 0006).
+    const objectKeys = [...new Set(instances.map((summary) => summary.instance.objectKey))];
+    const perObject = await Promise.all(
+      objectKeys.map(async (objectKey) => {
+        const [objectVersions, records] = await Promise.all([
+          api.listBusinessObjectVersions(objectKey),
+          api.listObjectRecords(objectKey),
+        ]);
+        return recordLabels(records, objectVersions);
+      }),
+    );
+    labels = Object.assign({}, ...perObject);
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'not_found') {
       notFound();
@@ -83,13 +102,19 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
   const shown =
     versions.find((version) => version.version === requested) ?? versions[0] ?? undefined;
   const isNewest = shown !== undefined && shown.version === definition.version;
-  const knownRoles = [
+
+  const definitionRoles = [
     ...new Set(
       definition.nodes
         .map((node) => node.assigneeRole)
         .filter((role): role is string => role !== undefined && role !== ''),
     ),
   ].sort();
+  const knownRoles = [...new Set([...roleCatalogue, ...definitionRoles])].sort();
+  // A role nobody holds is a real hazard: the instance stops at that node and no
+  // inbox shows the work. The definition is still valid, so this warns instead of
+  // blocking — an administrator may be about to grant the role.
+  const unheldRoles = definitionRoles.filter((role) => !roleCatalogue.includes(role));
 
   return (
     <>
@@ -120,6 +145,19 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
           {`${definition.nodes.length} node · ${definition.edges.length} đường chuyển`}
         </span>
       </p>
+
+      {unheldRoles.length > 0 ? (
+        <Card className="mb-6 border-warning/40">
+          <CardTitle className="text-warning">Role chưa có ai giữ</CardTitle>
+          <CardDescription>
+            {`Quy trình này giao việc cho ${unheldRoles.map((role) => `"${role}"`).join(', ')}, nhưng hiện không tài khoản nào giữ role đó. Instance sẽ dừng ở bước ấy và không xuất hiện trong inbox của ai — gán role bằng `}
+            <code className="font-mono text-xs">
+              {`make useradm ARGS="-add-role -email <email> -roles ${unheldRoles[0]}"`}
+            </code>
+            {', rồi tải lại trang này.'}
+          </CardDescription>
+        </Card>
+      ) : null}
 
       {versions.length > 1 ? (
         <div className="mb-6 flex flex-wrap items-center gap-2">
@@ -177,6 +215,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
             </p>
             <InstanceList
               instances={instances}
+              recordLabels={labels}
               emptyHint="Chạy quy trình này từ màn hình bản ghi của business object để thấy instance ở đây."
             />
           </section>
