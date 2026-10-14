@@ -63,6 +63,14 @@
   smoke test nên dùng làm lát cắt tham chiếu.
 - Ba quy trình này là **dữ liệu thật**: chúng cần identity, bộ phận, và quy trình đã publish trước
   khi người dùng thật chạm vào.
+- **Đã dựng và seed** (`scripts/seed-demo.sh`): object `hr_onboarding`, ba định nghĩa
+  `purchase_approval`, `incident_triage`, `hr_onboarding_flow` (publish v1), tài khoản cho từng role
+  mà quy trình giao việc, và mỗi quy trình một instance đang chờ đúng role của nó — để màn hình
+  Tasks có việc thật thay vì inbox rỗng.
+- **Giới hạn cần nói rõ**: engine hiện chỉ có một loại việc người (human_task) với ba quyết định
+  duyệt / trả về / từ chối. "Giao việc" và "xác nhận hoàn tất" của HR được diễn đạt bằng tiêu đề
+  task trên cùng cơ chế đó, chưa có loại task riêng (checklist, tệp đính kèm, xác nhận không phê
+  duyệt).
 
 ### Môi trường (D10)
 
@@ -75,8 +83,9 @@
 
 ## Việc chưa làm ở bước này (để không tự lừa mình)
 
-- **Giao diện Tasks vẫn dùng fixture**: endpoint inbox đã có, màn hình chưa đọc nó.
 - Màn hình Workflows vẫn là preview thiết kế; chưa có trình thiết kế đọc/ghi definition qua API.
+- **Chưa có màn hình liệt kê instance**: inbox là lối vào duy nhất, và một instance đã kết thúc chỉ
+  mở được khi biết id của nó. Danh sách instance theo bản ghi hoặc theo định nghĩa là việc kế tiếp.
 - OIDC: chỉ có interface (`service.Provider`), chưa có provider nào cắm vào.
 - Reset mật khẩu tự phục vụ (email), khoá tài khoản sau nhiều lần sai, và xoay session: hiện là
   thao tác của admin qua `make useradm`.

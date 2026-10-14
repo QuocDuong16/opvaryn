@@ -1,16 +1,19 @@
 #!/usr/bin/env bash
 #
 # Seeds the demo dataset through the public API, so the data has exactly the shape
-# a user would create by hand. Two objects the playbook names as candidate pilots
-# are seeded with a handful of records: purchase requests and IT incidents.
+# a user would create by hand. The three pilot processes D07 names are seeded:
+# purchase requests, IT incidents, and HR onboarding.
 #
 # Since ADR 0008 the API needs a session and records carry the department of the
 # session that created them, so this script bootstraps one account per department
 # and creates each record as that department. That is what makes the department
 # scoping visible in the demo instead of theoretical.
 #
-# Idempotent: departments and users are created only when missing, objects only
-# when their key is missing, and records only while the object has none.
+# Idempotent: departments and users are created only when missing, objects and
+# process definitions only when their key is missing, and records only while the
+# object has none. The pilot processes are started only when the role that should
+# hold the next task has no open task for that definition, so re-running the seed
+# does not pile up instances — but it is a demo seeder, not a data synchroniser.
 #
 # Requires: the API running against migrated PostgreSQL (make docker-up,
 # cd apps/api && go run ./cmd/migrate, make dev-api).
@@ -87,15 +90,97 @@ login() {
   [[ "$status" == "200" ]]
 }
 
-# jar_for <department> [email] -> path of a cookie jar signed in as that account
+# jar_for <email> -> path of a cookie jar signed in as that account
 jar_for() {
-  local department="$1" email="${2:-seed_$1@opvaryn.local}"
-  local jar="$jar_dir/$department.cookies"
+  local email="$1"
+  local slug="${email//[@.]/_}"
+  local jar="$jar_dir/$slug.cookies"
   if [[ ! -f "$jar" ]]; then
     login "$jar" "$email" ||
       fail "không đăng nhập được tài khoản '$email'"
   fi
   printf '%s' "$jar"
+}
+
+# ensure_process_definition <jar> <key> <json-body>: publish version 1 only when missing.
+ensure_process_definition() {
+  local jar="$1" key="$2" body="$3" status
+  status="$(request "$jar" GET "/api/v1/process-definitions/$key")"
+  case "$status" in
+    200) echo "seed: quy trình '$key' đã tồn tại, bỏ qua." ;;
+    404)
+      status="$(request "$jar" POST /api/v1/process-definitions "$body")"
+      [[ "$status" == "201" ]] || fail "tạo quy trình '$key' trả về $status, mong đợi 201."
+      echo "seed: đã publish quy trình '$key' (v1)."
+      ;;
+    *) fail "GET process definition '$key' trả về $status." ;;
+  esac
+}
+
+# inbox_has_task <jar> <definition-key> -> 0 when that person already has an open
+# task of the process. This is how the seeder decides whether a pilot flow still
+# needs an instance in flight, without a "list instances" endpoint.
+inbox_has_task() {
+  local status
+  status="$(request "$1" GET /api/v1/tasks)"
+  [[ "$status" == "200" ]] || fail "GET /api/v1/tasks trả về $status."
+  grep -q "\"definitionKey\":\"$2\"" "$body_file"
+}
+
+# record_id_for <jar> <object-key> <field-key> <value> -> id of the matching record
+record_id_for() {
+  local status
+  status="$(request "$1" GET "/api/v1/business-objects/$2/records")"
+  [[ "$status" == "200" ]] || fail "GET records của '$2' trả về $status."
+  python3 - "$body_file" "$3" "$4" <<'PY'
+import json, sys
+
+records = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+field, value = sys.argv[2], sys.argv[3]
+match = next((record for record in records if record["values"].get(field) == value), None)
+if match is None:
+    sys.exit(f"seed: không tìm thấy bản ghi có {field}={value!r}")
+print(match["id"])
+PY
+}
+
+# start_instance <jar> <definition-key> <record-id> -> prints the new instance id
+start_instance() {
+  local status
+  status="$(request "$1" POST /api/v1/process-instances \
+    "$(printf '{"definitionKey":"%s","recordId":"%s"}' "$2" "$3")")"
+  [[ "$status" == "201" ]] || fail "start instance cho '$2' trả về $status, mong đợi 201."
+  python3 -c 'import json,sys; print(json.load(open(sys.argv[1], encoding="utf-8"))["instance"]["id"])' "$body_file"
+}
+
+# open_task_id <jar> <instance-id> <node-key> -> prints the open task of that node
+open_task_id() {
+  local status
+  status="$(request "$1" GET "/api/v1/process-instances/$2")"
+  [[ "$status" == "200" ]] || fail "GET instance '$2' trả về $status."
+  python3 - "$body_file" "$3" <<'PY'
+import json, sys
+
+view = json.load(open(sys.argv[1], encoding="utf-8"))
+node = sys.argv[2]
+tasks = [task for task in view["tasks"] if task["status"] == "open" and task["nodeKey"] == node]
+if not tasks:
+    sys.exit(f"seed: instance không có task mở ở node {node!r}")
+print(tasks[0]["id"])
+PY
+}
+
+# decide_task <jar> <instance-id> <task-id> <decision> [reason]
+decide_task() {
+  local status
+  if [[ -n "${5:-}" ]]; then
+    status="$(request "$1" POST "/api/v1/process-instances/$2/tasks/$3/decisions" \
+      "$(printf '{"decision":"%s","reason":"%s"}' "$4" "$5")")"
+  else
+    status="$(request "$1" POST "/api/v1/process-instances/$2/tasks/$3/decisions" \
+      "$(printf '{"decision":"%s"}' "$4")")"
+  fi
+  [[ "$status" == "200" ]] || fail "quyết định '$4' cho task '$3' trả về $status, mong đợi 200."
 }
 
 # ensure_object <jar> <key> <json-body>: create the definition only when it is missing.
@@ -159,7 +244,7 @@ seed_records() {
   for entry in "$@"; do
     department="${entry%%:*}"
     values="${entry#*:}"
-    jar="$(jar_for "$department")"
+    jar="$(jar_for "seed_$department@opvaryn.local")"
     status="$(request "$jar" POST "/api/v1/business-objects/$key/records" "{\"values\":$values}")"
     [[ "$status" == "201" ]] || fail "tạo bản ghi cho '$key' ở bộ phận '$department' trả về $status, mong đợi 201."
   done
@@ -173,12 +258,23 @@ ensure_department van_hanh "Vận hành"
 ensure_department marketing "Marketing"
 ensure_department ke_toan "Kế toán"
 ensure_department ban_giam_doc "Ban giám đốc"
+ensure_department nhan_su "Nhân sự"
 ensure_user seed@opvaryn.local "Tài khoản seed" ban_giam_doc "admin"
 for department in ky_thuat kinh_doanh van_hanh marketing; do
   ensure_user "seed_$department@opvaryn.local" "Seed $department" "$department" "nhan_vien"
 done
 
-admin_jar="$(jar_for ban_giam_doc seed@opvaryn.local)"
+# Accounts that hold the roles the pilot processes assign. Without them an instance
+# would wait forever on a role nobody has, which would make the pilot data useless.
+ensure_user seed_truong_ky_thuat@opvaryn.local "Trưởng bộ phận Kỹ thuật" ky_thuat "nhan_vien,truong_bo_phan"
+ensure_user seed_ke_toan@opvaryn.local "Kế toán" ke_toan "ke_toan"
+ensure_user seed_giam_doc@opvaryn.local "Giám đốc" ban_giam_doc "giam_doc"
+ensure_user seed_it@opvaryn.local "IT support" ky_thuat "it_support"
+# HR opens the onboarding records, so this account is also the department account
+# the record seeder signs in with.
+ensure_user seed_nhan_su@opvaryn.local "Nhân sự" nhan_su "nhan_vien,nhan_su"
+
+admin_jar="$(jar_for seed@opvaryn.local)"
 
 purchase_body='{
   "key": "purchase_request",
@@ -239,7 +335,161 @@ seed_records "$admin_jar" it_incident "$incident_body" \
   'van_hanh:{"summary":"Hộp thư dùng chung không nhận được email từ đối tác","reporter":"Nguyễn Thảo Vy","severity":"trung_binh","system":"email","opened_at":"2026-10-10","impact":"Chậm phản hồi yêu cầu mua hàng."}' \
   'marketing:{"summary":"Laptop khởi động chậm sau bản cập nhật","reporter":"Hoàng Minh Đức","severity":"thap","system":"laptop","opened_at":"2026-10-11","impact":"Thời gian khởi động khoảng 4 phút."}'
 
+hr_body='{
+  "key": "hr_onboarding",
+  "name": "Onboarding nhân sự",
+  "description": "HR mở hồ sơ cho người mới; IT cấp tài khoản và thiết bị; quản lý trực tiếp xác nhận đã nhận việc.",
+  "fields": [
+    {"key": "employee_name", "label": "Họ tên nhân viên", "type": "text", "required": true},
+    {"key": "position", "label": "Vị trí", "type": "text", "required": true},
+    {"key": "department", "label": "Bộ phận", "type": "select", "required": true, "options": [
+      {"value": "ky_thuat", "label": "Kỹ thuật"},
+      {"value": "kinh_doanh", "label": "Kinh doanh"},
+      {"value": "van_hanh", "label": "Vận hành"},
+      {"value": "marketing", "label": "Marketing"},
+      {"value": "nhan_su", "label": "Nhân sự"}
+    ]},
+    {"key": "start_date", "label": "Ngày bắt đầu", "type": "date", "required": true},
+    {"key": "equipment", "label": "Thiết bị cần cấp", "type": "select", "options": [
+      {"value": "laptop", "label": "Laptop"},
+      {"value": "laptop_phone", "label": "Laptop và điện thoại"},
+      {"value": "none", "label": "Không cần"}
+    ]},
+    {"key": "notes", "label": "Ghi chú bàn giao", "type": "text"}
+  ]
+}'
+
+# HR opens the file, so these records carry the HR department even when the new hire
+# joins another one — that is what "bộ phận của bản ghi là bộ phận người tạo" means.
+ensure_object "$admin_jar" hr_onboarding "$hr_body"
+seed_records "$admin_jar" hr_onboarding "$hr_body" \
+  'nhan_su:{"employee_name":"Nguyễn Văn Hùng","position":"Kỹ sư backend","department":"ky_thuat","start_date":"2026-11-03","equipment":"laptop","notes":"Bàn làm việc tầng 3, nhận thiết bị trong ngày đầu tiên."}' \
+  'nhan_su:{"employee_name":"Trần Thị Mai","position":"Chuyên viên marketing","department":"marketing","start_date":"2026-11-10","equipment":"laptop_phone","notes":"Cần tài khoản cho hai hệ thống chiến dịch."}'
+
+# ------------------------------------------------- quy trình pilot (D07) ----
+
+purchase_process_body='{
+  "key": "purchase_approval",
+  "name": "Duyệt đề nghị mua hàng",
+  "description": "Trưởng bộ phận duyệt trước; từ 20 triệu trở lên giám đốc duyệt, dưới ngưỡng kế toán xác nhận ngân sách.",
+  "objectKey": "purchase_request",
+  "nodes": [
+    {"key": "start", "type": "start", "title": "Nhận đề nghị"},
+    {"key": "department_approval", "type": "human_task", "title": "Trưởng bộ phận duyệt", "assigneeRole": "truong_bo_phan"},
+    {"key": "value_gate", "type": "condition", "title": "Từ 20 triệu trở lên?", "condition": {"field": "estimated_amount", "op": "gte", "value": 20000000}},
+    {"key": "director_approval", "type": "human_task", "title": "Giám đốc duyệt", "assigneeRole": "giam_doc"},
+    {"key": "accounting_check", "type": "human_task", "title": "Kế toán xác nhận ngân sách", "assigneeRole": "ke_toan"},
+    {"key": "end", "type": "end", "title": "Kết thúc"}
+  ],
+  "edges": [
+    {"from": "start", "to": "department_approval"},
+    {"from": "department_approval", "to": "value_gate"},
+    {"from": "value_gate", "to": "director_approval", "when": "true"},
+    {"from": "value_gate", "to": "accounting_check", "when": "false"},
+    {"from": "director_approval", "to": "end"},
+    {"from": "accounting_check", "to": "end"}
+  ]
+}'
+
+incident_process_body='{
+  "key": "incident_triage",
+  "name": "Phân loại và xử lý sự cố IT",
+  "description": "IT tiếp nhận và phân loại; sự cố nghiêm trọng chuyển trưởng bộ phận chỉ đạo, còn lại IT xử lý và xác nhận hoàn tất.",
+  "objectKey": "it_incident",
+  "nodes": [
+    {"key": "start", "type": "start", "title": "Tiếp nhận báo cáo"},
+    {"key": "triage", "type": "human_task", "title": "IT phân loại sự cố", "assigneeRole": "it_support"},
+    {"key": "severity_gate", "type": "condition", "title": "Mức độ nghiêm trọng?", "condition": {"field": "severity", "op": "eq", "value": "nghiem_trong"}},
+    {"key": "escalate", "type": "human_task", "title": "Trưởng bộ phận IT chỉ đạo xử lý", "assigneeRole": "truong_bo_phan"},
+    {"key": "handle", "type": "human_task", "title": "IT xử lý và xác nhận hoàn tất", "assigneeRole": "it_support"},
+    {"key": "end", "type": "end", "title": "Kết thúc"}
+  ],
+  "edges": [
+    {"from": "start", "to": "triage"},
+    {"from": "triage", "to": "severity_gate"},
+    {"from": "severity_gate", "to": "escalate", "when": "true"},
+    {"from": "severity_gate", "to": "handle", "when": "false"},
+    {"from": "escalate", "to": "end"},
+    {"from": "handle", "to": "end"}
+  ]
+}'
+
+hr_process_body='{
+  "key": "hr_onboarding_flow",
+  "name": "Onboarding nhân sự",
+  "description": "HR chuẩn bị hồ sơ, IT cấp tài khoản và thiết bị, quản lý trực tiếp xác nhận nhận việc. Các bước là việc cần làm, không phải phê duyệt.",
+  "objectKey": "hr_onboarding",
+  "nodes": [
+    {"key": "start", "type": "start", "title": "Mở hồ sơ"},
+    {"key": "hr_prepare", "type": "human_task", "title": "HR chuẩn bị hồ sơ và hợp đồng", "assigneeRole": "nhan_su"},
+    {"key": "it_setup", "type": "human_task", "title": "IT cấp tài khoản và thiết bị", "assigneeRole": "it_support"},
+    {"key": "manager_confirm", "type": "human_task", "title": "Quản lý trực tiếp xác nhận nhận việc", "assigneeRole": "truong_bo_phan"},
+    {"key": "end", "type": "end", "title": "Kết thúc"}
+  ],
+  "edges": [
+    {"from": "start", "to": "hr_prepare"},
+    {"from": "hr_prepare", "to": "it_setup"},
+    {"from": "it_setup", "to": "manager_confirm"},
+    {"from": "manager_confirm", "to": "end"}
+  ]
+}'
+
+echo "seed: publish quy trình pilot"
+ensure_process_definition "$admin_jar" purchase_approval "$purchase_process_body"
+ensure_process_definition "$admin_jar" incident_triage "$incident_process_body"
+ensure_process_definition "$admin_jar" hr_onboarding_flow "$hr_process_body"
+
+# ------------------------------------------------- việc đang chờ (inbox) ----
+# Each pilot flow gets one instance resting on a role, so the Tasks screen has real
+# work for several people instead of an empty inbox. An instance is only started
+# when the role that should hold the task has nothing open for that process yet.
+
+echo "seed: tạo việc đang chờ cho từng quy trình"
+truong_jar="$(jar_for seed_truong_ky_thuat@opvaryn.local)"
+giam_doc_jar="$(jar_for seed_giam_doc@opvaryn.local)"
+it_jar="$(jar_for seed_it@opvaryn.local)"
+hr_jar="$(jar_for seed_nhan_su@opvaryn.local)"
+
+# Một đề nghị trên ngưỡng, đã được trưởng bộ phận duyệt: việc tiếp theo của giám đốc.
+if inbox_has_task "$giam_doc_jar" purchase_approval; then
+  echo "seed: giám đốc đã có việc của purchase_approval, bỏ qua."
+else
+  record_id="$(record_id_for "$admin_jar" purchase_request title "MacBook Pro 14 inch cho nhân viên mới")"
+  instance_id="$(start_instance "$admin_jar" purchase_approval "$record_id")"
+  task_id="$(open_task_id "$truong_jar" "$instance_id" department_approval)"
+  decide_task "$truong_jar" "$instance_id" "$task_id" approve
+  echo "seed: đề nghị 52.900.000đ đã qua trưởng bộ phận, đang chờ giám đốc."
+fi
+
+# Một đề nghị dưới ngưỡng còn nguyên ở bước đầu, để inbox có việc mới nhất.
+if inbox_has_task "$truong_jar" purchase_approval; then
+  echo "seed: trưởng bộ phận đã có việc của purchase_approval, bỏ qua."
+else
+  record_id="$(record_id_for "$admin_jar" purchase_request title "Màn hình Dell UltraSharp 27 inch")"
+  start_instance "$admin_jar" purchase_approval "$record_id" >/dev/null
+  echo "seed: đề nghị 9.800.000đ đang chờ trưởng bộ phận duyệt."
+fi
+
+# Sự cố nghiêm trọng: bước phân loại của IT mở đường cho nhánh escalation.
+if inbox_has_task "$it_jar" incident_triage; then
+  echo "seed: IT đã có việc của incident_triage, bỏ qua."
+else
+  record_id="$(record_id_for "$admin_jar" it_incident summary "Đồng bộ tồn kho ERP lệch so với thực tế")"
+  start_instance "$admin_jar" incident_triage "$record_id" >/dev/null
+  echo "seed: sự cố ERP nghiêm trọng đang chờ IT phân loại."
+fi
+
+# Onboarding mới mở: HR giữ việc đầu tiên của chuỗi HR → IT → quản lý.
+if inbox_has_task "$hr_jar" hr_onboarding_flow; then
+  echo "seed: HR đã có việc của hr_onboarding_flow, bỏ qua."
+else
+  record_id="$(record_id_for "$admin_jar" hr_onboarding employee_name "Nguyễn Văn Hùng")"
+  start_instance "$admin_jar" hr_onboarding_flow "$record_id" >/dev/null
+  echo "seed: hồ sơ Nguyễn Văn Hùng đang chờ HR chuẩn bị."
+fi
+
 echo "seed: hoàn tất. Mở http://localhost:21500/objects để xem dữ liệu."
+echo "seed: http://localhost:21500/tasks để xem việc đang chờ (đăng nhập bằng tài khoản seed_*)."
 if [[ "$skipped" == "1" ]]; then
   echo "seed: có object bị bỏ qua do schema khác — xem cảnh báo ở trên." >&2
 fi
