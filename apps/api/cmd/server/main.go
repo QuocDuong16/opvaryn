@@ -53,16 +53,36 @@ func run() error {
 	}
 	defer st.Close()
 
+	// The outbound integration (ADR 0012): queued rows are drained by a worker in this
+	// process, so no extra service has to be operated. When no URL is configured the
+	// worker does nothing at all.
+	webhooks := service.NewWebhooks(st, service.WebhookConfig{
+		URL:         cfg.WebhookURL,
+		Secret:      cfg.WebhookSecret,
+		Timeout:     cfg.WebhookTimeout,
+		MaxAttempts: cfg.WebhookMaxAttempts,
+	}, log)
+	go webhooks.Run(ctx)
+	if webhooks.Enabled() {
+		log.Info("outbound webhook enabled", "maxAttempts", cfg.WebhookMaxAttempts)
+	}
+
 	server := &http.Server{
 		Addr: net.JoinHostPort("", strconv.Itoa(cfg.Port)),
 		Handler: httpapi.NewRouter(cfg, st, httpapi.Services{
 			BusinessObjects:    service.NewBusinessObjects(st),
 			ObjectRecords:      service.NewObjectRecords(st),
 			ProcessDefinitions: service.NewProcessDefinitions(st, st),
-			ProcessRuntime:     service.NewProcessRuntime(st),
-			Identity:           service.NewIdentity(st),
-			Metrics:            service.NewMetrics(st, st),
-			ProcessMetrics:     service.NewProcessMetrics(st, st),
+			ProcessRuntime: service.NewProcessRuntime(st, service.WithWebhooks(service.WebhookConfig{
+				URL:         cfg.WebhookURL,
+				Secret:      cfg.WebhookSecret,
+				Timeout:     cfg.WebhookTimeout,
+				MaxAttempts: cfg.WebhookMaxAttempts,
+			})),
+			Identity:       service.NewIdentity(st),
+			Metrics:        service.NewMetrics(st, st),
+			ProcessMetrics: service.NewProcessMetrics(st, st),
+			Webhooks:       webhooks,
 		}, log),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       cfg.ReadTimeout,

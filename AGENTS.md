@@ -20,8 +20,9 @@ Working agreement for agents and contributors in this repository.
   definitions, records, sign-in/permissions, the task inbox with its decisions, the workflow
   designer (read, publish version, run a process from a record) and analytics (metrics over a
   typed projection, the dashboard layout, and the process operational read model of ADR 0011) are
-  `live` against PostgreSQL and the Go service; the kanban/connector panels are `mock` fixtures;
-  conditional visibility, calculated fields and SLA/escalation are `concept`.
+  `live` against PostgreSQL and the Go service, as is the outbound webhook integration (ADR 0012);
+  the kanban/connector panels are `mock` fixtures; conditional visibility, calculated fields and
+  SLA/escalation are `concept`.
 
 ## Working agreement
 

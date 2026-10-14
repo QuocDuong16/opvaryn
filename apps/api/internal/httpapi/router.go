@@ -23,6 +23,7 @@ type Services struct {
 	Identity           *service.Identity
 	Metrics            *service.Metrics
 	ProcessMetrics     *service.ProcessMetrics
+	Webhooks           *service.Webhooks
 }
 
 // NewRouter builds the HTTP handler for the demo API.
@@ -86,6 +87,7 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 		})
 
 		r.Get("/process-metrics", handleGetProcessMetrics(services.ProcessMetrics, log))
+		r.Get("/webhook-deliveries", handleListWebhookDeliveries(services.Webhooks, log))
 
 		r.Route("/metrics", func(r chi.Router) {
 			r.Get("/", handleListMetrics(services.Metrics, log))

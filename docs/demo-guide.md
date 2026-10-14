@@ -77,7 +77,7 @@ Thứ tự gợi ý, kèm phần cần nói rõ để không trình bày quá:
 | 7 | **Analytics** `/analytics` | Metric thật trên dữ liệu thật: tạo metric từ field của object (đếm/tổng/trung bình, lọc, nhóm), thấy con số và phân rã ngay; kéo–thả sắp widget, **Lưu bố cục**, F5 để thấy còn nguyên | **live** |
 | 8 | **Applications** `/apps` | Danh sách và chi tiết đọc bản ghi thật; kanban; tab **Cấu hình** (các ô đều bị khoá); panel tích hợp | live + mock + concept |
 | 9 | **Roadmap** `/roadmap` | Bốn phase, điều kiện nghiệm thu MVP, quyết định đang mở chặn tiến độ và các quyết định đã chốt | concept |
-| 10 | **Cài đặt** `/settings` | Danh sách endpoint, cổng, lệnh seed/smoke — tiện để chứng minh dữ liệu thật bằng curl | live |
+| 10 | **Cài đặt** `/settings` | Danh sách endpoint, cổng, lệnh seed/smoke; **nhật ký giao webhook** (bật/tắt, số lần thử, lỗi cuối) | live |
 
 Câu nên nói ở mục 8: "kanban và connector là mô phỏng". Nhãn `Mock` / `Concept` đã hiện sẵn ở góc
 phải mỗi màn hình, nên người xem tự kiểm chứng được. Mục 6 (Tasks) và 7 (Analytics) là **live**: mọi

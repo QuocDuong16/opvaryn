@@ -1,6 +1,10 @@
+import { ApiError, type WebhookDeliveryList } from '@opvaryn/contracts';
+
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { createServerApiClient, describeApiError } from '@/lib/api/server';
+import { formatTimestamp } from '@/lib/format';
 
 export const metadata = { title: 'Cài đặt' };
 
@@ -107,7 +111,27 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
   },
 ];
 
-export default function SettingsPage() {
+const DELIVERY_STATUS_LABELS: Record<string, string> = {
+  pending: 'đang chờ gửi lại',
+  delivered: 'đã gửi',
+  failed: 'bỏ cuộc',
+};
+
+export default async function SettingsPage() {
+  // The integration card is live data, and it is allowed to fail on its own: a missing
+  // session or a stopped API must not blank the reference tables below.
+  const api = createServerApiClient();
+  let deliveries: WebhookDeliveryList | null = null;
+  let deliveriesError: string | null = null;
+  try {
+    deliveries = await api.listWebhookDeliveries(10);
+  } catch (cause) {
+    deliveriesError =
+      cause instanceof ApiError && cause.code === 'forbidden'
+        ? 'Cần role process_designer hoặc admin để xem nhật ký giao.'
+        : describeApiError(cause);
+  }
+
   return (
     <>
       <PageHeader
@@ -187,6 +211,89 @@ export default function SettingsPage() {
           </dl>
         </Card>
       </div>
+      <section className="mt-8">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold tracking-tight">Tích hợp ra ngoài (webhook)</h2>
+          <StatusBadge kind={deliveriesError ? 'mock' : 'live'} />
+        </div>
+        <Card>
+          <CardDescription>
+            Khi engine làm việc mà hệ thống khác cần biết — instance bắt đầu, một việc được giao,
+            instance kết thúc hoặc bị từ chối — nó gửi một POST JSON đã ký HMAC tới
+            <code className="mx-1 font-mono text-xs">OPVARYN_WEBHOOK_URL</code> (ADR 0012). Thông
+            báo được ghi vào hàng đợi <em>cùng transaction</em> với sự kiện, gửi lại khi bên nhận
+            lỗi, và bỏ cuộc sau số lần thử cho phép — một thông báo cũ không được chặn việc mới, và
+            quyết định của người dùng không bao giờ phụ thuộc vào việc gửi này.
+          </CardDescription>
+
+          {deliveriesError ? (
+            <p className="mt-4 rounded-lg border border-warning/40 px-3 py-2 text-sm text-warning">
+              {deliveriesError}
+            </p>
+          ) : null}
+
+          {deliveries ? (
+            <>
+              <p className="mt-4 text-sm">
+                {deliveries.enabled
+                  ? 'Đang bật: mọi sự kiện được thông báo ra ngoài.'
+                  : 'Đang tắt: chưa cấu hình OPVARYN_WEBHOOK_URL, không có thông báo nào được xếp hàng.'}
+              </p>
+              {deliveries.data.length === 0 ? (
+                <p className="mt-2 text-sm text-on-surface-muted">
+                  Chưa có lần giao nào được ghi lại.
+                </p>
+              ) : (
+                <div className="mt-4 overflow-x-auto rounded-xl border border-border">
+                  <table className="w-full text-sm">
+                    <thead className="bg-surface-raised text-left text-xs tracking-wide text-on-surface-muted uppercase">
+                      <tr>
+                        <th scope="col" className="px-4 py-3 font-medium">
+                          Sự kiện
+                        </th>
+                        <th scope="col" className="px-4 py-3 font-medium">
+                          Trạng thái
+                        </th>
+                        <th scope="col" className="px-4 py-3 font-medium">
+                          Số lần thử
+                        </th>
+                        <th scope="col" className="px-4 py-3 font-medium">
+                          Lỗi cuối
+                        </th>
+                        <th scope="col" className="px-4 py-3 font-medium">
+                          Tạo lúc
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border bg-surface-raised/40">
+                      {deliveries.data.map((delivery) => (
+                        <tr key={delivery.id}>
+                          <td className="px-4 py-3 align-top font-mono text-xs">
+                            {delivery.event}
+                            <span className="mt-0.5 block text-[10px] text-on-surface-muted">
+                              {`instance ${delivery.instanceId.slice(0, 8)}…`}
+                            </span>
+                          </td>
+                          <td className="px-4 py-3 align-top text-xs">
+                            {DELIVERY_STATUS_LABELS[delivery.status] ?? delivery.status}
+                          </td>
+                          <td className="px-4 py-3 align-top text-xs">{delivery.attempts}</td>
+                          <td className="px-4 py-3 align-top text-xs text-on-surface-muted">
+                            {delivery.lastError ?? '—'}
+                          </td>
+                          <td className="px-4 py-3 align-top text-xs whitespace-nowrap text-on-surface-muted">
+                            {formatTimestamp(delivery.createdAt)}
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </>
+          ) : null}
+        </Card>
+      </section>
     </>
   );
 }

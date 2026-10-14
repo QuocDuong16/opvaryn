@@ -176,7 +176,8 @@ export default function RoadmapPage() {
             <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Chưa có</dt>
             <dd className="mt-1 text-sm">
               Kéo thả trên canvas, OIDC (chờ IdP của tổ chức), SLA và escalation (cần chính sách
-              thời gian làm việc, V1.x), tích hợp thật — phần còn lại của MVP V1 và V1.x.
+              thời gian làm việc, V1.x), và Integration Hub đầy đủ (adapter, mapping) — phần còn lại
+              của V1.x/V2.
             </dd>
           </div>
         </dl>
@@ -213,8 +214,9 @@ export default function RoadmapPage() {
             tiêu chuẩn của bản demo. Hiện đã đáp ứng mục 1–4 và 6 (admin dựng object, form, quy
             trình và metric ngay trong web; nhân viên tạo bản ghi và theo dõi trạng thái; có
             approval, nhánh điều kiện, reject/return; quyền và phạm vi kiểm tra ở server kèm audit;
-            người quản lý tự cấu hình dashboard với metric được cấp quyền). Mục 5 và 7 còn thiếu:
-            tích hợp API thật, và bằng chứng restart/retry không mất state.
+            người quản lý tự cấu hình dashboard với metric được cấp quyền). Mục 5 và 7 cũng đã có:
+            webhook ra ngoài có retry và nhật ký giao (ADR 0012), và `make smoke-restart` chứng minh
+            crash không mất state, retry không áp dụng hai lần.
           </CardDescription>
           <ol className="mt-4 space-y-2.5">
             {MVP_ACCEPTANCE.map((item, index) => (

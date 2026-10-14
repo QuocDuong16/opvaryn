@@ -294,6 +294,27 @@ func (e ProcessTaskStatus) Valid() bool {
 	}
 }
 
+// Defines values for WebhookDeliveryStatus.
+const (
+	Delivered WebhookDeliveryStatus = "delivered"
+	Failed    WebhookDeliveryStatus = "failed"
+	Pending   WebhookDeliveryStatus = "pending"
+)
+
+// Valid indicates whether the value is a known member of the WebhookDeliveryStatus enum.
+func (e WebhookDeliveryStatus) Valid() bool {
+	switch e {
+	case Delivered:
+		return true
+	case Failed:
+		return true
+	case Pending:
+		return true
+	default:
+		return false
+	}
+}
+
 // BusinessObject defines model for BusinessObject.
 type BusinessObject struct {
 	CreatedAt   time.Time `json:"createdAt"`
@@ -861,6 +882,35 @@ type UpdateProcessDefinitionRequest struct {
 	ObjectKey   string        `json:"objectKey"`
 }
 
+// WebhookDelivery defines model for WebhookDelivery.
+type WebhookDelivery struct {
+	Attempts    int        `json:"attempts"`
+	CreatedAt   time.Time  `json:"createdAt"`
+	DeliveredAt *time.Time `json:"deliveredAt,omitempty"`
+
+	// Event Example: task_created
+	Event          string                `json:"event"`
+	Id             openapi_types.UUID    `json:"id"`
+	InstanceId     openapi_types.UUID    `json:"instanceId"`
+	LastError      *string               `json:"lastError,omitempty"`
+	LastStatusCode *int                  `json:"lastStatusCode,omitempty"`
+	NextAttemptAt  time.Time             `json:"nextAttemptAt"`
+	Status         WebhookDeliveryStatus `json:"status"`
+	TaskId         *openapi_types.UUID   `json:"taskId,omitempty"`
+}
+
+// WebhookDeliveryStatus defines model for WebhookDelivery.Status.
+type WebhookDeliveryStatus string
+
+// WebhookDeliveryList defines model for WebhookDeliveryList.
+type WebhookDeliveryList struct {
+	// Data Newest first.
+	Data []WebhookDelivery `json:"data"`
+
+	// Enabled Whether an endpoint is configured; when false nothing is queued.
+	Enabled bool `json:"enabled"`
+}
+
 // DefinitionKey defines model for DefinitionKey.
 type DefinitionKey = string
 
@@ -912,6 +962,12 @@ type GetProcessMetricsParams struct {
 
 	// WindowDays How far back to look; 1–365, default 30.
 	WindowDays *int `form:"windowDays,omitempty" json:"windowDays,omitempty"`
+}
+
+// ListWebhookDeliveriesParams defines parameters for ListWebhookDeliveries.
+type ListWebhookDeliveriesParams struct {
+	// Limit How many deliveries to return, newest first; 1–200, default 50.
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.

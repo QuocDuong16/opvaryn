@@ -58,11 +58,26 @@ type processRuntimeStore interface {
 // store only applies the resulting write atomically (ADR 0007 section 8).
 type ProcessRuntime struct {
 	store processRuntimeStore
+	// webhooks decides whether a committed write also owes the outside world a
+	// notification; the rows travel inside the same write (ADR 0012).
+	webhooks WebhookConfig
+}
+
+// RuntimeOption configures the runtime without changing every existing caller.
+type RuntimeOption func(*ProcessRuntime)
+
+// WithWebhooks announces committed events to the configured endpoint.
+func WithWebhooks(config WebhookConfig) RuntimeOption {
+	return func(runtime *ProcessRuntime) { runtime.webhooks = config }
 }
 
 // NewProcessRuntime returns a ProcessRuntime over the given store.
-func NewProcessRuntime(st processRuntimeStore) *ProcessRuntime {
-	return &ProcessRuntime{store: st}
+func NewProcessRuntime(st processRuntimeStore, options ...RuntimeOption) *ProcessRuntime {
+	runtime := &ProcessRuntime{store: st}
+	for _, option := range options {
+		option(runtime)
+	}
+	return runtime
 }
 
 // InstanceView is what the API returns for an instance: the row, its tasks and
@@ -166,10 +181,15 @@ func (r *ProcessRuntime) Start(ctx context.Context, in StartInput) (InstanceView
 		}))
 	}
 
+	deliveries, err := webhookDeliveriesFor(instance, tasks, events, r.webhooks.Enabled())
+	if err != nil {
+		return InstanceView{}, err
+	}
 	if err := r.store.StartProcessInstance(ctx, domain.StartInstanceWrite{
-		Instance: instance,
-		Tasks:    tasks,
-		Events:   events,
+		Instance:   instance,
+		Tasks:      tasks,
+		Events:     events,
+		Deliveries: deliveries,
 	}); err != nil {
 		return InstanceView{}, err
 	}
@@ -331,6 +351,11 @@ func (r *ProcessRuntime) Decide(ctx context.Context, in DecideInput) (InstanceVi
 		}}
 	}
 
+	deliveries, err := webhookDeliveriesFor(instance, write.TasksToCreate, write.Events, r.webhooks.Enabled())
+	if err != nil {
+		return InstanceView{}, err
+	}
+	write.Deliveries = deliveries
 	if err := r.store.CompleteProcessTask(ctx, write); err != nil {
 		return InstanceView{}, err
 	}

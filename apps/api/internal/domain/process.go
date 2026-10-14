@@ -205,6 +205,10 @@ type StartInstanceWrite struct {
 	Instance ProcessInstance
 	Tasks    []ProcessTask
 	Events   []ProcessEvent
+	// Deliveries are the outbound notifications this write owes the outside world
+	// (ADR 0012). They are inserted in the same transaction as the state change, so a
+	// crash cannot lose a notification that already happened.
+	Deliveries []WebhookDelivery
 }
 
 // CompleteTaskWrite is the whole write of one decision: a compare-and-swap on the
@@ -226,4 +230,7 @@ type CompleteTaskWrite struct {
 	TasksToCreate   []ProcessTask
 	TasksToCancel   []uuid.UUID
 	Events          []ProcessEvent
+	// Deliveries are the outbound notifications this decision owes (ADR 0012), written
+	// with the same compare-and-swap: a delivery exists exactly when the decision does.
+	Deliveries []WebhookDelivery
 }

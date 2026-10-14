@@ -18,6 +18,13 @@ type Config struct {
 	ReadTimeout     time.Duration `env:"API_READ_TIMEOUT" envDefault:"10s"`
 	WriteTimeout    time.Duration `env:"API_WRITE_TIMEOUT" envDefault:"15s"`
 	ShutdownTimeout time.Duration `env:"API_SHUTDOWN_TIMEOUT" envDefault:"10s"`
+
+	// Outbound webhook (ADR 0012). An empty URL means the integration is off, which is
+	// the default: nothing is queued and nothing leaves the building.
+	WebhookURL         string        `env:"OPVARYN_WEBHOOK_URL"`
+	WebhookSecret      string        `env:"OPVARYN_WEBHOOK_SECRET"`
+	WebhookTimeout     time.Duration `env:"OPVARYN_WEBHOOK_TIMEOUT" envDefault:"5s"`
+	WebhookMaxAttempts int           `env:"OPVARYN_WEBHOOK_MAX_ATTEMPTS" envDefault:"5"`
 }
 
 // Load reads configuration from the environment, applying demo defaults so the
@@ -41,6 +48,10 @@ func (c Config) validate() error {
 		return fmt.Errorf("DATABASE_URL must not be empty")
 	case len(c.AllowedOrigins) == 0:
 		return fmt.Errorf("CORS_ALLOWED_ORIGINS must list at least one origin")
+	case c.WebhookURL != "" && c.WebhookMaxAttempts < 1:
+		return fmt.Errorf("OPVARYN_WEBHOOK_MAX_ATTEMPTS must be at least 1, got %d", c.WebhookMaxAttempts)
+	case c.WebhookURL != "" && c.WebhookTimeout <= 0:
+		return fmt.Errorf("OPVARYN_WEBHOOK_TIMEOUT must be positive, got %s", c.WebhookTimeout)
 	}
 	return nil
 }

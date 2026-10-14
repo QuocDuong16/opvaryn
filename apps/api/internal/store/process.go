@@ -283,7 +283,10 @@ func (s *Store) StartProcessInstance(ctx context.Context, in domain.StartInstanc
 		if err := insertProcessTasks(ctx, tx, in.Tasks); err != nil {
 			return err
 		}
-		return insertProcessEvents(ctx, tx, in.Events)
+		if err := insertProcessEvents(ctx, tx, in.Events); err != nil {
+			return err
+		}
+		return insertWebhookDeliveries(ctx, tx, in.Deliveries)
 	})
 	return classify(err)
 }
@@ -340,7 +343,10 @@ func (s *Store) CompleteProcessTask(ctx context.Context, in domain.CompleteTaskW
 		if err := insertProcessTasks(ctx, tx, in.TasksToCreate); err != nil {
 			return err
 		}
-		return insertProcessEvents(ctx, tx, in.Events)
+		if err := insertProcessEvents(ctx, tx, in.Events); err != nil {
+			return err
+		}
+		return insertWebhookDeliveries(ctx, tx, in.Deliveries)
 	})
 	return classify(err)
 }
@@ -387,6 +393,27 @@ func insertProcessEvents(ctx context.Context, tx pgx.Tx, events []domain.Process
 			event.InstanceID, string(event.Type), event.NodeKey, event.Actor, payload,
 		); err != nil {
 			return fmt.Errorf("insert process event: %w", err)
+		}
+	}
+	return nil
+}
+
+// insertWebhookDeliveries queues the outbound notifications of one write, inside the same
+// transaction (ADR 0012): a delivery exists exactly when the state change that caused it
+// does. Nothing here talks to the network — a slow or broken receiver must never slow
+// down a decision, let alone fail one.
+func insertWebhookDeliveries(ctx context.Context, tx pgx.Tx, deliveries []domain.WebhookDelivery) error {
+	for _, delivery := range deliveries {
+		var taskID any
+		if delivery.TaskID != uuid.Nil {
+			taskID = delivery.TaskID
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO webhook_deliveries (id, event_type, instance_id, task_id, payload)
+			VALUES ($1, $2, $3, $4, $5)`,
+			delivery.ID, string(delivery.EventType), delivery.InstanceID, taskID, delivery.Payload,
+		); err != nil {
+			return fmt.Errorf("queue webhook delivery: %w", err)
 		}
 	}
 	return nil

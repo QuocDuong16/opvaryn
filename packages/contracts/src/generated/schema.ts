@@ -316,6 +316,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/webhook-deliveries": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recent outbound webhook deliveries
+         * @description The delivery log of the outbound integration (ADR 0012): what was announced to the
+         *     outside world, how many attempts it took, and why the last one failed. It is what
+         *     makes integration failures visible to an operator instead of only to a log file.
+         *     Requires `admin` or `process_designer`.
+         */
+        get: operations["listWebhookDeliveries"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/process-metrics": {
         parameters: {
             query?: never;
@@ -892,6 +915,33 @@ export interface components {
              * @description How many measurements the numbers rest on.
              */
             samples: number;
+        };
+        WebhookDelivery: {
+            /** Format: uuid */
+            id: string;
+            /** @example task_created */
+            event: string;
+            /** Format: uuid */
+            instanceId: string;
+            /** Format: uuid */
+            taskId?: string;
+            /** @enum {string} */
+            status: "pending" | "delivered" | "failed";
+            attempts: number;
+            /** Format: date-time */
+            nextAttemptAt: string;
+            lastStatusCode?: number;
+            lastError?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            deliveredAt?: string;
+        };
+        WebhookDeliveryList: {
+            /** @description Whether an endpoint is configured; when false nothing is queued. */
+            enabled: boolean;
+            /** @description Newest first. */
+            data: components["schemas"]["WebhookDelivery"][];
         };
         ProcessMetricsOverview: {
             windowDays: number;
@@ -1530,6 +1580,40 @@ export interface operations {
             };
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listWebhookDeliveries: {
+        parameters: {
+            query?: {
+                /** @description How many deliveries to return, newest first; 1–200, default 50. */
+                limit?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The delivery log */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WebhookDeliveryList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            /** @description The signed-in user is not an admin or a process designer */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             503: components["responses"]["ServiceUnavailable"];
         };
     };

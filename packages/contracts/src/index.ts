@@ -64,6 +64,10 @@ export type UpdateMetricDefinitionRequest = components['schemas']['UpdateMetricD
 export type ProcessMetricsOverview = components['schemas']['ProcessMetricsOverview'];
 /** One duration summary: average, median and how many samples. */
 export type DurationStats = components['schemas']['DurationStats'];
+/** One outbound webhook delivery (ADR 0012). */
+export type WebhookDelivery = components['schemas']['WebhookDelivery'];
+/** The delivery log plus whether the integration is on. */
+export type WebhookDeliveryList = components['schemas']['WebhookDeliveryList'];
 /** Stable error envelope returned by every failing endpoint. */
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 /** The signed-in user with roles and department. */
@@ -104,6 +108,7 @@ export interface ApiClient {
     definitionKey?: string;
     windowDays?: number;
   }): Promise<ProcessMetricsOverview>;
+  listWebhookDeliveries(limit?: number): Promise<WebhookDeliveryList>;
   getProcessInstance(instanceId: string): Promise<ProcessInstanceView>;
   listProcessInstances(filter?: {
     objectKey?: string;
@@ -248,6 +253,11 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
 
     getMetricResult: (key) =>
       request<MetricResult>(`/api/v1/metrics/${encodeURIComponent(key)}/result`),
+
+    listWebhookDeliveries: (limit) =>
+      request<WebhookDeliveryList>(
+        `/api/v1/webhook-deliveries${limit ? `?limit=${limit}` : ''}`,
+      ),
 
     getProcessMetrics: (filter = {}) => {
       const params = new URLSearchParams();

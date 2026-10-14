@@ -34,6 +34,9 @@ tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
   hướng tự viết (ADR 0010). Cùng trang đó có **số liệu vận hành** của engine (instance đã chạy,
   cycle time, thời gian một bước, tỉ lệ duyệt, tỉ lệ phải chạy lại) trên một read model cố định
   (ADR 0011); SLA vẫn thuộc V1.x vì engine chưa có chính sách thời gian làm việc.
+- **Live**: tích hợp ra ngoài — webhook có ký HMAC cho bốn sự kiện của engine, hàng đợi ghi cùng
+  transaction với sự kiện, retry có backoff, nhật ký giao xem được ở trang Cài đặt (ADR 0012). Điều
+  kiện nghiệm thu #5 của playbook đạt bằng một tích hợp chạy thật, được kiểm chứng end-to-end.
 - **Mock**: kanban và connector trong Application showcase.
 - **Live (MVP)**: workflow runtime tự xây trên PostgreSQL — process definition publish theo phiên
   bản bất biến, instance gắn với phiên bản lúc start, human task duyệt theo role với
@@ -57,7 +60,8 @@ Toàn bộ D04–D10 đã chốt và đang chạy trong code (ADR 0005–0010). 
 [ADR 0008](docs/adr/0008-identity-permissions-pilot-and-deployment.md),
 [ADR 0009](docs/adr/0009-deployment-topology-and-backup.md),
 [ADR 0010](docs/adr/0010-analytics-query-builder.md),
-[ADR 0011](docs/adr/0011-process-operational-metrics.md).
+[ADR 0011](docs/adr/0011-process-operational-metrics.md),
+[ADR 0012](docs/adr/0012-outbound-webhook-integration.md).
 
 ## Bắt đầu nhanh
 
@@ -103,7 +107,8 @@ bí mật, cập nhật phiên bản, phục hồi khi database hỏng, xử lý
 [docs/ops-runbook.md](docs/ops-runbook.md); lý do đằng sau topology ở
 [ADR 0009](docs/adr/0009-deployment-topology-and-backup.md),
 [ADR 0010](docs/adr/0010-analytics-query-builder.md),
-[ADR 0011](docs/adr/0011-process-operational-metrics.md).
+[ADR 0011](docs/adr/0011-process-operational-metrics.md),
+[ADR 0012](docs/adr/0012-outbound-webhook-integration.md).
 
 Các target thường dùng:
 

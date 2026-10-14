@@ -28,6 +28,10 @@ cleanup() {
     kill "$server_pid" 2>/dev/null || true
     wait "$server_pid" 2>/dev/null || true
   fi
+  if [[ -n "${receiver_pid:-}" ]] && kill -0 "$receiver_pid" 2>/dev/null; then
+    kill "$receiver_pid" 2>/dev/null || true
+    wait "$receiver_pid" 2>/dev/null || true
+  fi
   rm -f "$log_file" "$body_file" "$tmp_records"
   rm -rf "$smoke_tmp_dir"
 }
@@ -77,8 +81,24 @@ if curl -sf "$base_url/healthz" >/dev/null 2>&1; then
   fail "another server is already answering on $base_url — stop it before running the smoke test"
 fi
 
-echo "smoke: starting the API"
-"$api_dir/bin/server" >"$log_file" 2>&1 &
+# A real receiver for the outbound webhook (ADR 0012). It refuses the first request on
+# purpose, so the retry path is exercised rather than assumed.
+receiver_file="$smoke_tmp_dir/webhook-received.jsonl"
+receiver_port=21912
+python3 "$root_dir/scripts/webhook-receiver.py" "$receiver_file" 1 "$receiver_port" &
+receiver_pid=$!
+for _ in $(seq 1 20); do
+  if curl -s -o /dev/null "http://127.0.0.1:$receiver_port/" 2>/dev/null; then
+    break
+  fi
+  sleep 0.5
+done
+
+echo "smoke: starting the API (outbound webhook pointed at the receiver)"
+OPVARYN_WEBHOOK_URL="http://127.0.0.1:$receiver_port/" \
+  OPVARYN_WEBHOOK_SECRET="smoke-webhook-secret" \
+  OPVARYN_WEBHOOK_MAX_ATTEMPTS=3 \
+  "$api_dir/bin/server" >"$log_file" 2>&1 &
 server_pid=$!
 
 for _ in $(seq 1 30); do
@@ -549,6 +569,54 @@ status="$(request_as "$designer_jar" GET "/api/v1/process-metrics?definitionKey=
 [[ "$status" == "404" ]] || fail "an unknown definition filter returned $status, expected 404"
 status="$(request GET /api/v1/process-metrics)"
 [[ "$status" == "401" ]] || fail "reading process metrics anonymously returned $status, expected 401"
+
+echo "smoke: outbound webhook (queued with the event, retried, delivered, signed)"
+# The instance started above queued notifications. The receiver refused the first one, so
+# the delivery must have been retried and only then recorded as delivered — the whole
+# point of ADR 0012 is that this happens without the decision waiting for it.
+# Wait for the *retried* delivery specifically: the receiver refused the first request, so
+# a row with attempts 2 and status delivered is the proof that the retry happened.
+for _ in $(seq 1 30); do
+  status="$(request_as "$designer_jar" GET /api/v1/webhook-deliveries)"
+  [[ "$status" == "200" ]] || fail "reading the delivery log returned $status"
+  if grep -q '"status":"delivered"' "$body_file" && grep -q '"attempts":2' "$body_file"; then
+    break
+  fi
+  sleep 1
+done
+grep -q '"status":"delivered"' "$body_file" || fail "no delivery was recorded as delivered"
+grep -q '"attempts":2' "$body_file" || fail "the refused attempt was not retried"
+grep -q '"enabled":true' "$body_file" || fail "the delivery log must report that the integration is on"
+
+python3 - "$receiver_file" <<'CHECK_WEBHOOK_RECEIVER'
+import json, sys
+
+lines = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8")]
+if not lines:
+    sys.exit("the receiver got nothing")
+accepted = lines[-1]
+payload = json.loads(accepted["body"])
+if payload["event"] != "instance_started" and payload["event"] != "task_created":
+    sys.exit(f"unexpected event reached the receiver: {payload['event']}")
+if "instance" not in payload or "definitionKey" not in payload["instance"]:
+    sys.exit(f"the payload does not describe the instance: {payload}")
+if not accepted["signature"].startswith("sha256="):
+    sys.exit(f"the delivery was not signed: {accepted['signature']!r}")
+print(f"smoke: the receiver accepted a signed {payload['event']} notification")
+CHECK_WEBHOOK_RECEIVER
+
+# The integration must never decide anything: a decision taken while the receiver was
+# refusing still returned 200 above, and the log says exactly what happened.
+python3 - "$receiver_file" <<'CHECK_WEBHOOK_SIGNATURE'
+import hashlib, hmac, json, sys
+
+lines = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8")]
+accepted = lines[-1]
+expected = "sha256=" + hmac.new(b"smoke-webhook-secret", accepted["body"].encode("utf-8"), hashlib.sha256).hexdigest()
+if accepted["signature"] != expected:
+    sys.exit("the signature does not match the body and the shared secret")
+print("smoke: the signature verifies against the shared secret")
+CHECK_WEBHOOK_SIGNATURE
 
 echo "smoke: logout ends the session"
 status="$(request_as "$designer_jar" POST /api/v1/auth/logout)"
