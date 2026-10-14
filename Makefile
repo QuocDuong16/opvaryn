@@ -41,8 +41,9 @@ docker-down: ## Stop local services
 docker-logs: ## Follow local service logs
 	$(DOCKER_COMPOSE) logs -f
 
-docker-config: ## Validate the effective Docker Compose configuration
+docker-config: ## Validate the effective Docker Compose configuration (both modes)
 	$(DOCKER_COMPOSE) config
+	@$(DOCKER_COMPOSE) --profile pilot config --quiet && echo "pilot profile: config valid"
 
 docker-clean: ## Stop services and delete Compose volumes
 	$(DOCKER_COMPOSE) down -v --remove-orphans

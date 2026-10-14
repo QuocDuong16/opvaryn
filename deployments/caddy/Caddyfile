@@ -1,0 +1,33 @@
+# Caddy for the pilot stack (ADR 0009): the only service reachable from the network.
+#
+# The API and the web app are bound to the host loopback and talk to each other over
+# the compose network; the browser reaches the web app through this proxy only, which
+# is also the only place TLS terminates.
+#
+# Certificates: `tls internal` issues from Caddy's own CA, which is the honest option
+# for a hostname no public CA can validate. Install that root certificate on the
+# clients that use the host (docs/ops-runbook.md), or replace this block with a real
+# certificate when the host has a resolvable name.
+
+{
+	# No admin API on a deployed instance.
+	admin off
+}
+
+{$OPVARYN_HOSTNAME:opvaryn.local} {
+	tls internal
+
+	encode zstd gzip
+
+	header {
+		X-Content-Type-Options nosniff
+		X-Frame-Options DENY
+		Referrer-Policy strict-origin-when-cross-origin
+		-Server
+	}
+
+	# Everything goes to the web app. The browser never calls the Go API directly —
+	# the web app is a BFF and forwards its own session cookie (ADR 0008) — so the API
+	# is not exposed here on purpose.
+	reverse_proxy web:21500
+}

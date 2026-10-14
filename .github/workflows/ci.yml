@@ -82,6 +82,11 @@ jobs:
       - name: Start PostgreSQL
         run: make docker-up
 
+      # Both compose modes are validated before anything runs: the pilot profile is
+      # what a deployment uses, and a broken service definition should fail here.
+      - name: Validate the compose configuration
+        run: make docker-config
+
       - name: Apply migrations
         run: cd apps/api && go run ./cmd/migrate
 

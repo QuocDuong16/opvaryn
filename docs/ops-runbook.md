@@ -15,11 +15,13 @@ Local development (`make docker-up` + `make dev`) không dùng trang này — xe
 | --- | --- | --- |
 | `postgres` | Database | Volume `postgres_data`; healthcheck `pg_isready` |
 | `migrate` | Chạy migration rồi thoát | `api` chỉ start khi service này kết thúc **thành công** — deploy không bao giờ phục vụ DB chưa migrate |
-| `api` | Go service | Healthcheck `/readyz`; cổng `${API_PORT}` (mặc định 21501) |
-| `web` | Next.js standalone | Healthcheck `/`; cổng `${WEB_PORT}` (mặc định 21500); gọi API qua mạng nội bộ `http://api:21501` |
+| `api` | Go service | Healthcheck `/readyz`; cổng `${API_PORT}` (mặc định 21501) **chỉ bind loopback** |
+| `web` | Next.js standalone | Healthcheck `/`; cổng `${WEB_PORT}` (mặc định 21500) **chỉ bind loopback**; gọi API qua mạng nội bộ `http://api:21501` |
+| `caddy` | TLS terminator + reverse proxy | **Service duy nhất mở ra mạng**: `${CADDY_HTTP_PORT}` (80) và `${CADDY_HTTPS_PORT}` (443) → `web:21500` |
 | `backup` | Job `pg_dump` định kỳ | Vòng lặp `scripts/backup-db.sh`; dump ghi ra `${BACKUP_DIR}` |
 
 `postgres` **không** thuộc profile `pilot`, nên `make docker-up` vẫn chỉ dựng Postgres cho dev.
+API và web chỉ bind loopback: ops vào được từ chính host, còn mạng ngoài chỉ thấy Caddy.
 
 ## 2. Chuẩn bị host (một lần)
 
@@ -28,15 +30,17 @@ git clone <repo> /opt/opvaryn && cd /opt/opvaryn
 cp .env.example .env          # rồi sửa, xem mục 3
 mkdir -p /srv/opvaryn-backups # nơi chứa dump, xem mục 5
 make images-build             # build image API + web
-make pilot-up                 # migrate → api → web → backup
+make pilot-up                 # migrate → api → web → caddy → backup
 ```
 
-Kiểm tra:
+Kiểm tra (thay `opvaryn.local` bằng `OPVARYN_HOSTNAME` của bạn; `-k` vì CA nội bộ chưa được tin ở
+máy bạn, xem mục 3):
 
 ```bash
 docker compose -f deployments/docker-compose.yml --profile pilot ps   # tất cả healthy, migrate exited(0)
-curl -s localhost:21501/readyz                                       # {"status":"ok"}
-curl -s -o /dev/null -w '%{http_code}\n' localhost:21500/            # 200
+curl -s localhost:21501/readyz                                       # {"status":"ok"} — API qua loopback
+curl -sk -o /dev/null -w '%{http_code}\n' https://opvaryn.local/     # 200 qua Caddy
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: opvaryn.local' http://localhost/  # 308 → HTTPS
 ```
 
 Tạo tài khoản đầu tiên (bài toán con gà–quả trứng, ADR 0008) — chạy trong container API:
@@ -51,16 +55,34 @@ docker compose -f deployments/docker-compose.yml --profile pilot exec api \
 
 > `useradm` cần bộ phận tồn tại trước: `-create-department -key ban_giam_doc -department-name 'Ban giám đốc'`.
 
-## 3. Bí mật và cấu hình
+## 3. HTTPS, bí mật và cấu hình
+
+**HTTPS** do service `caddy` lo (ADR 0009). Caddy phát chứng chỉ cho `OPVARYN_HOSTNAME` từ **CA nội bộ
+của chính nó** (`tls internal` trong `deployments/caddy/Caddyfile`), vì một hostname nội bộ không CA
+công cộng nào xác thực được. Máy khách sẽ cảnh báo cho tới khi bạn cài root certificate:
+
+```bash
+# Lấy root CA của Caddy ra host
+docker compose -f deployments/docker-compose.yml --profile pilot \
+  cp caddy:/data/caddy/pki/authorities/local/root.crt ./opvaryn-root.crt
+# Cài vào máy khách (Linux)
+sudo cp opvaryn-root.crt /usr/local/share/ca-certificates/opvaryn-root.crt && sudo update-ca-certificates
+```
+
+Khi host đã có tên phân giải công khai và muốn chứng chỉ thật: bỏ dòng `tls internal` trong
+Caddyfile (Caddy sẽ tự xin Let's Encrypt). Đổi cổng publish bằng `CADDY_HTTP_PORT`/`CADDY_HTTPS_PORT`
+nếu 80/443 đã bị chiếm trên host.
 
 - Mọi cấu hình nằm trong `.env` trên host (đã bị `.gitignore`). **Không** commit `.env`, không đặt
   bí mật vào `NEXT_PUBLIC_*`.
 - Bắt buộc đổi trước khi chạy thật: `POSTGRES_PASSWORD` (mật khẩu DB) và mật khẩu các tài khoản tạo
   bằng `useradm`. Mật khẩu demo trong repo chỉ dành cho máy local.
-- `API_ENV=production` khi chạy thật: session cookie chỉ được đặt `Secure` khi API không ở
-  development (ADR 0008) — đặt `production` **sau khi** host đã có HTTPS trước mặt (reverse proxy),
-  nếu không trình duyệt sẽ không gửi cookie.
-- `CORS_ALLOWED_ORIGINS` phải là origin thật của web (ví dụ `https://opvaryn.congty.local`).
+- `API_ENV=production`: session cookie chỉ được đặt `Secure` khi API không ở development (ADR 0008).
+  Với Caddy đứng trước, HTTPS đã có nên đặt `production` được — nhớ đổi cả
+  `CORS_ALLOWED_ORIGINS=https://<OPVARYN_HOSTNAME>`; nếu vẫn để `development` thì cookie không có
+  cờ `Secure` và trình duyệt sẽ gửi nó qua cả HTTP.
+- API và web **chỉ bind loopback**: đừng thêm publish `0.0.0.0` cho chúng, mọi truy cập từ mạng phải
+  đi qua Caddy.
 
 ## 4. Cập nhật phiên bản
 

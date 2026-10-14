@@ -80,7 +80,9 @@ services:
     restart: unless-stopped
     environment: *api-env
     ports:
-      - '${API_PORT:-21501}:21501'
+      # Loopback only: ops reach it on the host, the network does not. Public traffic
+      # arrives through caddy (ADR 0009).
+      - '127.0.0.1:${API_PORT:-21501}:21501'
     depends_on:
       postgres:
         condition: service_healthy
@@ -111,7 +113,8 @@ services:
       API_BASE_URL: http://api:21501
       TZ: ${TZ:-Asia/Ho_Chi_Minh}
     ports:
-      - '${WEB_PORT:-21500}:21500'
+      # Loopback only, for debugging the app without going through the proxy.
+      - '127.0.0.1:${WEB_PORT:-21500}:21500'
     depends_on:
       api:
         condition: service_healthy
@@ -127,6 +130,43 @@ services:
         limits:
           cpus: '1'
           memory: 768m
+
+  # The only service published to the network: TLS terminates here (ADR 0009).
+  caddy:
+    profiles: ['pilot']
+    image: caddy:2-alpine@sha256:d8542f48d34a9cf4e4c11a478865229840e87e4c96ea3f439101f31a5d35f75f
+    restart: unless-stopped
+    environment:
+      OPVARYN_HOSTNAME: ${OPVARYN_HOSTNAME:-opvaryn.local}
+      TZ: ${TZ:-Asia/Ho_Chi_Minh}
+    ports:
+      - '${CADDY_HTTP_PORT:-80}:80'
+      - '${CADDY_HTTPS_PORT:-443}:443'
+    volumes:
+      - ./deployments/caddy/Caddyfile:/etc/caddy/Caddyfile:ro
+      # Caddy's internal CA and issued certificates live in /data; losing it only
+      # means re-issuing, so it is a volume and not a bind mount.
+      - caddy_data:/data
+      - caddy_config:/config
+    extra_hosts:
+      # The healthcheck talks TLS to the same name the proxy serves (Caddy only
+      # answers for that SNI), so a refused handshake or a missing certificate shows
+      # up as unhealthy instead of passing silently.
+      - '${OPVARYN_HOSTNAME:-opvaryn.local}:127.0.0.1'
+    depends_on:
+      web:
+        condition: service_healthy
+    healthcheck:
+      test:
+        [
+          'CMD-SHELL',
+          'wget -q --no-check-certificate -O /dev/null "https://$${OPVARYN_HOSTNAME}/" || exit 1',
+        ]
+      interval: 15s
+      timeout: 5s
+      start_period: 10s
+      retries: 5
+    logging: *logging
 
   # Backup job: a loop around scripts/backup-db.sh (pg_dump + verify + retention).
   # It reuses the PostgreSQL image, so pg_dump matches the server version exactly.
@@ -167,3 +207,5 @@ services:
 
 volumes:
   postgres_data:
+  caddy_data:
+  caddy_config:
