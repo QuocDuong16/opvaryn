@@ -12,6 +12,13 @@ concept. Đồng thời, Process Execution Contract (lifecycle, concurrency, rej
 idempotency) vẫn là quyết định mở D05/D08 — viết runtime trước khi chốt sẽ khóa sớm những quyết
 định chưa được review.
 
+## Cập nhật
+
+> Điểm 2 dưới đây ("Runtime workflow không được triển khai trong giai đoạn demo") **đã hết hiệu
+> lực**: chủ dự án đã chốt D04/D05/D08 (xem [ADR 0005](0005-runtime-decisions-proposal.md)) và hợp
+> đồng thực thi nằm ở [ADR 0007](0007-process-execution-contract.md). Các điểm còn lại — quy ước
+> nhãn live/mock/concept, lát cắt chạy thật, và "schema đi cùng feature" — vẫn giữ nguyên.
+
 ## Quyết định
 
 1. Mọi màn hình và khối chức năng phải khai báo trạng thái bằng `StatusBadge`:

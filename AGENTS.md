@@ -47,10 +47,15 @@ Working agreement for agents and contributors in this repository.
   display and navigation only. Record values are validated against the object's field
   definitions in `internal/service` before they are stored; the web form never decides
   whether input is valid.
-- Workflow runtime is stubbed until the process execution contract is decided
-  (see `operations-playbook/architecture.html` section 04). Do not implement approval or
-  state-machine behavior beyond explicit demo scope, and do not add process, task or event
-  tables ahead of those decisions (ADR 0002, ADR 0003).
+- The workflow runtime exists and follows `docs/adr/0007` (execution contract) and ADR 0005 (the
+  decisions behind it: self-built on PostgreSQL, JSON conditions, reject terminal / return resets,
+  role resolver). Rules that must not be broken: a decision is one transaction with
+  compare-and-swap on the task and the instance; reject is terminal; return resets to a new
+  attempt; published process versions are immutable and running instances keep the version they
+  started with; every transition appends to `process_events`; a task may only be decided with the
+  role it was assigned to.
+- Do not add nodes, tables or endpoints for what ADR 0007 lists as deferred (parallel/join, timers,
+  SLA, subprocess, delegation, service actions/integration, cancellation, context snapshots).
 
 ## Backend and security
 

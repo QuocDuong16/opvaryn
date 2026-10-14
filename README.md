@@ -22,7 +22,11 @@ Các màn hình theo kế hoạch 8 tuần của bản demo đã dựng xong, m�
   thật (cookie trình duyệt).
 - **Mock**: Workflows (sơ đồ quy trình đọc từ fixture), Tasks (inbox duyệt/trả về/từ chối đổi state
   trong trình duyệt), số liệu Analytics (metric catalog trên fixture), kanban và connector trong
-  Application showcase.
+  Application showcase. Hai màn hình Workflows/Tasks đang là **preview thiết kế**: engine quy trình
+  đã chạy thật ở API (xem dưới) nhưng UI chưa nối vào, vì cần identity (D09).
+- **Live (MVP)**: workflow runtime tự xây trên PostgreSQL — process definition publish theo phiên
+  bản bất biến, instance gắn với phiên bản lúc start, human task duyệt theo role với
+  compare-and-swap, reject terminal, return reset attempt, event log append-only (ADR 0005/0007).
 - **Concept**: điều kiện hiển thị và calculated field của Form Builder, tab Cấu hình của Application
   Builder, escalation, template library, và nội dung Roadmap — các phần phụ thuộc quyết định còn mở.
 

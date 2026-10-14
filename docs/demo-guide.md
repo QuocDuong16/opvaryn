@@ -69,8 +69,8 @@ Thứ tự gợi ý, kèm phần cần nói rõ để không trình bày quá:
 | 3 | **Object detail** `/objects/<key>` | Form nhập liệu sinh từ schema vừa tạo; lưu một bản ghi; thử để trống field bắt buộc để thấy server chặn và báo lỗi | live |
 | 3b | **Publish phiên bản** (cùng trang) | Sửa schema rồi **Publish phiên bản v2**: bản ghi cũ vẫn nằm ở nhóm "phiên bản cũ" với đúng schema cũ, bản ghi mới dùng schema mới. Đây là bất biến #1 của playbook chạy thật | live |
 | 4 | **Forms** `/forms` | Đổi schema, thấy form đổi theo; danh sách "chưa có trong demo" | live + concept |
-| 5 | **Workflows** `/workflows` | Sơ đồ hai quy trình, click từng node xem cấu hình và nhánh điều kiện | **mock** |
-| 6 | **Tasks** `/tasks` | Duyệt / trả về / từ chối, timeline đổi theo; người giữ việc | **mock** |
+| 5 | **Workflows** `/workflows` | Sơ đồ hai quy trình, click từng node xem cấu hình và nhánh điều kiện — preview thiết kế; engine thật nằm ở API | **mock** |
+| 6 | **Tasks** `/tasks` | Duyệt / trả về / từ chối, timeline đổi theo; người giữ việc — màn hình dùng fixture, engine duyệt thật đã có ở API | **mock** |
 | 7 | **Analytics** `/analytics` | Kéo–thả sắp widget, đổi metric/dimension, **Lưu bố cục**, rồi F5 để thấy bố cục còn nguyên | số liệu **mock**, bố cục **live** |
 | 8 | **Applications** `/apps` | Danh sách và chi tiết đọc bản ghi thật; kanban; tab **Cấu hình** (các ô đều bị khoá); panel tích hợp | live + mock + concept |
 | 9 | **Roadmap** `/roadmap` | Bốn phase, điều kiện nghiệm thu MVP, các quyết định đang mở chặn tiến độ | concept |
