@@ -63,7 +63,10 @@ jobs:
   integration:
     name: API integration (PostgreSQL + smoke test)
     runs-on: ubuntu-24.04
-    timeout-minutes: 20
+    # The job grew with the product: it now also proves state survives a crash and builds
+    # both deployment images (each of which installs dependencies and compiles). 20 minutes
+    # was the old budget and a slow runner hit it, cancelling the job mid-run.
+    timeout-minutes: 40
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
