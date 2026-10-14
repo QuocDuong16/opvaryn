@@ -6,6 +6,7 @@
         docker-up docker-down docker-logs docker-config docker-clean \
         contract-generate contract-check \
         api-tools-check api-fix api-build api-test api-lint api-vuln api-check \
+        useradm \
         smoke-api smoke-demo-flows seed-demo \
         web-install web-lint web-format web-typecheck web-test web-build web-check \
         actions-lint docs-check quality-check clean
@@ -81,9 +82,13 @@ api-tools-check: ## Verify mise-managed Go analysis tools are installed
 api-fix: ## Tidy Go modules and format Go sources
 	cd apps/api && go mod tidy && go fmt ./...
 
-api-build: ## Build the API and migrate binaries
+api-build: ## Build the API, migrate and useradm binaries
 	cd apps/api && go build -o bin/server ./cmd/server
 	cd apps/api && go build -o bin/migrate ./cmd/migrate
+	cd apps/api && go build -o bin/useradm ./cmd/useradm
+
+useradm: ## Administer users and departments (e.g. make useradm ARGS="-list")
+	cd apps/api && go run ./cmd/useradm $(ARGS)
 
 api-test: ## Run Go API tests
 	cd apps/api && go test ./...

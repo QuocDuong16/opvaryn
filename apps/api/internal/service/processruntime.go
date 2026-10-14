@@ -81,8 +81,11 @@ type DecideInput struct {
 	TaskID     uuid.UUID
 	Decision   Decision
 	Reason     string
-	// ActorRole must match the role the task was assigned to (D08b).
-	ActorRole string
+	// Actor is the authenticated user and ActorRoles the roles that user holds:
+	// the task role is checked against them (D08b), never against a value the
+	// caller could simply claim.
+	Actor      string
+	ActorRoles []string
 }
 
 // Start creates an instance from the newest published version of the definition
@@ -191,9 +194,9 @@ func (r *ProcessRuntime) Decide(ctx context.Context, in DecideInput) (InstanceVi
 	if instance.State != domain.ProcessRunning {
 		return InstanceView{}, fmt.Errorf("%w: instance %s is %s", ErrStateConflict, instance.ID, instance.State)
 	}
-	actor := actorOrSystem(in.ActorRole)
-	if !strings.EqualFold(actor, task.AssigneeRole) {
-		return InstanceView{}, fmt.Errorf("%w: task %s is assigned to role %q, not %q",
+	actor := actorOrSystem(in.Actor)
+	if !hasRole(in.ActorRoles, task.AssigneeRole) {
+		return InstanceView{}, fmt.Errorf("%w: task %s is assigned to role %q and %s does not hold it",
 			ErrForbidden, task.ID, task.AssigneeRole, actor)
 	}
 
@@ -359,6 +362,15 @@ func openTaskIDs(tasks []domain.ProcessTask, exclude uuid.UUID) []uuid.UUID {
 		}
 	}
 	return ids
+}
+
+func hasRole(roles []string, role string) bool {
+	for _, held := range roles {
+		if held == role {
+			return true
+		}
+	}
+	return false
 }
 
 func actorOrSystem(actor string) string {

@@ -113,10 +113,15 @@ func handleStartProcessInstance(runtime *service.ProcessRuntime, log *slog.Logge
 			return
 		}
 
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
+
 		view, err := runtime.Start(r.Context(), service.StartInput{
 			DefinitionKey: body.DefinitionKey,
 			RecordID:      body.RecordId,
-			Actor:         stringValue(body.Actor),
+			Actor:         user.Email,
 		})
 		if err != nil {
 			writeStoreError(w, log, err, "start process instance")
@@ -128,6 +133,9 @@ func handleStartProcessInstance(runtime *service.ProcessRuntime, log *slog.Logge
 
 func handleGetProcessInstance(runtime *service.ProcessRuntime, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := requireUser(w, log, r); !ok {
+			return
+		}
 		instanceID, ok := parseUUIDParam(w, log, r, "instanceId", "process instance id")
 		if !ok {
 			return
@@ -151,6 +159,10 @@ func handleDecideProcessTask(runtime *service.ProcessRuntime, log *slog.Logger) 
 			return
 		}
 
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
 		instanceID, ok := parseUUIDParam(w, log, r, "instanceId", "process instance id")
 		if !ok {
 			return
@@ -165,7 +177,8 @@ func handleDecideProcessTask(runtime *service.ProcessRuntime, log *slog.Logger) 
 			TaskID:     taskID,
 			Decision:   service.Decision(body.Decision),
 			Reason:     stringValue(body.Reason),
-			ActorRole:  body.ActorRole,
+			Actor:      user.Email,
+			ActorRoles: user.Roles,
 		})
 		if err != nil {
 			writeStoreError(w, log, err, "decide process task")

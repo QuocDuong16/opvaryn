@@ -27,6 +27,7 @@ const (
 	codeNotFound       = "not_found"
 	codeConflict       = "conflict"
 	codeForbidden      = "forbidden"
+	codeUnauthorized   = "unauthorized"
 	codeUnavailable    = "service_unavailable"
 	codeInternal       = "internal_error"
 )

@@ -60,6 +60,7 @@ func run() error {
 			ObjectRecords:      service.NewObjectRecords(st),
 			ProcessDefinitions: service.NewProcessDefinitions(st, st),
 			ProcessRuntime:     service.NewProcessRuntime(st),
+			Identity:           service.NewIdentity(st),
 		}, log),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       cfg.ReadTimeout,

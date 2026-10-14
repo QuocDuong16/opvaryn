@@ -20,6 +20,7 @@ type Services struct {
 	ObjectRecords      *service.ObjectRecords
 	ProcessDefinitions *service.ProcessDefinitions
 	ProcessRuntime     *service.ProcessRuntime
+	Identity           *service.Identity
 }
 
 // NewRouter builds the HTTP handler for the demo API.
@@ -41,11 +42,23 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 		MaxAge:           300,
 	}))
 
+	// The session cookie is resolved once per request; handlers that need a user
+	// call requireUser. Endpoints that are still unprotected say so in ADR 0008.
+	router.Use(sessionMiddleware(services.Identity, log))
+
 	router.Get("/healthz", handleHealth(log))
 	router.Get("/readyz", handleReadiness(st, log))
 
 	router.Route("/api/v1", func(r chi.Router) {
 		r.Get("/meta", handleMeta(log))
+		// Secure cookies everywhere except local development, where the API speaks
+		// plain http (see sessionCookie).
+		secureCookies := !cfg.IsDevelopment()
+		r.Route("/auth", func(r chi.Router) {
+			r.Post("/login", handleLogin(services.Identity, secureCookies, log))
+			r.Post("/logout", handleLogout(services.Identity, secureCookies, log))
+		})
+		r.Get("/me", handleMe(log))
 		r.Route("/business-objects", func(r chi.Router) {
 			r.Get("/", handleListBusinessObjects(services.BusinessObjects, log))
 			r.Post("/", handleCreateBusinessObject(services.BusinessObjects, log))

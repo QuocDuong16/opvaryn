@@ -517,7 +517,8 @@ func TestApproveAboveThresholdWaitsForTheDirector(t *testing.T) {
 		InstanceID: view.Instance.ID,
 		TaskID:     manager.ID,
 		Decision:   DecisionApprove,
-		ActorRole:  managerRole,
+		Actor:      "lan@example.com",
+		ActorRoles: []string{managerRole},
 	})
 	if err != nil {
 		t.Fatalf("Decide returned error: %v", err)
@@ -552,7 +553,8 @@ func TestApproveBelowThresholdCompletesTheInstance(t *testing.T) {
 		InstanceID: view.Instance.ID,
 		TaskID:     manager.ID,
 		Decision:   DecisionApprove,
-		ActorRole:  managerRole,
+		Actor:      "lan@example.com",
+		ActorRoles: []string{managerRole},
 	})
 	if err != nil {
 		t.Fatalf("Decide returned error: %v", err)
@@ -583,7 +585,8 @@ func TestReturnResetsToANewAttempt(t *testing.T) {
 		TaskID:     manager.ID,
 		Decision:   DecisionReturn,
 		Reason:     "Bổ sung báo giá",
-		ActorRole:  managerRole,
+		Actor:      "lan@example.com",
+		ActorRoles: []string{managerRole},
 	})
 	if err != nil {
 		t.Fatalf("Decide returned error: %v", err)
@@ -623,7 +626,8 @@ func TestRejectIsTerminal(t *testing.T) {
 		TaskID:     manager.ID,
 		Decision:   DecisionReject,
 		Reason:     "Ngoài ngân sách quý",
-		ActorRole:  managerRole,
+		Actor:      "lan@example.com",
+		ActorRoles: []string{managerRole},
 	})
 	if err != nil {
 		t.Fatalf("Decide returned error: %v", err)
@@ -651,7 +655,8 @@ func TestDecideGuards(t *testing.T) {
 			InstanceID: view.Instance.ID,
 			TaskID:     openTaskFor(t, store, "manager_approval").ID,
 			Decision:   DecisionApprove,
-			ActorRole:  directorRole,
+			Actor:      "bao@example.com",
+			ActorRoles: []string{directorRole},
 		})
 		if !errors.Is(err, ErrForbidden) {
 			t.Fatalf("expected ErrForbidden, got %v", err)
@@ -668,7 +673,8 @@ func TestDecideGuards(t *testing.T) {
 			InstanceID: view.Instance.ID,
 			TaskID:     openTaskFor(t, store, "manager_approval").ID,
 			Decision:   DecisionReturn,
-			ActorRole:  managerRole,
+			Actor:      "lan@example.com",
+			ActorRoles: []string{managerRole},
 		})
 		var validation *ValidationError
 		if !asValidationError(err, &validation) || !strings.Contains(validation.Error(), "must carry a reason") {
@@ -684,13 +690,13 @@ func TestDecideGuards(t *testing.T) {
 
 		task := openTaskFor(t, store, "manager_approval")
 		if _, err := runtime.Decide(context.Background(), DecideInput{
-			InstanceID: view.Instance.ID, TaskID: task.ID, Decision: DecisionApprove, ActorRole: managerRole,
+			InstanceID: view.Instance.ID, TaskID: task.ID, Decision: DecisionApprove, Actor: "lan@example.com", ActorRoles: []string{managerRole},
 		}); err != nil {
 			t.Fatalf("first decision failed: %v", err)
 		}
 
 		_, err := runtime.Decide(context.Background(), DecideInput{
-			InstanceID: view.Instance.ID, TaskID: task.ID, Decision: DecisionApprove, ActorRole: managerRole,
+			InstanceID: view.Instance.ID, TaskID: task.ID, Decision: DecisionApprove, Actor: "lan@example.com", ActorRoles: []string{managerRole},
 		})
 		if !errors.Is(err, ErrStateConflict) {
 			t.Fatalf("expected ErrStateConflict for the second decision, got %v", err)
@@ -707,7 +713,8 @@ func TestDecideGuards(t *testing.T) {
 			InstanceID: view.Instance.ID,
 			TaskID:     openTaskFor(t, store, "manager_approval").ID,
 			Decision:   Decision("delegate"),
-			ActorRole:  managerRole,
+			Actor:      "lan@example.com",
+			ActorRoles: []string{managerRole},
 		})
 		var validation *ValidationError
 		if !asValidationError(err, &validation) {

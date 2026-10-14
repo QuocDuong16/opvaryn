@@ -162,6 +162,62 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/auth/login": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Sign in and open a session
+         * @description Verifies email and password and sets the httpOnly session cookie. An unknown email
+         *     and a wrong password answer identically, so the endpoint cannot be used to discover
+         *     which addresses exist.
+         */
+        post: operations["login"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/auth/logout": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** End the current session */
+        post: operations["logout"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** The signed-in user with roles and department */
+        get: operations["getMe"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/process-definitions": {
         parameters: {
             query?: never;
@@ -236,7 +292,8 @@ export interface paths {
         /**
          * Start a process instance from a stored record
          * @description Binds the instance to the definition version current at start and walks the
-         *     graph to its first waiting human task (or straight to the end).
+         *     graph to its first waiting human task (or straight to the end). The actor is
+         *     the signed-in user; there is no way to claim one from the body.
          */
         post: operations["startProcessInstance"];
         delete?: never;
@@ -276,7 +333,7 @@ export interface paths {
          * @description Applies exactly one decision. Approve advances along the graph, return resets
          *     the instance to a new attempt, reject is terminal. The task is decided with a
          *     compare-and-swap, so a second caller gets 409 instead of applying a second
-         *     transition. The actor role must match the role the task was assigned to.
+         *     transition. The task role must be one the signed-in user holds.
          */
         post: operations["decideProcessTask"];
         delete?: never;
@@ -577,23 +634,31 @@ export interface components {
             /** @description Append-only audit log, oldest first. */
             events: components["schemas"]["ProcessEvent"][];
         };
+        LoginRequest: {
+            /** @example lan@example.com */
+            email: string;
+            /** @example correct horse battery staple */
+            password: string;
+        };
+        Me: {
+            /** Format: uuid */
+            id: string;
+            email: string;
+            name: string;
+            /** @description Department key (D09b scoping). */
+            department: string;
+            roles: string[];
+        };
         StartProcessInstanceRequest: {
             definitionKey: string;
             /** Format: uuid */
             recordId: string;
-            /**
-             * @description Written to the audit log; a real identity arrives with D09.
-             * @example nhan_vien
-             */
-            actor?: string;
         };
         DecideProcessTaskRequest: {
             /** @enum {string} */
             decision: "approve" | "return" | "reject";
             /** @description Required for return and reject decisions. */
             reason?: string;
-            /** @description Must match the role the task was assigned to. */
-            actorRole: string;
         };
     };
     responses: {
@@ -617,6 +682,15 @@ export interface components {
         };
         /** @description The database dependency is unavailable */
         ServiceUnavailable: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
+        /** @description No session, or the session expired */
+        Unauthorized: {
             headers: {
                 [name: string]: unknown;
             };
@@ -910,6 +984,73 @@ export interface operations {
             503: components["responses"]["ServiceUnavailable"];
         };
     };
+    login: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["LoginRequest"];
+            };
+        };
+        responses: {
+            /** @description The signed-in user */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    logout: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The session is gone (an unknown session is not an error) */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+        };
+    };
+    getMe: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The current user */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Me"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
     listProcessDefinitions: {
         parameters: {
             query?: never;
@@ -1061,6 +1202,7 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             503: components["responses"]["ServiceUnavailable"];
         };
@@ -1086,6 +1228,7 @@ export interface operations {
                     "application/json": components["schemas"]["ProcessInstanceView"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             503: components["responses"]["ServiceUnavailable"];
         };
@@ -1118,7 +1261,8 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
-            /** @description The actor role does not hold the task */
+            401: components["responses"]["Unauthorized"];
+            /** @description The signed-in user does not hold the role the task was assigned to */
             403: {
                 headers: {
                     [name: string]: unknown;

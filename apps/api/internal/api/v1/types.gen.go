@@ -303,9 +303,7 @@ type CreateProcessDefinitionRequest struct {
 
 // DecideProcessTaskRequest defines model for DecideProcessTaskRequest.
 type DecideProcessTaskRequest struct {
-	// ActorRole Must match the role the task was assigned to.
-	ActorRole string                           `json:"actorRole"`
-	Decision  DecideProcessTaskRequestDecision `json:"decision"`
+	Decision DecideProcessTaskRequestDecision `json:"decision"`
 
 	// Reason Required for return and reject decisions.
 	Reason *string `json:"reason,omitempty"`
@@ -359,6 +357,25 @@ type HealthStatus struct {
 
 // HealthStatusStatus defines model for HealthStatus.Status.
 type HealthStatusStatus string
+
+// LoginRequest defines model for LoginRequest.
+type LoginRequest struct {
+	// Email Example: lan@example.com
+	Email string `json:"email"`
+
+	// Password Example: correct horse battery staple
+	Password string `json:"password"`
+}
+
+// Me defines model for Me.
+type Me struct {
+	// Department Department key (D09b scoping).
+	Department string             `json:"department"`
+	Email      string             `json:"email"`
+	Id         openapi_types.UUID `json:"id"`
+	Name       string             `json:"name"`
+	Roles      []string           `json:"roles"`
+}
 
 // Meta defines model for Meta.
 type Meta struct {
@@ -550,10 +567,6 @@ type ProcessTaskStatus string
 
 // StartProcessInstanceRequest defines model for StartProcessInstanceRequest.
 type StartProcessInstanceRequest struct {
-	// Actor Written to the audit log; a real identity arrives with D09.
-	//
-	// Example: nhan_vien
-	Actor         *string            `json:"actor,omitempty"`
 	DefinitionKey string             `json:"definitionKey"`
 	RecordId      openapi_types.UUID `json:"recordId"`
 }
@@ -605,6 +618,13 @@ type NotFound = ErrorResponse
 // ServiceUnavailable Stable error envelope. `code` is a machine-readable identifier; clients switch on
 // it and never on the human-readable message.
 type ServiceUnavailable = ErrorResponse
+
+// Unauthorized Stable error envelope. `code` is a machine-readable identifier; clients switch on
+// it and never on the human-readable message.
+type Unauthorized = ErrorResponse
+
+// LoginJSONRequestBody defines body for Login for application/json ContentType.
+type LoginJSONRequestBody = LoginRequest
 
 // CreateBusinessObjectJSONRequestBody defines body for CreateBusinessObject for application/json ContentType.
 type CreateBusinessObjectJSONRequestBody = CreateBusinessObjectRequest

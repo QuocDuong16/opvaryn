@@ -23,6 +23,8 @@ tags:
     description: Business object definitions (demo vertical slice)
   - name: object-records
     description: Records stored against a business object definition
+  - name: identity
+    description: Sign in, sign out and the current user
 paths:
   /healthz:
     get:
@@ -231,6 +233,60 @@ paths:
           $ref: '#/components/responses/NotFound'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/auth/login:
+    post:
+      operationId: login
+      tags: [identity]
+      summary: Sign in and open a session
+      description: |
+        Verifies email and password and sets the httpOnly session cookie. An unknown email
+        and a wrong password answer identically, so the endpoint cannot be used to discover
+        which addresses exist.
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/LoginRequest'
+      responses:
+        '200':
+          description: The signed-in user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/auth/logout:
+    post:
+      operationId: logout
+      tags: [identity]
+      summary: End the current session
+      responses:
+        '204':
+          description: The session is gone (an unknown session is not an error)
+  /api/v1/me:
+    get:
+      operationId: getMe
+      tags: [identity]
+      summary: The signed-in user with roles and department
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: The current user
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Me'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/process-definitions:
     get:
       operationId: listProcessDefinitions
@@ -343,7 +399,10 @@ paths:
       summary: Start a process instance from a stored record
       description: |
         Binds the instance to the definition version current at start and walks the
-        graph to its first waiting human task (or straight to the end).
+        graph to its first waiting human task (or straight to the end). The actor is
+        the signed-in user; there is no way to claim one from the body.
+      security:
+        - sessionCookie: []
       requestBody:
         required: true
         content:
@@ -359,6 +418,8 @@ paths:
                 $ref: '#/components/schemas/ProcessInstanceView'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '503':
@@ -368,6 +429,8 @@ paths:
       operationId: getProcessInstance
       tags: [process-runtime]
       summary: Get an instance with its tasks and its event log
+      security:
+        - sessionCookie: []
       parameters:
         - $ref: '#/components/parameters/InstanceId'
       responses:
@@ -377,6 +440,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProcessInstanceView'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '503':
@@ -390,7 +455,9 @@ paths:
         Applies exactly one decision. Approve advances along the graph, return resets
         the instance to a new attempt, reject is terminal. The task is decided with a
         compare-and-swap, so a second caller gets 409 instead of applying a second
-        transition. The actor role must match the role the task was assigned to.
+        transition. The task role must be one the signed-in user holds.
+      security:
+        - sessionCookie: []
       parameters:
         - $ref: '#/components/parameters/InstanceId'
         - $ref: '#/components/parameters/TaskId'
@@ -409,8 +476,10 @@ paths:
                 $ref: '#/components/schemas/ProcessInstanceView'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '403':
-          description: The actor role does not hold the task
+          description: The signed-in user does not hold the role the task was assigned to
           content:
             application/json:
               schema:
@@ -422,6 +491,14 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
 components:
+  securitySchemes:
+    sessionCookie:
+      type: apiKey
+      in: cookie
+      name: opvaryn.session
+      description: |
+        Session cookie set by `POST /auth/login`. The token is httpOnly on the client and
+        only its hash is stored server-side (ADR 0008).
   parameters:
     ObjectKey:
       name: key
@@ -470,6 +547,12 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     ServiceUnavailable:
       description: The database dependency is unavailable
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Unauthorized:
+      description: No session, or the session expired
       content:
         application/json:
           schema:
@@ -989,6 +1072,35 @@ components:
           description: Append-only audit log, oldest first.
           items:
             $ref: '#/components/schemas/ProcessEvent'
+    LoginRequest:
+      type: object
+      required: [email, password]
+      properties:
+        email:
+          type: string
+          example: lan@example.com
+        password:
+          type: string
+          minLength: 1
+          example: correct horse battery staple
+    Me:
+      type: object
+      required: [id, email, name, department, roles]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        name:
+          type: string
+        department:
+          type: string
+          description: Department key (D09b scoping).
+        roles:
+          type: array
+          items:
+            type: string
     StartProcessInstanceRequest:
       type: object
       required: [definitionKey, recordId]
@@ -998,13 +1110,9 @@ components:
         recordId:
           type: string
           format: uuid
-        actor:
-          type: string
-          description: Written to the audit log; a real identity arrives with D09.
-          example: nhan_vien
     DecideProcessTaskRequest:
       type: object
-      required: [decision, actorRole]
+      required: [decision]
       properties:
         decision:
           type: string
@@ -1013,6 +1121,3 @@ components:
           type: string
           maxLength: 500
           description: Required for return and reject decisions.
-        actorRole:
-          type: string
-          description: Must match the role the task was assigned to.
