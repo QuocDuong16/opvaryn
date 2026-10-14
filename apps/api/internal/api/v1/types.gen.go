@@ -528,8 +528,22 @@ type ProcessInstance struct {
 	UpdatedAt         time.Time            `json:"updatedAt"`
 }
 
+// ProcessInstanceList defines model for ProcessInstanceList.
+type ProcessInstanceList struct {
+	// Data Visible instances, newest first.
+	Data []ProcessInstanceSummary `json:"data"`
+}
+
 // ProcessInstanceState defines model for ProcessInstanceState.
 type ProcessInstanceState string
+
+// ProcessInstanceSummary defines model for ProcessInstanceSummary.
+type ProcessInstanceSummary struct {
+	Instance ProcessInstance `json:"instance"`
+
+	// OpenTasks The tasks of this instance still waiting on a decision.
+	OpenTasks []ProcessTask `json:"openTasks"`
+}
 
 // ProcessInstanceView defines model for ProcessInstanceView.
 type ProcessInstanceView struct {
@@ -634,6 +648,15 @@ type ServiceUnavailable = ErrorResponse
 // Unauthorized Stable error envelope. `code` is a machine-readable identifier; clients switch on
 // it and never on the human-readable message.
 type Unauthorized = ErrorResponse
+
+// ListProcessInstancesParams defines parameters for ListProcessInstances.
+type ListProcessInstancesParams struct {
+	// ObjectKey Only instances of this business object.
+	ObjectKey *string `form:"objectKey,omitempty" json:"objectKey,omitempty"`
+
+	// DefinitionKey Only instances of this process definition.
+	DefinitionKey *string `form:"definitionKey,omitempty" json:"definitionKey,omitempty"`
+}
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest

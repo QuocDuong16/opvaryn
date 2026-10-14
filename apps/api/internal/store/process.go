@@ -431,6 +431,94 @@ func (s *Store) FindVisibleProcessInstance(
 	return instance, true, nil
 }
 
+// ListVisibleProcessInstances returns the instances the scope may see, newest
+// first, optionally narrowed to one business object or one process definition. The
+// same record-visible-to-scope rule as every other read applies, so a screen cannot
+// list an instance whose record the caller may not read (ADR 0008). The limit is
+// applied in SQL: this backs a screen, not an export.
+func (s *Store) ListVisibleProcessInstances(
+	ctx context.Context,
+	filter domain.ProcessInstanceFilter,
+	scope domain.RecordScope,
+	limit int,
+) ([]domain.ProcessInstanceSummary, error) {
+	rows, err := s.pool.Query(ctx, processInstanceSelect+`
+		  JOIN business_object_records r ON r.id = i.record_id
+		 WHERE `+recordVisibleToScope+`
+		   AND ($1::text = '' OR i.object_key = $1)
+		   AND ($5::text = '' OR d.key = $5)
+		 ORDER BY i.started_at DESC, i.id
+		 LIMIT $6`,
+		filter.ObjectKey, scope.All, scope.DepartmentKey, scope.UserID, filter.DefinitionKey, limit)
+	if err != nil {
+		return nil, classify(fmt.Errorf("query process instances: %w", err))
+	}
+	defer rows.Close()
+
+	summaries := make([]domain.ProcessInstanceSummary, 0)
+	index := make(map[uuid.UUID]int)
+	for rows.Next() {
+		instance, err := scanProcessInstance(rows)
+		if err != nil {
+			return nil, classify(fmt.Errorf("scan process instance: %w", err))
+		}
+		index[instance.ID] = len(summaries)
+		summaries = append(summaries, domain.ProcessInstanceSummary{Instance: instance})
+	}
+	if err := rows.Err(); err != nil {
+		return nil, classify(fmt.Errorf("read process instances: %w", err))
+	}
+	if len(summaries) == 0 {
+		return summaries, nil
+	}
+
+	// One extra query for the open tasks of exactly these instances, so the list can
+	// say who holds each one up without loading every task and event of every row.
+	taskRows, err := s.pool.Query(ctx, `
+		SELECT id, instance_id, node_key, title, assignee_role, attempt,
+		       status, reason, decided_by, created_at, decided_at
+		  FROM process_tasks
+		 WHERE instance_id = ANY($1) AND status = 'open'
+		 ORDER BY created_at, id`, instanceIDs(summaries))
+	if err != nil {
+		return nil, classify(fmt.Errorf("query open tasks of instances: %w", err))
+	}
+	defer taskRows.Close()
+
+	for taskRows.Next() {
+		var (
+			task      domain.ProcessTask
+			status    string
+			decidedBy *string
+		)
+		if err := taskRows.Scan(
+			&task.ID, &task.InstanceID, &task.NodeKey, &task.Title, &task.AssigneeRole,
+			&task.Attempt, &status, &task.Reason, &decidedBy, &task.CreatedAt, &task.DecidedAt,
+		); err != nil {
+			return nil, classify(fmt.Errorf("scan open task of instance: %w", err))
+		}
+		task.Status = domain.ProcessTaskStatus(status)
+		if decidedBy != nil {
+			task.DecidedBy = *decidedBy
+		}
+		if position, ok := index[task.InstanceID]; ok {
+			summaries[position].OpenTasks = append(summaries[position].OpenTasks, task)
+		}
+	}
+	if err := taskRows.Err(); err != nil {
+		return nil, classify(fmt.Errorf("read open tasks of instances: %w", err))
+	}
+	return summaries, nil
+}
+
+func instanceIDs(summaries []domain.ProcessInstanceSummary) []uuid.UUID {
+	ids := make([]uuid.UUID, len(summaries))
+	for i, summary := range summaries {
+		ids[i] = summary.Instance.ID
+	}
+	return ids
+}
+
 func scanProcessInstance(row rowScanner) (domain.ProcessInstance, error) {
 	var (
 		instance domain.ProcessInstance

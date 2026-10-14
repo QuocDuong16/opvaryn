@@ -83,6 +83,7 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 		})
 
 		r.Route("/process-instances", func(r chi.Router) {
+			r.Get("/", handleListProcessInstances(services.ProcessRuntime, log))
 			r.Post("/", handleStartProcessInstance(services.ProcessRuntime, log))
 			r.Route("/{instanceId}", func(r chi.Router) {
 				r.Get("/", handleGetProcessInstance(services.ProcessRuntime, log))

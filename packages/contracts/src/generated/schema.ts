@@ -308,7 +308,14 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /**
+         * List the instances the signed-in user may see
+         * @description Scoped exactly like the record each instance runs on (ADR 0008): an instance is
+         *     listed only when its record is visible to the caller, and a caller who holds the
+         *     role of an open task sees it through that task. Optional filters narrow the list
+         *     to one business object or one process definition; newest first, capped at 200.
+         */
+        get: operations["listProcessInstances"];
         put?: never;
         /**
          * Start a process instance from a stored record
@@ -662,6 +669,15 @@ export interface components {
             tasks: components["schemas"]["ProcessTask"][];
             /** @description Append-only audit log, oldest first. */
             events: components["schemas"]["ProcessEvent"][];
+        };
+        ProcessInstanceSummary: {
+            instance: components["schemas"]["ProcessInstance"];
+            /** @description The tasks of this instance still waiting on a decision. */
+            openTasks: components["schemas"]["ProcessTask"][];
+        };
+        ProcessInstanceList: {
+            /** @description Visible instances, newest first. */
+            data: components["schemas"]["ProcessInstanceSummary"][];
         };
         LoginRequest: {
             /** @example lan@example.com */
@@ -1227,6 +1243,34 @@ export interface operations {
                 };
             };
             404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listProcessInstances: {
+        parameters: {
+            query?: {
+                /** @description Only instances of this business object. */
+                objectKey?: string;
+                /** @description Only instances of this process definition. */
+                definitionKey?: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The visible instances, newest first */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessInstanceList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };

@@ -416,6 +416,45 @@ paths:
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/process-instances:
+    get:
+      operationId: listProcessInstances
+      tags: [process-runtime]
+      summary: List the instances the signed-in user may see
+      description: |
+        Scoped exactly like the record each instance runs on (ADR 0008): an instance is
+        listed only when its record is visible to the caller, and a caller who holds the
+        role of an open task sees it through that task. Optional filters narrow the list
+        to one business object or one process definition; newest first, capped at 200.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: objectKey
+          in: query
+          required: false
+          description: Only instances of this business object.
+          schema:
+            type: string
+            example: purchase_request
+        - name: definitionKey
+          in: query
+          required: false
+          description: Only instances of this process definition.
+          schema:
+            type: string
+            example: purchase_approval
+      responses:
+        '200':
+          description: The visible instances, newest first
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessInstanceList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
     post:
       operationId: startProcessInstance
       tags: [process-runtime]
@@ -1112,6 +1151,26 @@ components:
           description: Append-only audit log, oldest first.
           items:
             $ref: '#/components/schemas/ProcessEvent'
+    ProcessInstanceSummary:
+      type: object
+      required: [instance, openTasks]
+      properties:
+        instance:
+          $ref: '#/components/schemas/ProcessInstance'
+        openTasks:
+          type: array
+          description: The tasks of this instance still waiting on a decision.
+          items:
+            $ref: '#/components/schemas/ProcessTask'
+    ProcessInstanceList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          description: Visible instances, newest first.
+          items:
+            $ref: '#/components/schemas/ProcessInstanceSummary'
     LoginRequest:
       type: object
       required: [email, password]

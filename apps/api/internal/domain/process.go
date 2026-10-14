@@ -183,6 +183,21 @@ type InboxItem struct {
 	Instance ProcessInstance
 }
 
+// ProcessInstanceFilter narrows a list of instances. Both fields are optional;
+// the caller passes one to ask for the instances of one object or one definition.
+type ProcessInstanceFilter struct {
+	ObjectKey     string
+	DefinitionKey string
+}
+
+// ProcessInstanceSummary is one instance as a list row: the instance itself plus
+// the tasks still waiting on a decision, so a screen can say who holds it up
+// without loading the whole event log.
+type ProcessInstanceSummary struct {
+	Instance  ProcessInstance
+	OpenTasks []ProcessTask
+}
+
 // StartInstanceWrite is the whole write of starting one instance: the row, the
 // tasks the first nodes created and the matching events. The store applies it in
 // one transaction or not at all.

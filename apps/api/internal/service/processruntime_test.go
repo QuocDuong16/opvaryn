@@ -331,6 +331,9 @@ type fakeRuntimeStore struct {
 	hidden bool
 	// scope remembers what visibility the service asked for.
 	scope domain.RecordScope
+	// listFilter and listLimit remember what the list call asked for.
+	listFilter domain.ProcessInstanceFilter
+	listLimit  int
 }
 
 func newFakeRuntimeStore(t *testing.T, values map[string]any) *fakeRuntimeStore {
@@ -444,6 +447,27 @@ func (f *fakeRuntimeStore) ListOpenTasksForRoles(context.Context, uuid.UUID) ([]
 		}
 	}
 	return items, nil
+}
+
+func (f *fakeRuntimeStore) ListVisibleProcessInstances(
+	_ context.Context,
+	filter domain.ProcessInstanceFilter,
+	scope domain.RecordScope,
+	limit int,
+) ([]domain.ProcessInstanceSummary, error) {
+	f.scope = scope
+	f.listFilter = filter
+	f.listLimit = limit
+	if f.hidden || f.instance.ID == uuid.Nil {
+		return nil, nil
+	}
+	summary := domain.ProcessInstanceSummary{Instance: f.instance}
+	for _, task := range f.tasks {
+		if task.Status == domain.TaskOpen {
+			summary.OpenTasks = append(summary.OpenTasks, task)
+		}
+	}
+	return []domain.ProcessInstanceSummary{summary}, nil
 }
 
 func openTaskFor(t *testing.T, store *fakeRuntimeStore, nodeKey string) domain.ProcessTask {

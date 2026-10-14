@@ -406,6 +406,37 @@ status="$(request_as "$outsider_jar" GET /api/v1/tasks)"
 [[ "$status" == "200" ]] || fail "reading the outsider inbox returned $status"
 grep -q '"data":\[\]' "$body_file" || fail "a user without the role must have an empty inbox"
 
+echo "smoke: GET /api/v1/process-instances (scoped, filterable, bounded)"
+status="$(request_as "$designer_jar" GET "/api/v1/process-instances?definitionKey=$process_key")"
+[[ "$status" == "200" ]] || fail "listing process instances returned $status, expected 200"
+python3 - "$body_file" "$process_key" "$designer_role" <<'PY' || fail "the instance list does not match the instances created above"
+import json, sys
+
+summaries = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+definition_key, approver_role = sys.argv[2], sys.argv[3]
+if len(summaries) != 4:
+    sys.exit(f"expected the four instances started in this run, got {len(summaries)}")
+if any(summary["instance"]["definitionKey"] != definition_key for summary in summaries):
+    sys.exit("the definition filter did not narrow the list")
+started = [summary["instance"]["startedAt"] for summary in summaries]
+if started != sorted(started, reverse=True):
+    sys.exit("instances must be listed newest first")
+waiting = [summary for summary in summaries if summary["instance"]["state"] == "running"]
+if len(waiting) != 1 or [task["assigneeRole"] for task in waiting[0]["openTasks"]] != [approver_role]:
+    sys.exit(f"the running instance should carry its open task: {waiting}")
+print("smoke: the instance list is filtered, ordered and carries the waiting task")
+PY
+
+echo "smoke: the instance list follows record visibility and refuses bad filters"
+status="$(request_as "$outsider_jar" GET "/api/v1/process-instances?definitionKey=$process_key")"
+[[ "$status" == "200" ]] || fail "the outsider instance list returned $status"
+grep -q '"data":\[\]' "$body_file" || fail "an outsider must not see instances of records they cannot read"
+status="$(request_as "$designer_jar" GET '/api/v1/process-instances?objectKey=Not%20A%20Key')"
+[[ "$status" == "400" ]] || fail "a malformed filter returned $status, expected 400"
+grep -q 'object_key' "$body_file" || fail "the malformed filter did not name the parameter"
+status="$(request GET "/api/v1/process-instances?definitionKey=$process_key")"
+[[ "$status" == "401" ]] || fail "listing instances anonymously returned $status, expected 401"
+
 echo "smoke: logout ends the session"
 status="$(request_as "$designer_jar" POST /api/v1/auth/logout)"
 [[ "$status" == "204" ]] || fail "logout returned $status, expected 204"

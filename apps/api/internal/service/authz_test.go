@@ -3,6 +3,7 @@ package service
 import (
 	"context"
 	"errors"
+	"strings"
 	"testing"
 
 	"github.com/google/uuid"
@@ -188,6 +189,83 @@ func TestInboxAnswersOnlyForTheCallersRoles(t *testing.T) {
 	}
 	if len(items) != 1 || items[0].Task.AssigneeRole != managerRole {
 		t.Fatalf("expected the caller's own open task, got %+v", items)
+	}
+}
+
+func TestInstanceListIsScopedAndBounded(t *testing.T) {
+	t.Parallel()
+
+	store := newFakeRuntimeStore(t, map[string]any{"estimated_amount": float64(1)})
+	runtime := NewProcessRuntime(store)
+	principal := managerPrincipal()
+
+	view, err := runtime.Start(context.Background(), StartInput{
+		DefinitionKey: "purchase_approval",
+		RecordID:      store.record.ID,
+		Principal:     principal,
+	})
+	if err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	summaries, err := runtime.List(context.Background(), ListInput{
+		ObjectKey: " purchase_request ",
+		Principal: principal,
+	})
+	if err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if len(summaries) != 1 || summaries[0].Instance.ID != view.Instance.ID {
+		t.Fatalf("expected the started instance in the list, got %+v", summaries)
+	}
+	if len(summaries[0].OpenTasks) != 1 || summaries[0].OpenTasks[0].Status != domain.TaskOpen {
+		t.Fatalf("a list row must carry its open tasks, got %+v", summaries[0].OpenTasks)
+	}
+	// The filter is trimmed and carried to the store, and the list is bounded.
+	if store.listFilter.ObjectKey != "purchase_request" {
+		t.Fatalf("expected the trimmed object key to reach the store, got %q", store.listFilter.ObjectKey)
+	}
+	if store.listLimit != maxInstanceList {
+		t.Fatalf("expected the store limit %d, got %d", maxInstanceList, store.listLimit)
+	}
+	if store.scope != (domain.RecordScope{UserID: principal.UserID, DepartmentKey: "ky_thuat"}) {
+		t.Fatalf("the instance list must use the principal scope, got %+v", store.scope)
+	}
+
+	// A hidden record means an empty list, not an error and not a leak.
+	store.hidden = true
+	hidden, err := runtime.List(context.Background(), ListInput{Principal: principal})
+	if err != nil {
+		t.Fatalf("List returned error for a hidden record: %v", err)
+	}
+	if len(hidden) != 0 {
+		t.Fatalf("expected no visible instances, got %+v", hidden)
+	}
+}
+
+func TestInstanceListRefusesAnonymousAndBadFilters(t *testing.T) {
+	t.Parallel()
+
+	store := newFakeRuntimeStore(t, nil)
+	runtime := NewProcessRuntime(store)
+
+	if _, err := runtime.List(context.Background(), ListInput{}); !errors.Is(err, ErrUnauthorized) {
+		t.Fatalf("an anonymous list must be refused, got %v", err)
+	}
+
+	var validation *ValidationError
+	err := func() error {
+		_, err := runtime.List(context.Background(), ListInput{
+			DefinitionKey: "Not A Key",
+			Principal:     managerPrincipal(),
+		})
+		return err
+	}()
+	if !errors.As(err, &validation) {
+		t.Fatalf("a malformed filter must be a validation error, got %v", err)
+	}
+	if len(validation.Problems) != 1 || !strings.Contains(validation.Problems[0], "definition_key") {
+		t.Fatalf("expected one problem naming definition_key, got %+v", validation.Problems)
 	}
 }
 

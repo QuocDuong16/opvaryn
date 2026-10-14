@@ -123,6 +123,25 @@ func handleListProcessDefinitionVersions(definitions *service.ProcessDefinitions
 
 // ----------------------------------------------------------------- runtime ----
 
+func handleListProcessInstances(runtime *service.ProcessRuntime, log *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
+		summaries, err := runtime.List(r.Context(), service.ListInput{
+			ObjectKey:     r.URL.Query().Get("objectKey"),
+			DefinitionKey: r.URL.Query().Get("definitionKey"),
+			Principal:     domain.NewPrincipal(user),
+		})
+		if err != nil {
+			writeStoreError(w, log, err, "list process instances")
+			return
+		}
+		writeJSON(w, log, http.StatusOK, apiv1.ProcessInstanceList{Data: toAPIInstanceSummaries(summaries)})
+	}
+}
+
 func handleStartProcessInstance(runtime *service.ProcessRuntime, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		var body apiv1.StartProcessInstanceJSONRequestBody
@@ -338,6 +357,17 @@ func toAPIInboxItems(items []domain.InboxItem) []apiv1.InboxItem {
 		result[i] = apiv1.InboxItem{
 			Task:     toAPIInstanceView(service.InstanceView{Tasks: []domain.ProcessTask{item.Task}}).Tasks[0],
 			Instance: toAPIInstanceView(service.InstanceView{Instance: item.Instance}).Instance,
+		}
+	}
+	return result
+}
+
+func toAPIInstanceSummaries(summaries []domain.ProcessInstanceSummary) []apiv1.ProcessInstanceSummary {
+	result := make([]apiv1.ProcessInstanceSummary, len(summaries))
+	for i, summary := range summaries {
+		result[i] = apiv1.ProcessInstanceSummary{
+			Instance:  toAPIInstanceView(service.InstanceView{Instance: summary.Instance}).Instance,
+			OpenTasks: toAPIInstanceView(service.InstanceView{Tasks: summary.OpenTasks}).Tasks,
 		}
 	}
 	return result
