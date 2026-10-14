@@ -94,8 +94,11 @@ con số trong dashboard là một truy vấn thật trên projection có kiểu
    bản để thấy service từ chối kèm lý do — không có đường nào để viết SQL.
 4. Đăng nhập tài khoản bộ phận khác và mở lại cùng metric: con số khác, vì metric chạy theo phạm vi
    đọc của người đang đăng nhập (ADR 0008). Đây là điểm nên nói rõ khi trình bày.
-5. Nhóm "Metric vận hành quy trình — chưa làm" (cycle time, approval rate, SLA) được ghi là `concept`:
-   chúng cần read model trên event log, chưa có.
+5. Cuộn xuống mục **Vận hành quy trình**: số instance đã chạy / hoàn tất / bị từ chối / đang chạy,
+   cycle time, thời gian một bước, tỉ lệ duyệt và tỉ lệ phải chạy lại — lọc theo quy trình và cửa sổ
+   7/30/90/365 ngày. Đây là read model cố định trên `process_instances`/`process_tasks` (ADR 0011),
+   cũng theo phạm vi đọc của bạn. **SLA chưa có** và màn hình nói thẳng như vậy: engine chưa có chính
+   sách thời gian làm việc (V1.x), nên không hiển thị hạn giả.
 
 ### Walkthrough màn hình Workflows (live)
 

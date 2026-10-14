@@ -407,6 +407,15 @@ type DecideProcessTaskRequest struct {
 // DecideProcessTaskRequestDecision defines model for DecideProcessTaskRequest.Decision.
 type DecideProcessTaskRequestDecision string
 
+// DurationStats defines model for DurationStats.
+type DurationStats struct {
+	AverageSeconds float64 `json:"averageSeconds"`
+	MedianSeconds  float64 `json:"medianSeconds"`
+
+	// Samples How many measurements the numbers rest on.
+	Samples int64 `json:"samples"`
+}
+
 // ErrorResponse Stable error envelope. `code` is a machine-readable identifier; clients switch on
 // it and never on the human-readable message.
 type ErrorResponse struct {
@@ -463,6 +472,14 @@ type InboxItem struct {
 type InboxList struct {
 	// Data Open tasks of the signed-in user, oldest first.
 	Data []InboxItem `json:"data"`
+}
+
+// InstanceCounts defines model for InstanceCounts.
+type InstanceCounts struct {
+	Completed int64 `json:"completed"`
+	Rejected  int64 `json:"rejected"`
+	Running   int64 `json:"running"`
+	Started   int64 `json:"started"`
 }
 
 // LoginRequest defines model for LoginRequest.
@@ -750,6 +767,27 @@ type ProcessInstanceView struct {
 	Tasks    []ProcessTask   `json:"tasks"`
 }
 
+// ProcessMetricsOverview defines model for ProcessMetricsOverview.
+type ProcessMetricsOverview struct {
+	// ApprovalRate Completed / (completed + rejected). Absent when nothing finished.
+	ApprovalRate *float64 `json:"approvalRate,omitempty"`
+
+	// CycleTime From instance start to finish, over instances finished in the window.
+	CycleTime DurationStats `json:"cycleTime"`
+
+	// DefinitionKey Empty means every process definition.
+	DefinitionKey string         `json:"definitionKey"`
+	GeneratedAt   time.Time      `json:"generatedAt"`
+	Instances     InstanceCounts `json:"instances"`
+
+	// ReworkRate Share of instances that needed more than one attempt. Absent with no instances.
+	ReworkRate *float64 `json:"reworkRate,omitempty"`
+
+	// StepTime From task creation to decision, over tasks decided in the window.
+	StepTime   DurationStats `json:"stepTime"`
+	WindowDays int           `json:"windowDays"`
+}
+
 // ProcessNode defines model for ProcessNode.
 type ProcessNode struct {
 	// AssigneeRole Required on human_task nodes; the role that receives the task (D08b).
@@ -865,6 +903,15 @@ type ListProcessInstancesParams struct {
 
 	// DefinitionKey Only instances of this process definition.
 	DefinitionKey *string `form:"definitionKey,omitempty" json:"definitionKey,omitempty"`
+}
+
+// GetProcessMetricsParams defines parameters for GetProcessMetrics.
+type GetProcessMetricsParams struct {
+	// DefinitionKey Only instances of this process definition.
+	DefinitionKey *string `form:"definitionKey,omitempty" json:"definitionKey,omitempty"`
+
+	// WindowDays How far back to look; 1–365, default 30.
+	WindowDays *int `form:"windowDays,omitempty" json:"windowDays,omitempty"`
 }
 
 // LoginJSONRequestBody defines body for Login for application/json ContentType.

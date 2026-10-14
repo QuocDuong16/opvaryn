@@ -60,6 +60,10 @@ export type MetricBucket = components['schemas']['MetricBucket'];
 export type CreateMetricDefinitionRequest = components['schemas']['CreateMetricDefinitionRequest'];
 /** Request body for replacing a metric definition. */
 export type UpdateMetricDefinitionRequest = components['schemas']['UpdateMetricDefinitionRequest'];
+/** The engine's operational read model over a window (ADR 0011). */
+export type ProcessMetricsOverview = components['schemas']['ProcessMetricsOverview'];
+/** One duration summary: average, median and how many samples. */
+export type DurationStats = components['schemas']['DurationStats'];
 /** Stable error envelope returned by every failing endpoint. */
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 /** The signed-in user with roles and department. */
@@ -96,6 +100,10 @@ export interface ApiClient {
   createMetric(input: CreateMetricDefinitionRequest): Promise<MetricDefinition>;
   updateMetric(key: string, input: UpdateMetricDefinitionRequest): Promise<MetricDefinition>;
   getMetricResult(key: string): Promise<MetricResult>;
+  getProcessMetrics(filter?: {
+    definitionKey?: string;
+    windowDays?: number;
+  }): Promise<ProcessMetricsOverview>;
   getProcessInstance(instanceId: string): Promise<ProcessInstanceView>;
   listProcessInstances(filter?: {
     objectKey?: string;
@@ -240,6 +248,18 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
 
     getMetricResult: (key) =>
       request<MetricResult>(`/api/v1/metrics/${encodeURIComponent(key)}/result`),
+
+    getProcessMetrics: (filter = {}) => {
+      const params = new URLSearchParams();
+      if (filter.definitionKey) {
+        params.set('definitionKey', filter.definitionKey);
+      }
+      if (filter.windowDays) {
+        params.set('windowDays', String(filter.windowDays));
+      }
+      const query = params.size > 0 ? `?${params.toString()}` : '';
+      return request<ProcessMetricsOverview>(`/api/v1/process-metrics${query}`);
+    },
 
     async listProcessDefinitions() {
       const payload = await request<{ data: ProcessDefinition[] }>('/api/v1/process-definitions');

@@ -4,10 +4,18 @@ import {
   type BusinessObject,
   type MetricDefinition,
   type MetricResult,
+  type ProcessDefinition,
+  type ProcessMetricsOverview,
 } from '@opvaryn/contracts';
 
 import { CreateMetricForm } from '@/components/analytics/create-metric-form';
 import { DashboardStudio } from '@/components/analytics/dashboard-studio';
+import {
+  durationLabel,
+  finishedCount,
+  formatRate,
+  reworkedLabel,
+} from '@/components/analytics/process-metrics';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -16,44 +24,28 @@ import { getDashboardWidgets } from '@/lib/dashboard';
 
 export const metadata = { title: 'Analytics' };
 
-const PLANNED_METRICS: readonly { metric: string; definition: string; note: string }[] = [
-  {
-    metric: 'Cycle Time',
-    definition: 'Thời gian từ submit đến hoàn thành / kết thúc',
-    note: 'Cần read model trên event log của instance; metric hiện tại chỉ đo field của bản ghi',
-  },
-  {
-    metric: 'Step Processing Time',
-    definition: 'Thời gian từ khi task được giao đến khi kết thúc',
-    note: 'Cần tách waiting time và active time từ process_tasks',
-  },
-  {
-    metric: 'Approval / Rejection Rate',
-    definition: 'Instance approved hoặc rejected cuối / tổng instance có kết quả',
-    note: 'Cần đếm theo trạng thái instance, không chỉ theo bản ghi',
-  },
-  {
-    metric: 'SLA Breach Rate',
-    definition: 'Task quá SLA / số task có SLA hợp lệ',
-    note: 'Chờ chính sách thời gian làm việc; SLA chưa có trong engine (ADR 0007 mục 12)',
-  },
-  {
-    metric: 'Rework Rate',
-    definition: 'Instance có ít nhất một vòng return / instance hợp lệ',
-    note: 'Đếm instance khác với đếm số vòng trả về — cần event, không chỉ bản ghi',
-  },
-];
+const WINDOW_CHOICES = [7, 30, 90, 365] as const;
 
-export default async function AnalyticsPage() {
+interface PageProps {
+  searchParams: Promise<{ definition?: string; window?: string }>;
+}
+
+export default async function AnalyticsPage({ searchParams }: PageProps) {
+  const { definition, window: windowParam } = await searchParams;
   const api = createServerApiClient();
 
   let metrics: MetricDefinition[] = [];
   let objects: BusinessObject[] = [];
+  let definitions: ProcessDefinition[] = [];
   let error: string | null = null;
   let needsSignIn = false;
 
   try {
-    [metrics, objects] = await Promise.all([api.listMetrics(), api.listBusinessObjects()]);
+    [metrics, objects, definitions] = await Promise.all([
+      api.listMetrics(),
+      api.listBusinessObjects(),
+      api.listProcessDefinitions(),
+    ]);
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'unauthorized') {
       needsSignIn = true;
@@ -78,6 +70,21 @@ export default async function AnalyticsPage() {
     if (result) {
       results[result.metric.key] = result;
     }
+  }
+
+  // The operational overview is a second, fixed catalogue (ADR 0011). It is answered with
+  // the same session, so its numbers are scoped to what this person may see — and it may
+  // fail on its own: a broken overview must not blank the dashboard.
+  const windowDays = Number.parseInt(windowParam ?? '', 10);
+  let overview: ProcessMetricsOverview | null = null;
+  let overviewError: string | null = null;
+  try {
+    overview = await api.getProcessMetrics({
+      ...(definition ? { definitionKey: definition } : {}),
+      ...(Number.isFinite(windowDays) ? { windowDays } : {}),
+    });
+  } catch (cause) {
+    overviewError = describeApiError(cause);
   }
 
   const widgets = await getDashboardWidgets(metrics.map((metric) => metric.key));
@@ -224,44 +231,133 @@ export default async function AnalyticsPage() {
         </>
       ) : null}
 
-      <section>
+      <section className="mb-8">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold tracking-tight">
-            Metric vận hành quy trình — chưa làm
-          </h2>
-          <StatusBadge kind="concept" />
+          <h2 className="text-lg font-semibold tracking-tight">Vận hành quy trình</h2>
+          <StatusBadge kind="live" />
         </div>
-        <p className="mb-3 max-w-3xl text-sm text-on-surface-muted">
-          Các metric dưới đây đo <em>thời gian và trạng thái của quy trình</em>, không phải field
-          của bản ghi: chúng cần một read model trên event log và task (ADR 0007), nên nằm ngoài
-          phạm vi query builder hiện tại (D06). Danh sách này là định nghĩa làm việc từ playbook.
-        </p>
-        <div className="overflow-x-auto rounded-xl border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-raised text-left text-xs tracking-wide text-on-surface-muted uppercase">
-              <tr>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Metric
-                </th>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Định nghĩa làm việc
-                </th>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Lưu ý
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border bg-surface-raised/40">
-              {PLANNED_METRICS.map((row) => (
-                <tr key={row.metric}>
-                  <td className="px-4 py-3 font-medium whitespace-nowrap">{row.metric}</td>
-                  <td className="px-4 py-3 text-on-surface-muted">{row.definition}</td>
-                  <td className="px-4 py-3 text-on-surface-muted">{row.note}</td>
-                </tr>
+
+        {overviewError ? (
+          <Card className="border-warning/40">
+            <CardTitle className="text-warning">Không đọc được số liệu vận hành</CardTitle>
+            <CardDescription>{overviewError}</CardDescription>
+          </Card>
+        ) : null}
+
+        {overview ? (
+          <>
+            <p className="mb-3 max-w-3xl text-sm text-on-surface-muted">
+              {`Engine trong ${overview.windowDays} ngày gần nhất, tính trên process_instances và process_tasks — không phải field của bản ghi, nên đây là bộ metric cố định (ADR 0011). Mọi con số theo phạm vi bạn được đọc: người khác có thể thấy số khác, và đó là thiết kế.`}
+            </p>
+
+            <form
+              method="get"
+              className="mb-4 flex flex-wrap items-end gap-3 rounded-xl border border-border bg-surface-raised px-4 py-3"
+            >
+              <label className="text-xs">
+                <span className="font-medium tracking-wide uppercase">Quy trình</span>
+                <select
+                  name="definition"
+                  defaultValue={overview.definitionKey}
+                  className="mt-1.5 block rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs focus:border-accent-strong focus:outline-none"
+                >
+                  <option value="">Tất cả quy trình</option>
+                  {definitions.map((item) => (
+                    <option key={item.key} value={item.key}>
+                      {item.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label className="text-xs">
+                <span className="font-medium tracking-wide uppercase">Cửa sổ</span>
+                <select
+                  name="window"
+                  defaultValue={String(overview.windowDays)}
+                  className="mt-1.5 block rounded-lg border border-border bg-surface px-2.5 py-1.5 text-xs focus:border-accent-strong focus:outline-none"
+                >
+                  {WINDOW_CHOICES.map((days) => (
+                    <option key={days} value={days}>
+                      {`${days} ngày`}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <button
+                type="submit"
+                className="rounded-lg border border-border px-3 py-1.5 text-xs font-medium transition-colors hover:bg-surface-overlay"
+              >
+                Xem
+              </button>
+            </form>
+
+            <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              {[
+                { label: 'Instance đã chạy', value: String(overview.instances.started) },
+                { label: 'Hoàn tất', value: String(overview.instances.completed) },
+                { label: 'Bị từ chối', value: String(overview.instances.rejected) },
+                { label: 'Đang chạy', value: String(overview.instances.running) },
+              ].map((item) => (
+                <Card key={item.label}>
+                  <dt className="text-xs tracking-wide text-on-surface-muted uppercase">
+                    {item.label}
+                  </dt>
+                  <dd className="mt-1 text-2xl font-semibold tracking-tight">{item.value}</dd>
+                </Card>
               ))}
-            </tbody>
-          </table>
-        </div>
+            </dl>
+
+            <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+              <Card>
+                <dt className="text-xs tracking-wide text-on-surface-muted uppercase">
+                  Cycle time
+                </dt>
+                <dd className="mt-1 text-sm">{durationLabel(overview.cycleTime)}</dd>
+                <p className="mt-1 text-xs text-on-surface-muted">
+                  {`từ lúc start tới lúc kết thúc · ${finishedCount(overview)} instance đã kết thúc`}
+                </p>
+              </Card>
+              <Card>
+                <dt className="text-xs tracking-wide text-on-surface-muted uppercase">
+                  Thời gian một bước
+                </dt>
+                <dd className="mt-1 text-sm">{durationLabel(overview.stepTime)}</dd>
+                <p className="mt-1 text-xs text-on-surface-muted">
+                  từ lúc giao việc tới lúc có quyết định
+                </p>
+              </Card>
+              <Card>
+                <dt className="text-xs tracking-wide text-on-surface-muted uppercase">
+                  Tỉ lệ duyệt
+                </dt>
+                <dd className="mt-1 text-2xl font-semibold tracking-tight">
+                  {formatRate(overview.approvalRate)}
+                </dd>
+                <p className="mt-1 text-xs text-on-surface-muted">
+                  hoàn tất / (hoàn tất + bị từ chối)
+                </p>
+              </Card>
+              <Card>
+                <dt className="text-xs tracking-wide text-on-surface-muted uppercase">
+                  Tỉ lệ phải chạy lại
+                </dt>
+                <dd className="mt-1 text-2xl font-semibold tracking-tight">
+                  {formatRate(overview.reworkRate)}
+                </dd>
+                <p className="mt-1 text-xs text-on-surface-muted">{reworkedLabel(overview)}</p>
+              </Card>
+            </dl>
+
+            <Card className="mt-4 border-warning/40">
+              <CardTitle className="text-warning">SLA chưa có</CardTitle>
+              <CardDescription>
+                Tỉ lệ vi phạm SLA cần một chính sách thời gian làm việc (giờ hành chính, ngày nghỉ)
+                mà engine chưa có — timer và escalation thuộc V1.x (ADR 0007 mục 12). Vì vậy bảng
+                này không hiển thị hạn giả: chỉ những gì đo được mới xuất hiện.
+              </CardDescription>
+            </Card>
+          </>
+        ) : null}
       </section>
     </>
   );

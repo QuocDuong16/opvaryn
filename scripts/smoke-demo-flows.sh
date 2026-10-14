@@ -427,6 +427,11 @@ CHECK_METRIC
 status="$(web_get "/analytics" "$tmp_dir/analytics.html")"
 assert_status "$status" "200" "analytics page"
 assert_contains "$tmp_dir/analytics.html" "Lưu bố cục" "analytics page"
+# The operational read model (ADR 0011) is on the same page and must answer too.
+assert_contains "$tmp_dir/analytics.html" "Vận hành quy trình" "the operational section is rendered"
+assert_contains "$tmp_dir/analytics.html" "Tỉ lệ duyệt" "the approval rate is shown"
+assert_contains "$tmp_dir/analytics.html" "Tỉ lệ phải chạy lại" "the rework rate is shown"
+assert_contains "$tmp_dir/analytics.html" "SLA chưa có" "the missing SLA policy is stated, not faked"
 assert_contains "$tmp_dir/analytics.html" "Tổng giá trị luồng demo" "the live metric is listed"
 assert_contains "$tmp_dir/analytics.html" "1.500.000" "the dashboard shows the real number"
 assert_contains "$tmp_dir/analytics.html" "trên 1 bản ghi bạn được đọc" "the widget says how much data it rests on"

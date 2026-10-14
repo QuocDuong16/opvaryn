@@ -86,6 +86,11 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
     purpose: 'Chạy metric trên projection có kiểu, theo phạm vi đọc của người gọi',
   },
   {
+    method: 'GET',
+    path: '/api/v1/process-metrics',
+    purpose: 'Read model vận hành: instance, cycle time, thời gian bước, tỉ lệ duyệt / chạy lại',
+  },
+  {
     method: 'POST',
     path: '/api/v1/process-instances',
     purpose: 'Khởi tạo instance từ một bản ghi đã lưu',

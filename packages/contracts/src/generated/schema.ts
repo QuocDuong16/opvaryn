@@ -316,6 +316,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/process-metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * How the engine is doing over a window
+         * @description The operational read model (ADR 0011): instances started, completed, rejected and
+         *     running, end-to-end cycle time, task decision time, approval rate and rework rate —
+         *     computed from the typed columns of process_instances and process_tasks, not from
+         *     record fields, which is why this is a fixed catalogue rather than a user-defined
+         *     metric (D06). Everything is scoped to the instances the caller may see, like any
+         *     other read (ADR 0008); a rate over nothing is absent, never zero. SLA breach is not
+         *     here: the engine has no SLA policy yet (ADR 0007 section 12).
+         */
+        get: operations["getProcessMetrics"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks": {
         parameters: {
             query?: never;
@@ -845,6 +871,49 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             updatedAt: string;
+        };
+        InstanceCounts: {
+            /** Format: int64 */
+            started: number;
+            /** Format: int64 */
+            completed: number;
+            /** Format: int64 */
+            rejected: number;
+            /** Format: int64 */
+            running: number;
+        };
+        DurationStats: {
+            /** Format: double */
+            averageSeconds: number;
+            /** Format: double */
+            medianSeconds: number;
+            /**
+             * Format: int64
+             * @description How many measurements the numbers rest on.
+             */
+            samples: number;
+        };
+        ProcessMetricsOverview: {
+            windowDays: number;
+            /** @description Empty means every process definition. */
+            definitionKey: string;
+            instances: components["schemas"]["InstanceCounts"];
+            /** @description From instance start to finish, over instances finished in the window. */
+            cycleTime: components["schemas"]["DurationStats"];
+            /** @description From task creation to decision, over tasks decided in the window. */
+            stepTime: components["schemas"]["DurationStats"];
+            /**
+             * Format: double
+             * @description Completed / (completed + rejected). Absent when nothing finished.
+             */
+            approvalRate?: number;
+            /**
+             * Format: double
+             * @description Share of instances that needed more than one attempt. Absent with no instances.
+             */
+            reworkRate?: number;
+            /** Format: date-time */
+            generatedAt: string;
         };
         MetricDefinitionList: {
             /** @description Metric definitions, ordered by key. */
@@ -1459,6 +1528,35 @@ export interface operations {
                     "application/json": components["schemas"]["MetricResult"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getProcessMetrics: {
+        parameters: {
+            query?: {
+                /** @description Only instances of this process definition. */
+                definitionKey?: string;
+                /** @description How far back to look; 1–365, default 30. */
+                windowDays?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The overview */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ProcessMetricsOverview"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             503: components["responses"]["ServiceUnavailable"];

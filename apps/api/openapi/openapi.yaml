@@ -462,6 +462,53 @@ paths:
           $ref: '#/components/responses/NotFound'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/process-metrics:
+    get:
+      operationId: getProcessMetrics
+      tags: [metrics]
+      summary: How the engine is doing over a window
+      description: |
+        The operational read model (ADR 0011): instances started, completed, rejected and
+        running, end-to-end cycle time, task decision time, approval rate and rework rate —
+        computed from the typed columns of process_instances and process_tasks, not from
+        record fields, which is why this is a fixed catalogue rather than a user-defined
+        metric (D06). Everything is scoped to the instances the caller may see, like any
+        other read (ADR 0008); a rate over nothing is absent, never zero. SLA breach is not
+        here: the engine has no SLA policy yet (ADR 0007 section 12).
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: definitionKey
+          in: query
+          required: false
+          description: Only instances of this process definition.
+          schema:
+            type: string
+            example: purchase_approval
+        - name: windowDays
+          in: query
+          required: false
+          description: How far back to look; 1–365, default 30.
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 365
+            default: 30
+      responses:
+        '200':
+          description: The overview
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ProcessMetricsOverview'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/tasks:
     get:
       operationId: listInboxTasks
@@ -1467,6 +1514,78 @@ components:
           type: string
           format: date-time
         updatedAt:
+          type: string
+          format: date-time
+    InstanceCounts:
+      type: object
+      required: [started, completed, rejected, running]
+      properties:
+        started:
+          type: integer
+          format: int64
+          minimum: 0
+        completed:
+          type: integer
+          format: int64
+          minimum: 0
+        rejected:
+          type: integer
+          format: int64
+          minimum: 0
+        running:
+          type: integer
+          format: int64
+          minimum: 0
+    DurationStats:
+      type: object
+      required: [averageSeconds, medianSeconds, samples]
+      properties:
+        averageSeconds:
+          type: number
+          format: double
+          minimum: 0
+        medianSeconds:
+          type: number
+          format: double
+          minimum: 0
+        samples:
+          type: integer
+          format: int64
+          minimum: 0
+          description: How many measurements the numbers rest on.
+    ProcessMetricsOverview:
+      type: object
+      required: [windowDays, definitionKey, instances, cycleTime, stepTime, generatedAt]
+      properties:
+        windowDays:
+          type: integer
+          minimum: 1
+        definitionKey:
+          type: string
+          description: Empty means every process definition.
+        instances:
+          $ref: '#/components/schemas/InstanceCounts'
+        cycleTime:
+          allOf:
+            - $ref: '#/components/schemas/DurationStats'
+          description: From instance start to finish, over instances finished in the window.
+        stepTime:
+          allOf:
+            - $ref: '#/components/schemas/DurationStats'
+          description: From task creation to decision, over tasks decided in the window.
+        approvalRate:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          description: Completed / (completed + rejected). Absent when nothing finished.
+        reworkRate:
+          type: number
+          format: double
+          minimum: 0
+          maximum: 1
+          description: Share of instances that needed more than one attempt. Absent with no instances.
+        generatedAt:
           type: string
           format: date-time
     MetricDefinitionList:

@@ -22,6 +22,7 @@ type Services struct {
 	ProcessRuntime     *service.ProcessRuntime
 	Identity           *service.Identity
 	Metrics            *service.Metrics
+	ProcessMetrics     *service.ProcessMetrics
 }
 
 // NewRouter builds the HTTP handler for the demo API.
@@ -83,6 +84,8 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 				r.Get("/versions", handleListProcessDefinitionVersions(services.ProcessDefinitions, log))
 			})
 		})
+
+		r.Get("/process-metrics", handleGetProcessMetrics(services.ProcessMetrics, log))
 
 		r.Route("/metrics", func(r chi.Router) {
 			r.Get("/", handleListMetrics(services.Metrics, log))

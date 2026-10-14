@@ -507,6 +507,49 @@ status="$(request_as "$outsider_jar" POST /api/v1/metrics \
 status="$(request GET "/api/v1/metrics/$metric_key/result")"
 [[ "$status" == "401" ]] || fail "reading a metric anonymously returned $status, expected 401"
 
+echo "smoke: process metrics (counts, rates, scope, guards)"
+status="$(request_as "$designer_jar" GET "/api/v1/process-metrics?definitionKey=$process_key&windowDays=7")"
+[[ "$status" == "200" ]] || fail "reading process metrics returned $status, expected 200"
+python3 - "$body_file" "$process_key" <<'CHECK_PROCESS_METRICS'
+import json, sys
+
+overview = json.load(open(sys.argv[1], encoding="utf-8"))
+expected_key, = sys.argv[2:3]
+if overview["definitionKey"] != expected_key or overview["windowDays"] != 7:
+    sys.exit(f"the response must report the window it answered for, got {overview['definitionKey']!r} {overview['windowDays']}")
+counts = overview["instances"]
+# Four instances were started in this run: two completed, one rejected, one returned and
+# still running on attempt 2.
+if counts["started"] != 4 or counts["completed"] != 2 or counts["rejected"] != 1 or counts["running"] != 1:
+    sys.exit(f"unexpected instance counts: {counts}")
+if overview["approvalRate"] != 2 / 3:
+    sys.exit(f"expected approval rate 2/3, got {overview['approvalRate']}")
+if overview["reworkRate"] != 0.25:
+    sys.exit(f"expected rework rate 1/4, got {overview['reworkRate']}")
+if overview["cycleTime"]["samples"] < 2 or overview["stepTime"]["samples"] < 3:
+    sys.exit(f"expected durations with samples, got {overview['cycleTime']} / {overview['stepTime']}")
+print("smoke: process metrics match the instances this run created")
+CHECK_PROCESS_METRICS
+
+# The same call as another department: the metrics are scoped like any other read, so the
+# outsider sees nothing of these instances.
+status="$(request_as "$outsider_jar" GET "/api/v1/process-metrics?definitionKey=$process_key&windowDays=7")"
+[[ "$status" == "200" ]] || fail "the outsider process metrics returned $status"
+grep -q '"started":0' "$body_file" || fail "an outsider must not see instances of records they cannot read"
+if grep -q '"approvalRate"' "$body_file"; then
+  fail "a rate over nothing must be absent, not reported"
+fi
+
+status="$(request_as "$designer_jar" GET "/api/v1/process-metrics?windowDays=400")"
+[[ "$status" == "400" ]] || fail "a 400-day window returned $status, expected 400"
+grep -q 'window_days' "$body_file" || fail "the invalid window did not name the parameter"
+status="$(request_as "$designer_jar" GET "/api/v1/process-metrics?definitionKey=Not%20A%20Key")"
+[[ "$status" == "400" ]] || fail "a malformed definition filter returned $status, expected 400"
+status="$(request_as "$designer_jar" GET "/api/v1/process-metrics?definitionKey=smoke_missing_$stamp")"
+[[ "$status" == "404" ]] || fail "an unknown definition filter returned $status, expected 404"
+status="$(request GET /api/v1/process-metrics)"
+[[ "$status" == "401" ]] || fail "reading process metrics anonymously returned $status, expected 401"
+
 echo "smoke: logout ends the session"
 status="$(request_as "$designer_jar" POST /api/v1/auth/logout)"
 [[ "$status" == "204" ]] || fail "logout returned $status, expected 204"

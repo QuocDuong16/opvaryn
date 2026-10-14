@@ -31,7 +31,9 @@ tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
 - **Live**: Analytics — metric định nghĩa bằng field của business object (đếm / tổng / trung bình,
   lọc theo đúng ngôn ngữ điều kiện của quy trình, nhóm theo một field), chạy trên projection có kiểu
   và trả về đúng phạm vi dữ liệu người đăng nhập được đọc; dashboard sắp bố cục và lưu lại. D06 chốt
-  hướng tự viết (ADR 0010). Metric vận hành quy trình (cycle time, SLA…) vẫn là `concept`.
+  hướng tự viết (ADR 0010). Cùng trang đó có **số liệu vận hành** của engine (instance đã chạy,
+  cycle time, thời gian một bước, tỉ lệ duyệt, tỉ lệ phải chạy lại) trên một read model cố định
+  (ADR 0011); SLA vẫn thuộc V1.x vì engine chưa có chính sách thời gian làm việc.
 - **Mock**: kanban và connector trong Application showcase.
 - **Live (MVP)**: workflow runtime tự xây trên PostgreSQL — process definition publish theo phiên
   bản bất biến, instance gắn với phiên bản lúc start, human task duyệt theo role với
@@ -54,7 +56,8 @@ Toàn bộ D04–D10 đã chốt và đang chạy trong code (ADR 0005–0010). 
 [ADR 0006](docs/adr/0006-definition-versioning.md), [ADR 0007](docs/adr/0007-process-execution-contract.md),
 [ADR 0008](docs/adr/0008-identity-permissions-pilot-and-deployment.md),
 [ADR 0009](docs/adr/0009-deployment-topology-and-backup.md),
-[ADR 0010](docs/adr/0010-analytics-query-builder.md).
+[ADR 0010](docs/adr/0010-analytics-query-builder.md),
+[ADR 0011](docs/adr/0011-process-operational-metrics.md).
 
 ## Bắt đầu nhanh
 
@@ -99,7 +102,8 @@ make pilot-down              # dừng stack, giữ volume và dump
 bí mật, cập nhật phiên bản, phục hồi khi database hỏng, xử lý sự cố — nằm ở
 [docs/ops-runbook.md](docs/ops-runbook.md); lý do đằng sau topology ở
 [ADR 0009](docs/adr/0009-deployment-topology-and-backup.md),
-[ADR 0010](docs/adr/0010-analytics-query-builder.md).
+[ADR 0010](docs/adr/0010-analytics-query-builder.md),
+[ADR 0011](docs/adr/0011-process-operational-metrics.md).
 
 Các target thường dùng:
 

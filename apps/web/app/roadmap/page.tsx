@@ -158,9 +158,10 @@ export default function RoadmapPage() {
               về / từ chối qua engine có event log. Định nghĩa quy trình: canvas của phiên bản đã
               publish, publish phiên bản mới, chạy quy trình từ bản ghi và xem instance. Bố cục
               dashboard lưu trong cookie. Analytics: metric tự định nghĩa trên field của object
-              (đếm/tổng/trung bình, lọc, nhóm), chạy trên projection có kiểu theo phạm vi đọc. Sản
-              phẩm chạy trên một host bằng Docker Compose, có TLS, job backup và diễn tập phục hồi
-              (`make restore-drill`).
+              (đếm/tổng/trung bình, lọc, nhóm) chạy trên projection có kiểu, cộng số liệu vận hành
+              của engine (cycle time, thời gian một bước, tỉ lệ duyệt, tỉ lệ chạy lại) — tất cả theo
+              phạm vi đọc. Sản phẩm chạy trên một host bằng Docker Compose, có TLS, job backup và
+              diễn tập phục hồi (`make restore-drill`).
             </dd>
           </div>
           <div>
@@ -174,9 +175,8 @@ export default function RoadmapPage() {
           <div>
             <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Chưa có</dt>
             <dd className="mt-1 text-sm">
-              Kéo thả trên canvas, OIDC (chờ IdP của tổ chức), metric vận hành quy trình (cycle
-              time, SLA — cần read model trên event log), tích hợp thật, SLA và escalation — phần
-              còn lại của MVP V1 và V1.x.
+              Kéo thả trên canvas, OIDC (chờ IdP của tổ chức), SLA và escalation (cần chính sách
+              thời gian làm việc, V1.x), tích hợp thật — phần còn lại của MVP V1 và V1.x.
             </dd>
           </div>
         </dl>
