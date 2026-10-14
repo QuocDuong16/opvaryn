@@ -87,13 +87,11 @@ const OUT_OF_MVP: readonly { title: string; body: string }[] = [
   },
 ];
 
-const OPEN_DECISIONS: readonly { id: string; topic: string; blocked: string }[] = [
-  {
-    id: 'D06',
-    topic: 'Analytics — embedded BI hay query builder giới hạn tự viết',
-    blocked: 'Dashboard có số liệu thật',
-  },
-];
+/**
+ * OPEN_DECISIONS is empty on purpose: every playbook decision D04–D10 is settled and the
+ * ADRs record them. A new open decision belongs here, not in a footnote.
+ */
+const OPEN_DECISIONS: readonly { id: string; topic: string; blocked: string }[] = [];
 
 /**
  * DECIDED mirrors the ADRs that closed a playbook decision, so the page does not
@@ -113,6 +111,11 @@ const DECIDED: readonly { id: string; topic: string; adr: string }[] = [
     id: 'D10',
     topic: 'Deployment một host nội bộ + backup có diễn tập phục hồi',
     adr: 'ADR 0009',
+  },
+  {
+    id: 'D06',
+    topic: 'Analytics: query builder giới hạn tự viết trên projection có kiểu',
+    adr: 'ADR 0010',
   },
 ];
 
@@ -154,8 +157,10 @@ export default function RoadmapPage() {
               PostgreSQL. Đăng nhập và phân quyền theo role + bộ phận. Inbox theo người, duyệt / trả
               về / từ chối qua engine có event log. Định nghĩa quy trình: canvas của phiên bản đã
               publish, publish phiên bản mới, chạy quy trình từ bản ghi và xem instance. Bố cục
-              dashboard lưu trong cookie. Sản phẩm chạy trên một host bằng Docker Compose, có job
-              backup và diễn tập phục hồi (`make restore-drill`).
+              dashboard lưu trong cookie. Analytics: metric tự định nghĩa trên field của object
+              (đếm/tổng/trung bình, lọc, nhóm), chạy trên projection có kiểu theo phạm vi đọc. Sản
+              phẩm chạy trên một host bằng Docker Compose, có TLS, job backup và diễn tập phục hồi
+              (`make restore-drill`).
             </dd>
           </div>
           <div>
@@ -163,15 +168,15 @@ export default function RoadmapPage() {
               Mô phỏng (mock)
             </dt>
             <dd className="mt-1 text-sm">
-              Số liệu analytics (metric catalog trên fixture), kanban và connector — giao diện thật,
-              dữ liệu fixture.
+              Kanban và connector trong Application showcase — giao diện thật, dữ liệu fixture.
             </dd>
           </div>
           <div>
             <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Chưa có</dt>
             <dd className="mt-1 text-sm">
-              Kéo thả trên canvas, OIDC (chờ IdP của tổ chức), read model analytics (chờ chốt D06),
-              tích hợp thật, SLA và escalation — phần còn lại của MVP V1 và V1.x.
+              Kéo thả trên canvas, OIDC (chờ IdP của tổ chức), metric vận hành quy trình (cycle
+              time, SLA — cần read model trên event log), tích hợp thật, SLA và escalation — phần
+              còn lại của MVP V1 và V1.x.
             </dd>
           </div>
         </dl>
@@ -205,11 +210,11 @@ export default function RoadmapPage() {
         <Card>
           <CardDescription>
             Danh sách tiêu chí từ playbook để một bản phát hành được coi là dùng được — khác với
-            tiêu chuẩn của bản demo. Hiện đã đáp ứng mục 1–4 (admin dựng object, form và quy trình
-            ngay trong web; nhân viên tạo bản ghi và theo dõi trạng thái; có approval, nhánh điều
-            kiện, reject/return; quyền và phạm vi kiểm tra ở server kèm audit). Mục 5–7 còn thiếu:
-            tích hợp API thật, read model analytics (chờ chốt D06), và bằng chứng restart/retry
-            không mất state.
+            tiêu chuẩn của bản demo. Hiện đã đáp ứng mục 1–4 và 6 (admin dựng object, form, quy
+            trình và metric ngay trong web; nhân viên tạo bản ghi và theo dõi trạng thái; có
+            approval, nhánh điều kiện, reject/return; quyền và phạm vi kiểm tra ở server kèm audit;
+            người quản lý tự cấu hình dashboard với metric được cấp quyền). Mục 5 và 7 còn thiếu:
+            tích hợp API thật, và bằng chứng restart/retry không mất state.
           </CardDescription>
           <ol className="mt-4 space-y-2.5">
             {MVP_ACCEPTANCE.map((item, index) => (

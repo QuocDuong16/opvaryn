@@ -28,8 +28,11 @@ tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
   tính từ graph, không lưu), xem lại phiên bản cũ, tạo định nghĩa mới và publish phiên bản tiếp theo
   bằng biểu mẫu; mọi kiểm tra graph nằm ở service Go. Trang bản ghi cũng có mục **chạy quy trình** và
   danh sách instance theo bản ghi/định nghĩa (`GET /api/v1/process-instances`).
-- **Mock**: số liệu Analytics (metric catalog trên fixture), kanban và connector trong Application
-  showcase.
+- **Live**: Analytics — metric định nghĩa bằng field của business object (đếm / tổng / trung bình,
+  lọc theo đúng ngôn ngữ điều kiện của quy trình, nhóm theo một field), chạy trên projection có kiểu
+  và trả về đúng phạm vi dữ liệu người đăng nhập được đọc; dashboard sắp bố cục và lưu lại. D06 chốt
+  hướng tự viết (ADR 0010). Metric vận hành quy trình (cycle time, SLA…) vẫn là `concept`.
+- **Mock**: kanban và connector trong Application showcase.
 - **Live (MVP)**: workflow runtime tự xây trên PostgreSQL — process definition publish theo phiên
   bản bất biến, instance gắn với phiên bản lúc start, human task duyệt theo role với
   compare-and-swap, reject terminal, return reset attempt, event log append-only (ADR 0005/0007).
@@ -44,14 +47,14 @@ tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
   Builder, SLA/escalation, template library, và nội dung Roadmap — các phần phụ thuộc quyết định
   còn mở hoặc thuộc V1.x.
 
-Quyết định D04/D05/D07/D08/D09/D10 đã chốt và đang chạy trong code (ADR 0005–0009); D06 (analytics)
-còn mở. Chi tiết phạm vi demo ở
+Toàn bộ D04–D10 đã chốt và đang chạy trong code (ADR 0005–0010). Chi tiết phạm vi demo ở
 [ADR 0002](docs/adr/0002-demo-scope-and-labels.md),
 [ADR 0003](docs/adr/0003-demo-data-slice-and-mock-surfaces.md),
 [ADR 0004](docs/adr/0004-dashboard-layout-storage-and-demo-flow-tests.md) và hạng mục MVP đã làm ở
 [ADR 0006](docs/adr/0006-definition-versioning.md), [ADR 0007](docs/adr/0007-process-execution-contract.md),
 [ADR 0008](docs/adr/0008-identity-permissions-pilot-and-deployment.md),
-[ADR 0009](docs/adr/0009-deployment-topology-and-backup.md).
+[ADR 0009](docs/adr/0009-deployment-topology-and-backup.md),
+[ADR 0010](docs/adr/0010-analytics-query-builder.md).
 
 ## Bắt đầu nhanh
 
@@ -95,7 +98,8 @@ make pilot-down              # dừng stack, giữ volume và dump
 `make docker-up` (không profile) vẫn chỉ dựng PostgreSQL cho dev local. Quy trình vận hành đầy đủ —
 bí mật, cập nhật phiên bản, phục hồi khi database hỏng, xử lý sự cố — nằm ở
 [docs/ops-runbook.md](docs/ops-runbook.md); lý do đằng sau topology ở
-[ADR 0009](docs/adr/0009-deployment-topology-and-backup.md).
+[ADR 0009](docs/adr/0009-deployment-topology-and-backup.md),
+[ADR 0010](docs/adr/0010-analytics-query-builder.md).
 
 Các target thường dùng:
 

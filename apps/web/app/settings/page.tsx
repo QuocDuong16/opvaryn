@@ -69,6 +69,22 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
     path: '/api/v1/process-instances',
     purpose: 'Instance theo phạm vi đọc, lọc theo business object hoặc quy trình',
   },
+  { method: 'GET', path: '/api/v1/metrics', purpose: 'Danh sách metric đã định nghĩa' },
+  {
+    method: 'POST',
+    path: '/api/v1/metrics',
+    purpose: 'Tạo metric (cần admin hoặc process_designer)',
+  },
+  {
+    method: 'PUT',
+    path: '/api/v1/metrics/{key}',
+    purpose: 'Sửa định nghĩa metric; key là định danh nên không đổi được',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/metrics/{key}/result',
+    purpose: 'Chạy metric trên projection có kiểu, theo phạm vi đọc của người gọi',
+  },
   {
     method: 'POST',
     path: '/api/v1/process-instances',

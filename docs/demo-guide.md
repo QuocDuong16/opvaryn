@@ -73,15 +73,29 @@ Thứ tự gợi ý, kèm phần cần nói rõ để không trình bày quá:
 | 5 | **Workflows** `/workflows` | Danh sách định nghĩa đọc từ API; mở một định nghĩa để xem canvas của phiên bản đã publish, xem lại phiên bản cũ, và publish phiên bản mới bằng biểu mẫu. Cần role `process_designer`/`admin` mới ghi được | **live** |
 | 5b | **Chạy quy trình** (trang bản ghi) | Chọn quy trình + bản ghi rồi **Chạy quy trình**: instance xuất hiện ngay trong danh sách instance của bản ghi và trong inbox của role đầu tiên | **live** |
 | 6 | **Tasks** `/tasks` | Inbox thật theo role của người đang đăng nhập; mở một việc để xem bản ghi, event log và **duyệt / trả về / từ chối**; thử bằng hai tài khoản khác role để thấy việc chuyển người | **live** |
-| 7 | **Analytics** `/analytics` | Kéo–thả sắp widget, đổi metric/dimension, **Lưu bố cục**, rồi F5 để thấy bố cục còn nguyên | số liệu **mock**, bố cục **live** |
+| 7 | **Analytics** `/analytics` | Metric thật trên dữ liệu thật: tạo metric từ field của object (đếm/tổng/trung bình, lọc, nhóm), thấy con số và phân rã ngay; kéo–thả sắp widget, **Lưu bố cục**, F5 để thấy còn nguyên | **live** |
 | 8 | **Applications** `/apps` | Danh sách và chi tiết đọc bản ghi thật; kanban; tab **Cấu hình** (các ô đều bị khoá); panel tích hợp | live + mock + concept |
 | 9 | **Roadmap** `/roadmap` | Bốn phase, điều kiện nghiệm thu MVP, quyết định đang mở chặn tiến độ và các quyết định đã chốt | concept |
 | 10 | **Cài đặt** `/settings` | Danh sách endpoint, cổng, lệnh seed/smoke — tiện để chứng minh dữ liệu thật bằng curl | live |
 
-Câu nên nói ở mục 7 và 8: "phần này là mô phỏng — số liệu analytics, kanban và connector chưa chạy
-thật". Nhãn `Mock` / `Concept` đã hiện sẵn ở góc phải mỗi màn hình, nên
-người xem tự kiểm chứng được. Riêng mục 6 (Tasks) là **live**: mọi quyết định đi qua engine, ghi
-event log, và người thứ hai quyết định cùng một task sẽ nhận 409.
+Câu nên nói ở mục 8: "kanban và connector là mô phỏng". Nhãn `Mock` / `Concept` đã hiện sẵn ở góc
+phải mỗi màn hình, nên người xem tự kiểm chứng được. Mục 6 (Tasks) và 7 (Analytics) là **live**: mọi
+quyết định đi qua engine và ghi event log (người thứ hai quyết định cùng một task nhận 409), còn mỗi
+con số trong dashboard là một truy vấn thật trên projection có kiểu, đúng phạm vi dữ liệu người đang
+đăng nhập được đọc.
+
+### Walkthrough màn hình Analytics (live)
+
+1. `/analytics` hiện dashboard với các metric đang có (sau `make seed-demo` là ba metric mẫu trên dữ
+   liệu thật: tổng giá trị đề nghị theo bộ phận, số đề nghị từ 20 triệu, số sự cố theo mức độ).
+2. Đổi kiểu hiển thị của một widget sang **Phân rã theo nhóm** để thấy các nhóm và tỉ lệ giữa chúng;
+   kéo widget để đổi thứ tự, ↑↓ cho bàn phím, **Mở rộng** để chiếm cả hai cột, **Lưu bố cục** rồi F5.
+3. Tạo một metric mới: chọn object, cách tính, field đo, bộ lọc và nhóm. Thử `sum` trên một field văn
+   bản để thấy service từ chối kèm lý do — không có đường nào để viết SQL.
+4. Đăng nhập tài khoản bộ phận khác và mở lại cùng metric: con số khác, vì metric chạy theo phạm vi
+   đọc của người đang đăng nhập (ADR 0008). Đây là điểm nên nói rõ khi trình bày.
+5. Nhóm "Metric vận hành quy trình — chưa làm" (cycle time, approval rate, SLA) được ghi là `concept`:
+   chúng cần read model trên event log, chưa có.
 
 ### Walkthrough màn hình Workflows (live)
 

@@ -36,3 +36,4 @@
 - [0007 — Process Execution Contract (node, transition, audit)](adr/0007-process-execution-contract.md)
 - [0008 — Identity, phân quyền, quy trình pilot và môi trường chạy](adr/0008-identity-permissions-pilot-and-deployment.md)
 - [0009 — Kiến trúc triển khai trên một host nội bộ, và backup có diễn tập phục hồi](adr/0009-deployment-topology-and-backup.md)
+- [0010 — Analytics: query builder giới hạn tự viết trên projection có kiểu (D06)](adr/0010-analytics-query-builder.md)

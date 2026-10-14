@@ -50,6 +50,16 @@ export type UpdateProcessDefinitionRequest =
 export type InboxItem = components['schemas']['InboxItem'];
 /** Request body for deciding one human task. */
 export type DecideProcessTaskRequest = components['schemas']['DecideProcessTaskRequest'];
+/** A saved metric: what to count or measure, on which object (D06). */
+export type MetricDefinition = components['schemas']['MetricDefinition'];
+/** What a metric currently answers, scoped to the caller. */
+export type MetricResult = components['schemas']['MetricResult'];
+/** One group of a grouped metric. */
+export type MetricBucket = components['schemas']['MetricBucket'];
+/** Request body for creating a metric. */
+export type CreateMetricDefinitionRequest = components['schemas']['CreateMetricDefinitionRequest'];
+/** Request body for replacing a metric definition. */
+export type UpdateMetricDefinitionRequest = components['schemas']['UpdateMetricDefinitionRequest'];
 /** Stable error envelope returned by every failing endpoint. */
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 /** The signed-in user with roles and department. */
@@ -81,6 +91,11 @@ export interface ApiClient {
   listInboxTasks(): Promise<InboxItem[]>;
   /** Role keys held by at least one user: what the workflow designer offers. */
   listRoles(): Promise<string[]>;
+  listMetrics(): Promise<MetricDefinition[]>;
+  getMetric(key: string): Promise<MetricDefinition>;
+  createMetric(input: CreateMetricDefinitionRequest): Promise<MetricDefinition>;
+  updateMetric(key: string, input: UpdateMetricDefinitionRequest): Promise<MetricDefinition>;
+  getMetricResult(key: string): Promise<MetricResult>;
   getProcessInstance(instanceId: string): Promise<ProcessInstanceView>;
   listProcessInstances(filter?: {
     objectKey?: string;
@@ -206,6 +221,25 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
       const payload = await request<{ data: string[] }>('/api/v1/roles');
       return payload.data;
     },
+
+    async listMetrics() {
+      const payload = await request<{ data: MetricDefinition[] }>('/api/v1/metrics');
+      return payload.data;
+    },
+
+    getMetric: (key) => request<MetricDefinition>(`/api/v1/metrics/${encodeURIComponent(key)}`),
+
+    createMetric: (input) =>
+      request<MetricDefinition>('/api/v1/metrics', { method: 'POST', body: input }),
+
+    updateMetric: (key, input) =>
+      request<MetricDefinition>(`/api/v1/metrics/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        body: input,
+      }),
+
+    getMetricResult: (key) =>
+      request<MetricResult>(`/api/v1/metrics/${encodeURIComponent(key)}/result`),
 
     async listProcessDefinitions() {
       const payload = await request<{ data: ProcessDefinition[] }>('/api/v1/process-definitions');

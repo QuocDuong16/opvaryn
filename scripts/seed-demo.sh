@@ -488,6 +488,50 @@ else
   echo "seed: hồ sơ Nguyễn Văn Hùng đang chờ HR chuẩn bị."
 fi
 
+# ------------------------------------------------------------- metric (D06) ----
+
+# ensure_metric <jar> <key> <json-body>: create the metric only when it is missing.
+ensure_metric() {
+  local jar="$1" key="$2" body="$3" status
+  status="$(request "$jar" GET "/api/v1/metrics/$key")"
+  case "$status" in
+    200) echo "seed: metric '$key' đã tồn tại, bỏ qua." ;;
+    404)
+      status="$(request "$jar" POST /api/v1/metrics "$body")"
+      [[ "$status" == "201" ]] || fail "tạo metric '$key' trả về $status, mong đợi 201."
+      echo "seed: đã tạo metric '$key'."
+      ;;
+    *) fail "GET metric '$key' trả về $status." ;;
+  esac
+}
+
+echo "seed: tạo metric mẫu trên dữ liệu thật"
+ensure_metric "$admin_jar" purchase_amount_by_department '{
+  "key": "purchase_amount_by_department",
+  "name": "Giá trị đề nghị theo bộ phận",
+  "description": "Tổng giá trị dự kiến của các đề nghị mua hàng, nhóm theo bộ phận đề nghị.",
+  "objectKey": "purchase_request",
+  "aggregation": "sum",
+  "field": "estimated_amount",
+  "groupBy": "department"
+}'
+ensure_metric "$admin_jar" purchase_requests_above_20m '{
+  "key": "purchase_requests_above_20m",
+  "name": "Đề nghị từ 20 triệu trở lên",
+  "description": "Số đề nghị vượt ngưỡng giám đốc duyệt — đúng ngưỡng mà quy trình purchase_approval dùng.",
+  "objectKey": "purchase_request",
+  "aggregation": "count",
+  "filter": {"field": "estimated_amount", "op": "gte", "value": 20000000}
+}'
+ensure_metric "$admin_jar" incidents_by_severity '{
+  "key": "incidents_by_severity",
+  "name": "Sự cố theo mức độ",
+  "description": "Số sự cố IT đã ghi nhận, nhóm theo mức độ — cơ sở cho việc định tuyến của incident_triage.",
+  "objectKey": "it_incident",
+  "aggregation": "count",
+  "groupBy": "severity"
+}'
+
 echo "seed: hoàn tất. Mở http://localhost:21500/objects để xem dữ liệu."
 echo "seed: http://localhost:21500/tasks để xem việc đang chờ (đăng nhập bằng tài khoản seed_*)."
 if [[ "$skipped" == "1" ]]; then

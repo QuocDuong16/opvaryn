@@ -402,41 +402,102 @@ status="$(web_post "/objects" "$tmp_dir/object-duplicate.html" \
 assert_status "$status" "200" "duplicate object submission"
 assert_contains "$tmp_dir/object-duplicate.html" "Key này đã tồn tại" "duplicate object submission"
 
-# ------------------------------------- flow D: dashboard layout is saved for real ----
+# --------------------------- flow D: metrics and the dashboard layout are real ----
 
-echo "flows: [D] the dashboard layout is saved and read back"
+echo "flows: [D] a metric answers real records and the dashboard layout is saved"
+metric_key="flow_amount_$stamp"
+status="$(curl -sS -b "$cookie_jar" -o "$tmp_dir/metric.json" -w '%{http_code}' -X POST \
+  "$api_base/api/v1/metrics" -H 'Content-Type: application/json' \
+  -d "$(printf '{"key":"%s","name":"Tổng giá trị luồng demo","objectKey":"%s","aggregation":"sum","field":"amount"}' "$metric_key" "$object_key")")"
+assert_status "$status" "201" "creating a metric through the API"
+
+# Flow A stored one record with amount 1.500.000; the metric must answer exactly that.
+status="$(curl -sS -b "$cookie_jar" -o "$tmp_dir/metric-result.json" -w '%{http_code}' \
+  "$api_base/api/v1/metrics/$metric_key/result")"
+assert_status "$status" "200" "reading the metric result"
+python3 - "$tmp_dir/metric-result.json" <<'CHECK_METRIC'
+import json, sys
+
+result = json.load(open(sys.argv[1], encoding="utf-8"))
+if result["total"] != 1500000 or result["records"] != 1:
+    sys.exit(f'expected 1500000 over 1 record, got {result["total"]} over {result["records"]}')
+print("flows: the metric answered over the projected record values")
+CHECK_METRIC
+
 status="$(web_get "/analytics" "$tmp_dir/analytics.html")"
 assert_status "$status" "200" "analytics page"
 assert_contains "$tmp_dir/analytics.html" "Lưu bố cục" "analytics page"
-default_widgets="$(count_occurrences "$tmp_dir/analytics.html" "Hiển thị")"
-[[ "$default_widgets" -gt 1 ]] ||
-  fail "[D] the default dashboard should render several widgets, found $default_widgets"
+assert_contains "$tmp_dir/analytics.html" "Tổng giá trị luồng demo" "the live metric is listed"
+assert_contains "$tmp_dir/analytics.html" "1.500.000" "the dashboard shows the real number"
+assert_contains "$tmp_dir/analytics.html" "trên 1 bản ghi bạn được đọc" "the widget says how much data it rests on"
 
 mapfile -t layout_args < <(form_args "$tmp_dir/analytics.html" layout layout)
 [[ ${#layout_args[@]} -ge 4 ]] || fail "[D] the layout form has no server-action fields"
 
-custom_layout='[{"id":"w1","kind":"kpi","metricId":"rework_rate","dimension":"process","span":2,"chartKind":"line"}]'
+custom_layout='[{"id":"w1","metricKey":"'"$metric_key"'","view":"bars","span":2}]'
 status="$(web_post "/analytics" "$tmp_dir/layout-saved.html" \
   "${layout_args[@]}" --form-string "layout=$custom_layout")"
 assert_status "$status" "200" "layout save"
 assert_contains "$tmp_dir/layout-saved.html" "Đã lưu 1 widget" "layout save"
 
 curl -sS -b "$cookie_jar" -o "$tmp_dir/analytics-saved.html" "$web_base/analytics"
-assert_contains "$tmp_dir/analytics-saved.html" "Rework rate" "saved layout renders the chosen metric"
-saved_widgets="$(count_occurrences "$tmp_dir/analytics-saved.html" "Hiển thị")"
-[[ "$saved_widgets" == "1" ]] ||
-  fail "[D] the saved layout should render 1 widget, found $saved_widgets"
+assert_contains "$tmp_dir/analytics-saved.html" "Tổng giá trị luồng demo" "saved layout renders the chosen metric"
+saved_widgets="$(count_occurrences "$tmp_dir/analytics-saved.html" "trên 1 bản ghi bạn được đọc")"
+[[ "$saved_widgets" -ge 1 ]] ||
+  fail "[D] the saved layout should still render its widget, found $saved_widgets"
 
+# A layout may only reference a metric that exists: writing one that does not is refused
+# instead of being stored and silently pruned when it is read back.
 status="$(web_post "/analytics" "$tmp_dir/layout-invalid.html" \
-  "${layout_args[@]}" --form-string 'layout=[{"id":"w1"}]')"
+  "${layout_args[@]}" --form-string 'layout=[{"id":"w1","metricKey":"khong_ton_tai","view":"kpi","span":1}]')"
 assert_status "$status" "200" "invalid layout save"
 assert_contains "$tmp_dir/layout-invalid.html" 'role="alert"' "invalid layout save"
+assert_contains "$tmp_dir/layout-invalid.html" "không tồn tại" "the refusal names the problem"
 
-curl -sS -b "$cookie_jar" -o "$tmp_dir/analytics-kept.html" "$web_base/analytics"
-kept_widgets="$(count_occurrences "$tmp_dir/analytics-kept.html" "Hiển thị")"
-[[ "$kept_widgets" == "1" ]] ||
-  fail "[D] a rejected save must not overwrite the stored layout (found $kept_widgets widgets)"
-assert_contains "$tmp_dir/analytics-kept.html" "Rework rate" "a rejected save must keep the layout"
+echo "flows: [D] a metric created through the web form answers immediately"
+web_metric_key="flow_metric_$stamp"
+status="$(web_get "/analytics" "$tmp_dir/analytics-form.html")"
+assert_status "$status" "200" "analytics page with the create form"
+assert_contains "$tmp_dir/analytics-form.html" "Tạo metric" "the create form is offered"
+mapfile -t metric_args < <(form_args "$tmp_dir/analytics-form.html" key aggregation)
+[[ ${#metric_args[@]} -ge 4 ]] || fail "[D] the metric form has no server-action fields"
+status="$(web_post "/analytics" "$tmp_dir/metric-created.html" \
+  "${metric_args[@]}" \
+  --form-string "key=$web_metric_key" \
+  --form-string 'name=Đề nghị trên 1 triệu' \
+  --form-string "objectKey=$object_key" \
+  --form-string 'aggregation=count' \
+  --form-string 'filterField=amount' \
+  --form-string 'filterOp=gte' \
+  --form-string 'filterValue=1000000')"
+assert_status "$status" "200" "creating a metric through the web form"
+assert_contains "$tmp_dir/metric-created.html" "Đã tạo metric" "creating a metric through the web form"
+
+curl -sS -b "$cookie_jar" -o "$tmp_dir/web-metric-result.json" \
+  "$api_base/api/v1/metrics/$web_metric_key/result"
+python3 - "$tmp_dir/web-metric-result.json" <<'CHECK_WEB_METRIC'
+import json, sys
+
+result = json.load(open(sys.argv[1], encoding="utf-8"))
+metric = result["metric"]
+if metric["aggregation"] != "count" or metric["filter"]["field"] != "amount":
+    sys.exit(f"the stored metric lost its definition: {metric}")
+if result["records"] != 1:
+    sys.exit(f'expected the one record above the filter to count, got {result["records"]}')
+print("flows: the metric created in the web form filters and counts real records")
+CHECK_WEB_METRIC
+
+# A metric the service must refuse: sum over a text field. The message comes from Go.
+status="$(web_post "/analytics" "$tmp_dir/metric-invalid.html" \
+  "${metric_args[@]}" \
+  --form-string "key=${web_metric_key}_bad" \
+  --form-string 'name=Sai kiểu' \
+  --form-string "objectKey=$object_key" \
+  --form-string 'aggregation=sum' \
+  --form-string 'field=title')"
+assert_status "$status" "200" "invalid metric submission"
+assert_contains "$tmp_dir/metric-invalid.html" 'role="alert"' "invalid metric submission"
+assert_contains "$tmp_dir/metric-invalid.html" "measures a number field" "the service explains the field type"
 
 # ------------------------------------------------- flow E: the demo surfaces ----
 
