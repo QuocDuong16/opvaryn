@@ -116,6 +116,7 @@ Các target thường dùng:
 | `make quality-check` | Toàn bộ gate phía trên + kiểm tra docs |
 | `make contract-generate` | Sinh types Go/TypeScript từ OpenAPI |
 | `make smoke-api` | Build API, chạy thử lát cắt business object + bản ghi trên PostgreSQL thật |
+| `make smoke-restart` | Giết API bằng SIGKILL rồi chứng minh state còn nguyên và retry không áp dụng hai lần |
 | `make smoke-demo-flows` | Build cả API và web, replay form của các luồng demo và kiểm chứng kết quả |
 | `make seed-demo` | Nạp business object và bản ghi mẫu qua API (idempotent) |
 | `make docker-up` / `make docker-down` | Bật/tắt PostgreSQL local |

@@ -55,7 +55,8 @@ curl -s localhost:21501/api/v1/meta   # tên, phiên bản, stage
 Hai bài kiểm thử tự động (chúng tự build và tự khởi động server riêng, nên **tắt `make dev` trước**):
 
 ```bash
-make smoke-api           # API + PostgreSQL: tạo, trùng key, dữ liệu sai, 404, quyền, inbox, duyệt chéo role
+make smoke-api           # API + PostgreSQL: tạo, trùng key, dữ liệu sai, 404, quyền, inbox, metric, duyệt chéo role
+make smoke-restart       # giết API bằng SIGKILL rồi kiểm state còn nguyên + retry trả 409, không nhân đôi side effect
 make smoke-demo-flows    # build web, replay form của các luồng demo (kể cả inbox → duyệt → trả về), kiểm chứng dữ liệu lưu
 ```
 

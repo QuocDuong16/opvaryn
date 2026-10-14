@@ -31,7 +31,8 @@ Working agreement for agents and contributors in this repository.
   new dependencies, and broad refactors.
 - Add tests for important business and security behavior, including rejected input.
 - Backend checks: `make api-check`. Frontend checks: `make web-check`. Full gate:
-  `make quality-check`. End-to-end behaviour: `make smoke-api` (API + PostgreSQL) and
+  `make quality-check`. End-to-end behaviour: `make smoke-api` (API + PostgreSQL),
+  `make smoke-restart` (a SIGKILL must not lose state and a retry must not apply twice) and
   `make smoke-demo-flows` (builds and starts both servers, replays the demo forms, verifies the
   stored rows; stop any dev server first). Demo dataset: `make seed-demo`. Report checks that
   were not run or failed.

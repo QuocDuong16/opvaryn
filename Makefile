@@ -8,7 +8,7 @@
         contract-generate contract-check \
         api-tools-check api-fix api-build api-test api-lint api-vuln api-check \
         useradm \
-        smoke-api smoke-demo-flows seed-demo \
+        smoke-api smoke-demo-flows smoke-restart seed-demo \
         web-install web-lint web-format web-typecheck web-test web-build web-check \
         actions-lint docs-check quality-check clean
 
@@ -177,6 +177,9 @@ web-check: ## Run web lint, format, type, test, and build checks
 
 smoke-api: ## Build the API, start it and smoke test it against local Postgres
 	bash scripts/smoke-api.sh
+
+smoke-restart: ## Prove a crash does not lose workflow state and a retry cannot apply twice
+	bash scripts/smoke-restart.sh
 
 smoke-demo-flows: ## Build both servers, start them and smoke test the web demo flows
 	bash scripts/smoke-demo-flows.sh

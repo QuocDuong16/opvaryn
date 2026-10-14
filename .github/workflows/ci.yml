@@ -101,6 +101,11 @@ jobs:
       - name: Smoke test the demo flows
         run: make smoke-demo-flows
 
+      # Acceptance criterion #7: a crash must not lose workflow state and a retry must
+      # not apply a decision twice. The script kills the API with SIGKILL and checks.
+      - name: Prove state survives a restart
+        run: make smoke-restart
+
       # The deployment images are part of the product: build them here so a broken
       # Dockerfile or a base image that stopped resolving fails the gate instead of
       # the next deploy. Nothing is pushed anywhere.

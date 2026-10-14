@@ -173,6 +173,8 @@ nhưng không dọn thì bảng chỉ lớn thêm. Một dòng cron mỗi ngày 
 - [ ] `make restore-drill` **PASS** sau lần thay đổi schema/backup gần nhất.
 - [ ] Đã thử một quy trình thật từ đầu tới cuối trên môi trường này (chạy từ bản ghi → duyệt → hoàn
       tất) và thấy nó trong event log.
+- [ ] `make smoke-restart` **PASS** trên môi trường này: state sống trong PostgreSQL, nên restart
+      (kể cả crash) không mất việc đang chờ và retry không áp dụng quyết định hai lần.
 - [ ] `make pilot-logs` không có lỗi lặp lại; log xoay vòng theo compose.
 - [ ] Đã biết ai gọi khi database hỏng, và lệnh phục hồi ở mục 5 đã được đọc một lần.
 
