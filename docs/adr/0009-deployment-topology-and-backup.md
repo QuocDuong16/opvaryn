@@ -49,7 +49,8 @@ dùng được.
    qua `main` + CI. Khi cần staging, đó là ADR mới.
 8. **TLS do một service Caddy trong compose lo** (bổ sung 2026-10-14, sau khi chủ dự án chọn phương
    án này): Caddy là **service duy nhất mở ra mạng** (`CADDY_HTTP_PORT`/`CADDY_HTTPS_PORT`, mặc định
-   80/443) và reverse-proxy tới `web:21500`; `api` và `web` chỉ bind **loopback** của host. Chứng chỉ
+   21580/21443 — giữ dải 21xxx như phần còn lại của repo, vì trên máy dùng chung thì 80/443 thuộc về
+   project khác; host nội bộ riêng thì đặt 80/443 trong `.env`) và reverse-proxy tới `web:21500`; `api` và `web` chỉ bind **loopback** của host. Chứng chỉ
    phát từ **CA nội bộ của Caddy** (`tls internal`) vì hostname nội bộ không CA công cộng nào xác thực
    được — đổi sang chứng chỉ thật bằng cách bỏ dòng đó khi host có tên phân giải công khai. Hệ quả:
    `API_ENV=production` giờ an toàn để bật (cookie `Secure` đi qua HTTPS), và Caddy đặt sẵn vài header

@@ -17,7 +17,7 @@ Local development (`make docker-up` + `make dev`) không dùng trang này — xe
 | `migrate` | Chạy migration rồi thoát | `api` chỉ start khi service này kết thúc **thành công** — deploy không bao giờ phục vụ DB chưa migrate |
 | `api` | Go service | Healthcheck `/readyz`; cổng `${API_PORT}` (mặc định 21501) **chỉ bind loopback** |
 | `web` | Next.js standalone | Healthcheck `/`; cổng `${WEB_PORT}` (mặc định 21500) **chỉ bind loopback**; gọi API qua mạng nội bộ `http://api:21501` |
-| `caddy` | TLS terminator + reverse proxy | **Service duy nhất mở ra mạng**: `${CADDY_HTTP_PORT}` (80) và `${CADDY_HTTPS_PORT}` (443) → `web:21500` |
+| `caddy` | TLS terminator + reverse proxy | **Service duy nhất mở ra mạng**: `${CADDY_HTTP_PORT}` (21580) và `${CADDY_HTTPS_PORT}` (21443) → `web:21500` |
 | `backup` | Job `pg_dump` định kỳ | Vòng lặp `scripts/backup-db.sh`; dump ghi ra `${BACKUP_DIR}` |
 
 `postgres` **không** thuộc profile `pilot`, nên `make docker-up` vẫn chỉ dựng Postgres cho dev.
@@ -33,14 +33,14 @@ make images-build             # build image API + web
 make pilot-up                 # migrate → api → web → caddy → backup
 ```
 
-Kiểm tra (thay `opvaryn.local` bằng `OPVARYN_HOSTNAME` của bạn; `-k` vì CA nội bộ chưa được tin ở
-máy bạn, xem mục 3):
+Kiểm tra (thay `opvaryn.local` bằng `OPVARYN_HOSTNAME` của bạn và thêm `:21443` nếu chưa đổi cổng;
+`-k` vì CA nội bộ chưa được tin ở máy bạn, xem mục 3):
 
 ```bash
 docker compose -f deployments/docker-compose.yml --profile pilot ps   # tất cả healthy, migrate exited(0)
 curl -s localhost:21501/readyz                                       # {"status":"ok"} — API qua loopback
-curl -sk -o /dev/null -w '%{http_code}\n' https://opvaryn.local/     # 200 qua Caddy
-curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: opvaryn.local' http://localhost/  # 308 → HTTPS
+curl -sk -o /dev/null -w '%{http_code}\n' https://opvaryn.local:21443/   # 200 qua Caddy
+curl -s -o /dev/null -w '%{http_code}\n' -H 'Host: opvaryn.local' http://localhost:21580/  # 308 → HTTPS
 ```
 
 Tạo tài khoản đầu tiên (bài toán con gà–quả trứng, ADR 0008) — chạy trong container API:
@@ -70,8 +70,11 @@ sudo cp opvaryn-root.crt /usr/local/share/ca-certificates/opvaryn-root.crt && su
 ```
 
 Khi host đã có tên phân giải công khai và muốn chứng chỉ thật: bỏ dòng `tls internal` trong
-Caddyfile (Caddy sẽ tự xin Let's Encrypt). Đổi cổng publish bằng `CADDY_HTTP_PORT`/`CADDY_HTTPS_PORT`
-nếu 80/443 đã bị chiếm trên host.
+Caddyfile (Caddy sẽ tự xin Let's Encrypt).
+
+Cổng publish mặc định **21580/21443** để không đụng project khác trên máy dùng chung (quy ước 21xxx
+của repo). Trên host nội bộ riêng, đặt `CADDY_HTTP_PORT=80` và `CADDY_HTTPS_PORT=443` trong `.env`
+để người dùng không phải gõ cổng trong URL.
 
 - Mọi cấu hình nằm trong `.env` trên host (đã bị `.gitignore`). **Không** commit `.env`, không đặt
   bí mật vào `NEXT_PUBLIC_*`.
