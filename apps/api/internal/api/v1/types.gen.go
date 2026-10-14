@@ -32,28 +32,28 @@ func (e DecideProcessTaskRequestDecision) Valid() bool {
 
 // Defines values for FieldType.
 const (
-	Date   FieldType = "date"
-	File   FieldType = "file"
-	Number FieldType = "number"
-	Rows   FieldType = "rows"
-	Select FieldType = "select"
-	Text   FieldType = "text"
+	FieldTypeDate   FieldType = "date"
+	FieldTypeFile   FieldType = "file"
+	FieldTypeNumber FieldType = "number"
+	FieldTypeRows   FieldType = "rows"
+	FieldTypeSelect FieldType = "select"
+	FieldTypeText   FieldType = "text"
 )
 
 // Valid indicates whether the value is a known member of the FieldType enum.
 func (e FieldType) Valid() bool {
 	switch e {
-	case Date:
+	case FieldTypeDate:
 		return true
-	case File:
+	case FieldTypeFile:
 		return true
-	case Number:
+	case FieldTypeNumber:
 		return true
-	case Rows:
+	case FieldTypeRows:
 		return true
-	case Select:
+	case FieldTypeSelect:
 		return true
-	case Text:
+	case FieldTypeText:
 		return true
 	default:
 		return false
@@ -99,30 +99,102 @@ func (e MetaStage) Valid() bool {
 	}
 }
 
+// Defines values for MetricAggregation.
+const (
+	Avg   MetricAggregation = "avg"
+	Count MetricAggregation = "count"
+	Sum   MetricAggregation = "sum"
+)
+
+// Valid indicates whether the value is a known member of the MetricAggregation enum.
+func (e MetricAggregation) Valid() bool {
+	switch e {
+	case Avg:
+		return true
+	case Count:
+		return true
+	case Sum:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MetricFilterOp.
+const (
+	MetricFilterOpEq  MetricFilterOp = "eq"
+	MetricFilterOpGt  MetricFilterOp = "gt"
+	MetricFilterOpGte MetricFilterOp = "gte"
+	MetricFilterOpLt  MetricFilterOp = "lt"
+	MetricFilterOpLte MetricFilterOp = "lte"
+	MetricFilterOpNe  MetricFilterOp = "ne"
+)
+
+// Valid indicates whether the value is a known member of the MetricFilterOp enum.
+func (e MetricFilterOp) Valid() bool {
+	switch e {
+	case MetricFilterOpEq:
+		return true
+	case MetricFilterOpGt:
+		return true
+	case MetricFilterOpGte:
+		return true
+	case MetricFilterOpLt:
+		return true
+	case MetricFilterOpLte:
+		return true
+	case MetricFilterOpNe:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for MetricValueKind.
+const (
+	MetricValueKindDate   MetricValueKind = "date"
+	MetricValueKindNumber MetricValueKind = "number"
+	MetricValueKindText   MetricValueKind = "text"
+)
+
+// Valid indicates whether the value is a known member of the MetricValueKind enum.
+func (e MetricValueKind) Valid() bool {
+	switch e {
+	case MetricValueKindDate:
+		return true
+	case MetricValueKindNumber:
+		return true
+	case MetricValueKindText:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ProcessConditionOp.
 const (
-	Eq  ProcessConditionOp = "eq"
-	Gt  ProcessConditionOp = "gt"
-	Gte ProcessConditionOp = "gte"
-	Lt  ProcessConditionOp = "lt"
-	Lte ProcessConditionOp = "lte"
-	Ne  ProcessConditionOp = "ne"
+	ProcessConditionOpEq  ProcessConditionOp = "eq"
+	ProcessConditionOpGt  ProcessConditionOp = "gt"
+	ProcessConditionOpGte ProcessConditionOp = "gte"
+	ProcessConditionOpLt  ProcessConditionOp = "lt"
+	ProcessConditionOpLte ProcessConditionOp = "lte"
+	ProcessConditionOpNe  ProcessConditionOp = "ne"
 )
 
 // Valid indicates whether the value is a known member of the ProcessConditionOp enum.
 func (e ProcessConditionOp) Valid() bool {
 	switch e {
-	case Eq:
+	case ProcessConditionOpEq:
 		return true
-	case Gt:
+	case ProcessConditionOpGt:
 		return true
-	case Gte:
+	case ProcessConditionOpGte:
 		return true
-	case Lt:
+	case ProcessConditionOpLt:
 		return true
-	case Lte:
+	case ProcessConditionOpLte:
 		return true
-	case Ne:
+	case ProcessConditionOpNe:
 		return true
 	default:
 		return false
@@ -278,6 +350,29 @@ type CreateBusinessObjectRequest struct {
 	Name string `json:"name"`
 }
 
+// CreateMetricDefinitionRequest defines model for CreateMetricDefinitionRequest.
+type CreateMetricDefinitionRequest struct {
+	// Aggregation Count records, or measure one numeric field.
+	Aggregation MetricAggregation `json:"aggregation"`
+	Description *string           `json:"description,omitempty"`
+
+	// Field The numeric field to measure; must be empty for count.
+	Field *string `json:"field,omitempty"`
+
+	// Filter Optional filter with the same shape process branches use.
+	Filter *ProcessCondition `json:"filter,omitempty"`
+
+	// GroupBy Optional select, text or date field to group by.
+	GroupBy *string `json:"groupBy,omitempty"`
+
+	// Key Example: purchase_requests_open
+	Key  string `json:"key"`
+	Name string `json:"name"`
+
+	// ObjectKey Example: purchase_request
+	ObjectKey string `json:"objectKey"`
+}
+
 // CreateObjectRecordRequest defines model for CreateObjectRecordRequest.
 type CreateObjectRecordRequest struct {
 	// Values Field key → value map. Every key must exist on the object; required fields
@@ -403,6 +498,108 @@ type Meta struct {
 
 // MetaStage Example: demo
 type MetaStage string
+
+// MetricAggregation Count records, or measure one numeric field.
+type MetricAggregation string
+
+// MetricBucket defines model for MetricBucket.
+type MetricBucket struct {
+	// Key The grouping value.
+	Key     string  `json:"key"`
+	Records int64   `json:"records"`
+	Value   float64 `json:"value"`
+}
+
+// MetricDefinition defines model for MetricDefinition.
+type MetricDefinition struct {
+	// Aggregation Count records, or measure one numeric field.
+	Aggregation MetricAggregation   `json:"aggregation"`
+	CreatedAt   time.Time           `json:"createdAt"`
+	CreatedBy   *openapi_types.UUID `json:"createdBy,omitempty"`
+	Description *string             `json:"description,omitempty"`
+
+	// Filter Optional filter, absent when the metric measures everything.
+	Filter *MetricFilter `json:"filter,omitempty"`
+
+	// GroupBy Optional grouping field; absent for a single number.
+	GroupBy *MetricFieldRef    `json:"groupBy,omitempty"`
+	Id      openapi_types.UUID `json:"id"`
+	Key     string             `json:"key"`
+
+	// Measure The numeric field for sum and avg; absent for count.
+	Measure   *MetricFieldRef `json:"measure,omitempty"`
+	Name      string          `json:"name"`
+	ObjectKey string          `json:"objectKey"`
+	UpdatedAt time.Time       `json:"updatedAt"`
+}
+
+// MetricDefinitionList defines model for MetricDefinitionList.
+type MetricDefinitionList struct {
+	// Data Metric definitions, ordered by key.
+	Data []MetricDefinition `json:"data"`
+}
+
+// MetricDefinitionRequest defines model for MetricDefinitionRequest.
+type MetricDefinitionRequest struct {
+	// Aggregation Count records, or measure one numeric field.
+	Aggregation MetricAggregation `json:"aggregation"`
+	Description *string           `json:"description,omitempty"`
+
+	// Field The numeric field to measure; must be empty for count.
+	Field *string `json:"field,omitempty"`
+
+	// Filter Optional filter with the same shape process branches use.
+	Filter *ProcessCondition `json:"filter,omitempty"`
+
+	// GroupBy Optional select, text or date field to group by.
+	GroupBy *string `json:"groupBy,omitempty"`
+	Name    string  `json:"name"`
+
+	// ObjectKey Example: purchase_request
+	ObjectKey string `json:"objectKey"`
+}
+
+// MetricFieldRef defines model for MetricFieldRef.
+type MetricFieldRef struct {
+	Key string `json:"key"`
+
+	// Kind The kind of a field, resolved when the metric was saved. It decides which typed
+	// column the metric filters, groups or measures on.
+	Kind MetricValueKind `json:"kind"`
+}
+
+// MetricFilter The single filter a metric carries, using the D04 condition shape.
+type MetricFilter struct {
+	Field string `json:"field"`
+
+	// Kind The kind of a field, resolved when the metric was saved. It decides which typed
+	// column the metric filters, groups or measures on.
+	Kind MetricValueKind `json:"kind"`
+	Op   MetricFilterOp  `json:"op"`
+
+	// Value The literal to compare against, typed by the field.
+	Value interface{} `json:"value"`
+}
+
+// MetricFilterOp defines model for MetricFilter.Op.
+type MetricFilterOp string
+
+// MetricResult defines model for MetricResult.
+type MetricResult struct {
+	// Buckets Biggest 50 groups, empty when the metric does not group.
+	Buckets []MetricBucket   `json:"buckets"`
+	Metric  MetricDefinition `json:"metric"`
+
+	// Records How many records the value rests on.
+	Records int64 `json:"records"`
+
+	// Total The aggregate over every record the caller may see.
+	Total float64 `json:"total"`
+}
+
+// MetricValueKind The kind of a field, resolved when the metric was saved. It decides which typed
+// column the metric filters, groups or measures on.
+type MetricValueKind string
 
 // ObjectRecord defines model for ObjectRecord.
 type ObjectRecord struct {
@@ -614,6 +811,9 @@ type UpdateBusinessObjectRequest struct {
 	Name string `json:"name"`
 }
 
+// UpdateMetricDefinitionRequest defines model for UpdateMetricDefinitionRequest.
+type UpdateMetricDefinitionRequest = MetricDefinitionRequest
+
 // UpdateProcessDefinitionRequest defines model for UpdateProcessDefinitionRequest.
 type UpdateProcessDefinitionRequest struct {
 	Description *string       `json:"description,omitempty"`
@@ -628,6 +828,9 @@ type DefinitionKey = string
 
 // InstanceId defines model for InstanceId.
 type InstanceId = openapi_types.UUID
+
+// MetricKey defines model for MetricKey.
+type MetricKey = string
 
 // ObjectKey defines model for ObjectKey.
 type ObjectKey = string
@@ -675,6 +878,12 @@ type UpdateBusinessObjectJSONRequestBody = UpdateBusinessObjectRequest
 
 // CreateObjectRecordJSONRequestBody defines body for CreateObjectRecord for application/json ContentType.
 type CreateObjectRecordJSONRequestBody = CreateObjectRecordRequest
+
+// CreateMetricDefinitionJSONRequestBody defines body for CreateMetricDefinition for application/json ContentType.
+type CreateMetricDefinitionJSONRequestBody = CreateMetricDefinitionRequest
+
+// UpdateMetricDefinitionJSONRequestBody defines body for UpdateMetricDefinition for application/json ContentType.
+type UpdateMetricDefinitionJSONRequestBody = UpdateMetricDefinitionRequest
 
 // CreateProcessDefinitionJSONRequestBody defines body for CreateProcessDefinition for application/json ContentType.
 type CreateProcessDefinitionJSONRequestBody = CreateProcessDefinitionRequest

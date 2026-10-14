@@ -78,7 +78,15 @@ func (s *Store) ListObjectRecords(
 // (service layer) owns validation and stamps CreatedBy/DepartmentKey from the
 // session; the returned record carries the version id but not the number, because
 // the caller already knows it.
-func (s *Store) CreateObjectRecord(ctx context.Context, record domain.ObjectRecord) (domain.ObjectRecord, error) {
+// CreateObjectRecord stores one record together with its typed projection, in one
+// transaction: a metric must never see a record whose projected values are missing, and
+// a record must never exist without them (AGENTS.md: a field that is measured gets a
+// typed projection).
+func (s *Store) CreateObjectRecord(
+	ctx context.Context,
+	record domain.ObjectRecord,
+	projection []domain.RecordFieldValue,
+) (domain.ObjectRecord, error) {
 	values, err := json.Marshal(record.Values)
 	if err != nil {
 		return domain.ObjectRecord{}, fmt.Errorf("encode values: %w", err)
@@ -93,14 +101,42 @@ func (s *Store) CreateObjectRecord(ctx context.Context, record domain.ObjectReco
 		departmentKey = record.DepartmentKey
 	}
 
-	row := s.pool.QueryRow(ctx, `
-		INSERT INTO business_object_records
-		       (id, object_id, object_version_id, values, created_by, department_key)
-		VALUES ($1, $2, $3, $4, $5, $6)
-		RETURNING `+objectRecordColumns,
-		record.ID, record.ObjectID, record.ObjectVersionID, values, createdBy, departmentKey)
+	created := record
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		row := tx.QueryRow(ctx, `
+			INSERT INTO business_object_records
+			       (id, object_id, object_version_id, values, created_by, department_key)
+			VALUES ($1, $2, $3, $4, $5, $6)
+			RETURNING `+objectRecordColumns,
+			record.ID, record.ObjectID, record.ObjectVersionID, values, createdBy, departmentKey)
 
-	created, err := scanObjectRecord(row)
+		stored, err := scanObjectRecord(row)
+		if err != nil {
+			return err
+		}
+		created = stored
+
+		for _, field := range projection {
+			var textValue, numberValue, dateValue any
+			switch field.Kind {
+			case domain.MetricNumber:
+				numberValue = field.Number
+			case domain.MetricDate:
+				dateValue = field.Date
+			default:
+				textValue = field.Text
+			}
+			if _, err := tx.Exec(ctx, `
+				INSERT INTO record_field_values
+				       (record_id, object_key, field_key, text_value, number_value, date_value)
+				VALUES ($1, $2, $3, $4, $5, $6)`,
+				record.ID, stored.ObjectKey, field.FieldKey, textValue, numberValue, dateValue,
+			); err != nil {
+				return fmt.Errorf("project field %s: %w", field.FieldKey, err)
+			}
+		}
+		return nil
+	})
 	if err != nil {
 		var pgErr *pgconn.PgError
 		// The addressed object or version was deleted between the lookup and the

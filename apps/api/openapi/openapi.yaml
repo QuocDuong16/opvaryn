@@ -312,6 +312,156 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/metrics:
+    get:
+      operationId: listMetrics
+      tags: [metrics]
+      summary: List the metric definitions
+      description: |
+        Reading configuration is open to any signed-in user, like reading business object
+        or process definitions.
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: Metric definitions, ordered by key
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricDefinitionList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      operationId: createMetricDefinition
+      tags: [metrics]
+      summary: Create a metric definition
+      description: |
+        A metric counts records of one business object or measures one numeric field of
+        it, optionally filtered by the same JSON condition process branches use (D04) and
+        optionally grouped by one select, text or date field. Requires `admin` or
+        `process_designer`: a metric is configuration. Field kinds are resolved when the
+        metric is saved, so a later schema edit does not change what a metric measures.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateMetricDefinitionRequest'
+      responses:
+        '201':
+          description: Metric created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricDefinition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: The signed-in user is not an admin or a process designer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/metrics/{key}:
+    get:
+      operationId: getMetricDefinition
+      tags: [metrics]
+      summary: Read one metric definition
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/MetricKey'
+      responses:
+        '200':
+          description: The metric definition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricDefinition'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    put:
+      operationId: updateMetricDefinition
+      tags: [metrics]
+      summary: Replace a metric definition
+      description: |
+        The key is the identity: a saved dashboard layout points at it, so it cannot be
+        changed. Everything else may be replaced. Requires `admin` or `process_designer`.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/MetricKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateMetricDefinitionRequest'
+      responses:
+        '200':
+          description: The updated metric definition
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricDefinition'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          description: The signed-in user is not an admin or a process designer
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/metrics/{key}/result:
+    get:
+      operationId: getMetricResult
+      tags: [metrics]
+      summary: Answer a metric over the records the caller may see
+      description: |
+        The result is scoped exactly like a record read (ADR 0008): department, own
+        records, and records whose instance holds an open task for a role the caller has.
+        Two people can therefore see different numbers for the same metric, which is the
+        point of department scoping and is stated on the screen. The total is computed
+        over every visible record; buckets (when the metric groups) are the biggest 50.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/MetricKey'
+      responses:
+        '200':
+          description: The metric and what it currently answers
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/MetricResult'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/tasks:
     get:
       operationId: listInboxTasks
@@ -598,6 +748,14 @@ components:
       in: path
       required: true
       description: Stable machine key of the process definition.
+      schema:
+        type: string
+        pattern: '^[a-z][a-z0-9_]{1,63}$'
+    MetricKey:
+      name: key
+      in: path
+      required: true
+      description: Stable machine key of the metric.
       schema:
         type: string
         pattern: '^[a-z][a-z0-9_]{1,63}$'
@@ -1241,6 +1399,155 @@ components:
           description: Role keys held by at least one user, sorted.
           items:
             type: string
+    MetricAggregation:
+      type: string
+      enum: [count, sum, avg]
+      description: Count records, or measure one numeric field.
+    MetricValueKind:
+      type: string
+      enum: [text, number, date]
+      description: |
+        The kind of a field, resolved when the metric was saved. It decides which typed
+        column the metric filters, groups or measures on.
+    MetricFieldRef:
+      type: object
+      required: [key, kind]
+      properties:
+        key:
+          type: string
+        kind:
+          $ref: '#/components/schemas/MetricValueKind'
+    MetricFilter:
+      type: object
+      required: [field, kind, op, value]
+      properties:
+        field:
+          type: string
+        kind:
+          $ref: '#/components/schemas/MetricValueKind'
+        op:
+          type: string
+          enum: [eq, ne, gt, gte, lt, lte]
+        value:
+          description: The literal to compare against, typed by the field.
+      description: The single filter a metric carries, using the D04 condition shape.
+    MetricDefinition:
+      type: object
+      required: [id, key, name, objectKey, aggregation, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        key:
+          type: string
+        name:
+          type: string
+        description:
+          type: string
+        objectKey:
+          type: string
+        aggregation:
+          $ref: '#/components/schemas/MetricAggregation'
+        measure:
+          allOf:
+            - $ref: '#/components/schemas/MetricFieldRef'
+          description: The numeric field for sum and avg; absent for count.
+        filter:
+          allOf:
+            - $ref: '#/components/schemas/MetricFilter'
+          description: Optional filter, absent when the metric measures everything.
+        groupBy:
+          allOf:
+            - $ref: '#/components/schemas/MetricFieldRef'
+          description: Optional grouping field; absent for a single number.
+        createdBy:
+          type: string
+          format: uuid
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    MetricDefinitionList:
+      type: object
+      required: [data]
+      properties:
+        data:
+          type: array
+          description: Metric definitions, ordered by key.
+          items:
+            $ref: '#/components/schemas/MetricDefinition'
+    MetricDefinitionRequest:
+      type: object
+      required: [name, objectKey, aggregation]
+      properties:
+        name:
+          type: string
+          maxLength: 120
+        description:
+          type: string
+          maxLength: 500
+        objectKey:
+          type: string
+          example: purchase_request
+        aggregation:
+          $ref: '#/components/schemas/MetricAggregation'
+        field:
+          type: string
+          description: The numeric field to measure; must be empty for count.
+        filter:
+          allOf:
+            - $ref: '#/components/schemas/ProcessCondition'
+          description: Optional filter with the same shape process branches use.
+        groupBy:
+          type: string
+          description: Optional select, text or date field to group by.
+    CreateMetricDefinitionRequest:
+      allOf:
+        - $ref: '#/components/schemas/MetricDefinitionRequest'
+        - type: object
+          required: [key]
+          properties:
+            key:
+              type: string
+              example: purchase_requests_open
+    UpdateMetricDefinitionRequest:
+      $ref: '#/components/schemas/MetricDefinitionRequest'
+    MetricBucket:
+      type: object
+      required: [key, records, value]
+      properties:
+        key:
+          type: string
+          description: The grouping value.
+        records:
+          type: integer
+          format: int64
+          minimum: 0
+        value:
+          type: number
+          format: double
+    MetricResult:
+      type: object
+      required: [metric, total, records, buckets]
+      properties:
+        metric:
+          $ref: '#/components/schemas/MetricDefinition'
+        total:
+          type: number
+          format: double
+          description: The aggregate over every record the caller may see.
+        records:
+          type: integer
+          format: int64
+          minimum: 0
+          description: How many records the value rests on.
+        buckets:
+          type: array
+          description: Biggest 50 groups, empty when the metric does not group.
+          items:
+            $ref: '#/components/schemas/MetricBucket'
     DecideProcessTaskRequest:
       type: object
       required: [decision]

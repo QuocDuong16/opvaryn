@@ -23,7 +23,7 @@ const (
 type recordStore interface {
 	GetBusinessObjectByKey(ctx context.Context, key string) (domain.BusinessObject, error)
 	ListObjectRecords(ctx context.Context, objectID uuid.UUID, scope domain.RecordScope) ([]domain.ObjectRecord, error)
-	CreateObjectRecord(ctx context.Context, record domain.ObjectRecord) (domain.ObjectRecord, error)
+	CreateObjectRecord(ctx context.Context, record domain.ObjectRecord, projection []domain.RecordFieldValue) (domain.ObjectRecord, error)
 }
 
 // ObjectRecords stores and lists records of business object definitions. Every
@@ -88,7 +88,7 @@ func (s *ObjectRecords) Create(ctx context.Context, objectKey string, values map
 		DepartmentKey: principal.DepartmentKey,
 	}
 
-	created, err := s.store.CreateObjectRecord(ctx, record)
+	created, err := s.store.CreateObjectRecord(ctx, record, projectRecordValues(object.Fields, record.Values))
 	if err != nil {
 		return domain.ObjectRecord{}, err
 	}
@@ -97,6 +97,52 @@ func (s *ObjectRecords) Create(ctx context.Context, objectKey string, values map
 	created.ObjectKey = object.Key
 	created.ObjectVersion = object.Version
 	return created, nil
+}
+
+// projectRecordValues turns stored values into the typed projection metrics read
+// (AGENTS.md: a field that is measured gets a typed projection). It runs on values the
+// service already validated and normalized, so their shape is known; a field type that
+// carries no scalar (rows) is skipped, and an absent optional value projects nothing
+// rather than an empty row.
+func projectRecordValues(fields []domain.FieldDefinition, values map[string]any) []domain.RecordFieldValue {
+	projected := make([]domain.RecordFieldValue, 0, len(values))
+	for _, field := range fields {
+		value, ok := values[field.Key]
+		if !ok || value == nil {
+			continue
+		}
+		switch field.Type {
+		case domain.FieldTypeNumber:
+			number, ok := numberValue(value)
+			if !ok {
+				continue
+			}
+			projected = append(projected, domain.RecordFieldValue{
+				FieldKey: field.Key, Kind: domain.MetricNumber, Number: number,
+			})
+		case domain.FieldTypeDate:
+			text, ok := value.(string)
+			if !ok {
+				continue
+			}
+			date, err := time.Parse(time.DateOnly, text)
+			if err != nil {
+				continue
+			}
+			projected = append(projected, domain.RecordFieldValue{
+				FieldKey: field.Key, Kind: domain.MetricDate, Date: date,
+			})
+		case domain.FieldTypeText, domain.FieldTypeSelect, domain.FieldTypeFile:
+			text, ok := value.(string)
+			if !ok {
+				continue
+			}
+			projected = append(projected, domain.RecordFieldValue{
+				FieldKey: field.Key, Kind: domain.MetricText, Text: text,
+			})
+		}
+	}
+	return projected
 }
 
 func (s *ObjectRecords) lookup(ctx context.Context, objectKey string) (domain.BusinessObject, error) {

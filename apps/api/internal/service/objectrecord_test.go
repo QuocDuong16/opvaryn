@@ -17,6 +17,8 @@ type fakeRecordStore struct {
 	object  domain.BusinessObject
 	records []domain.ObjectRecord
 	created domain.ObjectRecord
+	// projected is the typed projection written beside the record; metrics read it.
+	projected []domain.RecordFieldValue
 	// scope remembers what the service asked for, so the department rule can be
 	// asserted without a database.
 	scope domain.RecordScope
@@ -38,11 +40,16 @@ func (f *fakeRecordStore) ListObjectRecords(_ context.Context, _ uuid.UUID, scop
 	return f.records, nil
 }
 
-func (f *fakeRecordStore) CreateObjectRecord(_ context.Context, record domain.ObjectRecord) (domain.ObjectRecord, error) {
+func (f *fakeRecordStore) CreateObjectRecord(
+	_ context.Context,
+	record domain.ObjectRecord,
+	projection []domain.RecordFieldValue,
+) (domain.ObjectRecord, error) {
 	if f.err != nil {
 		return domain.ObjectRecord{}, f.err
 	}
 	f.created = record
+	f.projected = projection
 	return record, nil
 }
 

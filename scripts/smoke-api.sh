@@ -453,6 +453,60 @@ PY
 status="$(request GET /api/v1/roles)"
 [[ "$status" == "401" ]] || fail "listing roles anonymously returned $status, expected 401"
 
+echo "smoke: metrics (create, scoped result, validation, permissions)"
+metric_key="smoke_amount_$stamp"
+status="$(request_as "$designer_jar" POST /api/v1/metrics \
+  "$(printf '{"key":"%s","name":"Tổng giá trị đề nghị","objectKey":"%s","aggregation":"sum","field":"amount"}' "$metric_key" "$object_key")")"
+[[ "$status" == "201" ]] || fail "creating a metric returned $status, expected 201"
+grep -q "\"aggregation\":\"sum\"" "$body_file" || fail "the created metric lost its aggregation"
+grep -q '"kind":"number"' "$body_file" || fail "the created metric did not resolve the field kind"
+
+# Two records exist by now: 1.500.000 on v1 and 5.000 on v2.
+status="$(request_as "$designer_jar" GET "/api/v1/metrics/$metric_key/result")"
+[[ "$status" == "200" ]] || fail "reading a metric result returned $status, expected 200"
+python3 - "$body_file" <<'PY' || fail "the metric result does not match the stored records"
+import json, sys
+
+result = json.load(open(sys.argv[1], encoding="utf-8"))
+if result["total"] != 1505000 or result["records"] != 2:
+    sys.exit(f'expected total 1505000 over 2 records, got {result["total"]} over {result["records"]}')
+if result["buckets"]:
+    sys.exit(f"a metric without grouping must not return buckets: {result['buckets']}")
+print("smoke: the metric answered over the projected values")
+PY
+
+# The same metric over the same records, but scoped to another department: an outsider
+# sees nothing, because a metric never widens what a person may read (ADR 0008).
+status="$(request_as "$outsider_jar" GET "/api/v1/metrics/$metric_key/result")"
+[[ "$status" == "200" ]] || fail "the outsider metric result returned $status"
+python3 - "$body_file" <<'PY' || fail "a metric must be scoped like a record read"
+import json, sys
+
+result = json.load(open(sys.argv[1], encoding="utf-8"))
+if result["total"] != 0 or result["records"] != 0:
+    sys.exit(f'expected an empty answer for an outsider, got {result["total"]} over {result["records"]}')
+print("smoke: the metric is scoped to the caller's department")
+PY
+
+status="$(request_as "$designer_jar" POST /api/v1/metrics \
+  "$(printf '{"key":"smoke_bad_metric_%s","name":"Sai","objectKey":"%s","aggregation":"sum","field":"note"}' "$stamp" "$object_key")")"
+[[ "$status" == "400" ]] || fail "a sum over a text field returned $status, expected 400"
+grep -q 'measures a number field' "$body_file" || fail "the invalid measure was not explained"
+# `priority` only exists in version 1 of this object, so measuring it must be refused:
+# the rule is about the schema in force, not about values that happen to be stored.
+status="$(request_as "$designer_jar" POST /api/v1/metrics \
+  "$(printf '{"key":"smoke_old_field_%s","name":"Sai","objectKey":"%s","aggregation":"count","groupBy":"priority"}' "$stamp" "$object_key")")"
+[[ "$status" == "400" ]] || fail "grouping by a field of an older version returned $status, expected 400"
+grep -q 'is not a field' "$body_file" || fail "the unknown grouping field was not explained"
+status="$(request_as "$designer_jar" POST /api/v1/metrics \
+  "$(printf '{"key":"smoke_unknown_field_%s","name":"Sai","objectKey":"%s","aggregation":"count","groupBy":"nope"}' "$stamp" "$object_key")")"
+[[ "$status" == "400" ]] || fail "grouping by an unknown field returned $status, expected 400"
+status="$(request_as "$outsider_jar" POST /api/v1/metrics \
+  "$(printf '{"key":"smoke_denied_metric_%s","name":"Không được phép","objectKey":"%s","aggregation":"count"}' "$stamp" "$object_key")")"
+[[ "$status" == "403" ]] || fail "creating a metric without a designer role returned $status, expected 403"
+status="$(request GET "/api/v1/metrics/$metric_key/result")"
+[[ "$status" == "401" ]] || fail "reading a metric anonymously returned $status, expected 401"
+
 echo "smoke: logout ends the session"
 status="$(request_as "$designer_jar" POST /api/v1/auth/logout)"
 [[ "$status" == "204" ]] || fail "logout returned $status, expected 204"

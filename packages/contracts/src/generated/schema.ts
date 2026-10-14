@@ -241,6 +241,81 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/metrics": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the metric definitions
+         * @description Reading configuration is open to any signed-in user, like reading business object
+         *     or process definitions.
+         */
+        get: operations["listMetrics"];
+        put?: never;
+        /**
+         * Create a metric definition
+         * @description A metric counts records of one business object or measures one numeric field of
+         *     it, optionally filtered by the same JSON condition process branches use (D04) and
+         *     optionally grouped by one select, text or date field. Requires `admin` or
+         *     `process_designer`: a metric is configuration. Field kinds are resolved when the
+         *     metric is saved, so a later schema edit does not change what a metric measures.
+         */
+        post: operations["createMetricDefinition"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/metrics/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** Read one metric definition */
+        get: operations["getMetricDefinition"];
+        /**
+         * Replace a metric definition
+         * @description The key is the identity: a saved dashboard layout points at it, so it cannot be
+         *     changed. Everything else may be replaced. Requires `admin` or `process_designer`.
+         */
+        put: operations["updateMetricDefinition"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/metrics/{key}/result": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Answer a metric over the records the caller may see
+         * @description The result is scoped exactly like a record read (ADR 0008): department, own
+         *     records, and records whose instance holds an open task for a role the caller has.
+         *     Two people can therefore see different numbers for the same metric, which is the
+         *     point of department scoping and is stated on the screen. The total is computed
+         *     over every visible record; buckets (when the metric groups) are the biggest 50.
+         */
+        get: operations["getMetricResult"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/tasks": {
         parameters: {
             query?: never;
@@ -726,6 +801,96 @@ export interface components {
             /** @description Role keys held by at least one user, sorted. */
             data: string[];
         };
+        /**
+         * @description Count records, or measure one numeric field.
+         * @enum {string}
+         */
+        MetricAggregation: "count" | "sum" | "avg";
+        /**
+         * @description The kind of a field, resolved when the metric was saved. It decides which typed
+         *     column the metric filters, groups or measures on.
+         * @enum {string}
+         */
+        MetricValueKind: "text" | "number" | "date";
+        MetricFieldRef: {
+            key: string;
+            kind: components["schemas"]["MetricValueKind"];
+        };
+        /** @description The single filter a metric carries, using the D04 condition shape. */
+        MetricFilter: {
+            field: string;
+            kind: components["schemas"]["MetricValueKind"];
+            /** @enum {string} */
+            op: "eq" | "ne" | "gt" | "gte" | "lt" | "lte";
+            /** @description The literal to compare against, typed by the field. */
+            value: unknown;
+        };
+        MetricDefinition: {
+            /** Format: uuid */
+            id: string;
+            key: string;
+            name: string;
+            description?: string;
+            objectKey: string;
+            aggregation: components["schemas"]["MetricAggregation"];
+            /** @description The numeric field for sum and avg; absent for count. */
+            measure?: components["schemas"]["MetricFieldRef"];
+            /** @description Optional filter, absent when the metric measures everything. */
+            filter?: components["schemas"]["MetricFilter"];
+            /** @description Optional grouping field; absent for a single number. */
+            groupBy?: components["schemas"]["MetricFieldRef"];
+            /** Format: uuid */
+            createdBy?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        MetricDefinitionList: {
+            /** @description Metric definitions, ordered by key. */
+            data: components["schemas"]["MetricDefinition"][];
+        };
+        MetricDefinitionRequest: {
+            name: string;
+            description?: string;
+            /** @example purchase_request */
+            objectKey: string;
+            aggregation: components["schemas"]["MetricAggregation"];
+            /** @description The numeric field to measure; must be empty for count. */
+            field?: string;
+            /** @description Optional filter with the same shape process branches use. */
+            filter?: components["schemas"]["ProcessCondition"];
+            /** @description Optional select, text or date field to group by. */
+            groupBy?: string;
+        };
+        CreateMetricDefinitionRequest: components["schemas"]["MetricDefinitionRequest"] & {
+            /** @example purchase_requests_open */
+            key: string;
+        };
+        UpdateMetricDefinitionRequest: components["schemas"]["MetricDefinitionRequest"];
+        MetricBucket: {
+            /** @description The grouping value. */
+            key: string;
+            /** Format: int64 */
+            records: number;
+            /** Format: double */
+            value: number;
+        };
+        MetricResult: {
+            metric: components["schemas"]["MetricDefinition"];
+            /**
+             * Format: double
+             * @description The aggregate over every record the caller may see.
+             */
+            total: number;
+            /**
+             * Format: int64
+             * @description How many records the value rests on.
+             */
+            records: number;
+            /** @description Biggest 50 groups, empty when the metric does not group. */
+            buckets: components["schemas"]["MetricBucket"][];
+        };
         DecideProcessTaskRequest: {
             /** @enum {string} */
             decision: "approve" | "return" | "reject";
@@ -785,6 +950,8 @@ export interface components {
         ObjectKey: string;
         /** @description Stable machine key of the process definition. */
         DefinitionKey: string;
+        /** @description Stable machine key of the metric. */
+        MetricKey: string;
         /** @description Process instance identifier. */
         InstanceId: string;
         /** @description Human task identifier. */
@@ -1142,6 +1309,158 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listMetrics: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description Metric definitions, ordered by key */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricDefinitionList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    createMetricDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateMetricDefinitionRequest"];
+            };
+        };
+        responses: {
+            /** @description Metric created */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricDefinition"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            /** @description The signed-in user is not an admin or a process designer */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getMetricDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the metric. */
+                key: components["parameters"]["MetricKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The metric definition */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricDefinition"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    updateMetricDefinition: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the metric. */
+                key: components["parameters"]["MetricKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateMetricDefinitionRequest"];
+            };
+        };
+        responses: {
+            /** @description The updated metric definition */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricDefinition"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            /** @description The signed-in user is not an admin or a process designer */
+            403: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getMetricResult: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the metric. */
+                key: components["parameters"]["MetricKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The metric and what it currently answers */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["MetricResult"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
