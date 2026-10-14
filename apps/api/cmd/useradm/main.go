@@ -10,6 +10,7 @@
 //	useradm -create -email lan@example.com -name "Lan" -password '...' -department ky_thuat -roles truong_bo_phan
 //	useradm -add-role -email lan@example.com -roles process_designer
 //	useradm -set-password -email lan@example.com -password '...'
+//	useradm -prune-sessions
 //	useradm -list
 package main
 
@@ -39,6 +40,7 @@ func run() error {
 		create           = flag.Bool("create", false, "create a user")
 		setPassword      = flag.Bool("set-password", false, "replace a user's password")
 		addRole          = flag.Bool("add-role", false, "grant roles to an existing user")
+		pruneSessions    = flag.Bool("prune-sessions", false, "delete expired sessions")
 		list             = flag.Bool("list", false, "list users")
 
 		email      = flag.String("email", "", "user email (normalised to lower case)")
@@ -109,6 +111,14 @@ func run() error {
 		fmt.Printf("password updated for %s\n", user.Email)
 		return nil
 
+	case *pruneSessions:
+		removed, err := identity.PruneSessions(ctx)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("removed %d expired session(s)\n", removed)
+		return nil
+
 	case *list:
 		users, err := identity.ListUsers(ctx)
 		if err != nil {
@@ -122,7 +132,7 @@ func run() error {
 
 	default:
 		flag.Usage()
-		return fmt.Errorf("nothing to do: pass -create, -add-role, -set-password, -create-department or -list")
+		return fmt.Errorf("nothing to do: pass -create, -add-role, -set-password, -create-department, -prune-sessions or -list")
 	}
 }
 

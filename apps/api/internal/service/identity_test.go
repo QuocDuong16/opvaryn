@@ -29,6 +29,18 @@ func newFakeIdentityStore() *fakeIdentityStore {
 	}
 }
 
+// DeleteExpiredSessions mirrors the store's DELETE ... WHERE expires_at <= now.
+func (f *fakeIdentityStore) DeleteExpiredSessions(_ context.Context, now time.Time) (int64, error) {
+	var removed int64
+	for token, session := range f.sessions {
+		if !session.ExpiresAt.After(now) {
+			delete(f.sessions, token)
+			removed++
+		}
+	}
+	return removed, nil
+}
+
 func (f *fakeIdentityStore) FindUserByEmail(_ context.Context, email string) (domain.User, bool, error) {
 	for _, user := range f.users {
 		if user.Email == email {
@@ -461,6 +473,34 @@ func TestListRolesIsTheRoleCatalogue(t *testing.T) {
 
 	if _, err := identity.ListRoles(context.Background(), anonymous()); !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("an anonymous caller must be refused, got %v", err)
+	}
+}
+
+// TestPruneSessionsRemovesOnlyExpiredOnes pins the housekeeping rule: an expired
+// session goes, a live one stays.
+func TestPruneSessionsRemovesOnlyExpiredOnes(t *testing.T) {
+	t.Parallel()
+
+	store := newFakeIdentityStore()
+	identity := NewIdentity(store)
+	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
+	identity.now = func() time.Time { return now }
+
+	store.sessions["expired"] = domain.Session{TokenHash: []byte("expired"), ExpiresAt: now.Add(-time.Minute)}
+	store.sessions["live"] = domain.Session{TokenHash: []byte("live"), ExpiresAt: now.Add(time.Hour)}
+
+	removed, err := identity.PruneSessions(context.Background())
+	if err != nil {
+		t.Fatalf("PruneSessions returned error: %v", err)
+	}
+	if removed != 1 {
+		t.Fatalf("expected one expired session removed, got %d", removed)
+	}
+	if _, ok := store.sessions["live"]; !ok {
+		t.Fatal("a session that has not expired must survive pruning")
+	}
+	if _, ok := store.sessions["expired"]; ok {
+		t.Fatal("the expired session should be gone")
 	}
 }
 

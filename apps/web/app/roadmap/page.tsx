@@ -93,11 +93,6 @@ const OPEN_DECISIONS: readonly { id: string; topic: string; blocked: string }[] 
     topic: 'Analytics — embedded BI hay query builder giới hạn tự viết',
     blocked: 'Dashboard có số liệu thật',
   },
-  {
-    id: 'D10',
-    topic: 'Deployment & backup — hạ tầng, monitoring, khôi phục, staging',
-    blocked: 'Chạy ngoài môi trường local',
-  },
 ];
 
 /**
@@ -114,6 +109,11 @@ const DECIDED: readonly { id: string; topic: string; adr: string }[] = [
     adr: 'ADR 0005',
   },
   { id: 'D09', topic: 'Local auth + RBAC theo role và bộ phận', adr: 'ADR 0008' },
+  {
+    id: 'D10',
+    topic: 'Deployment một host nội bộ + backup có diễn tập phục hồi',
+    adr: 'ADR 0009',
+  },
 ];
 
 const PLANS: readonly { resource: string; demo: string; mvp: string }[] = [
@@ -154,7 +154,8 @@ export default function RoadmapPage() {
               PostgreSQL. Đăng nhập và phân quyền theo role + bộ phận. Inbox theo người, duyệt / trả
               về / từ chối qua engine có event log. Định nghĩa quy trình: canvas của phiên bản đã
               publish, publish phiên bản mới, chạy quy trình từ bản ghi và xem instance. Bố cục
-              dashboard lưu trong cookie.
+              dashboard lưu trong cookie. Sản phẩm chạy trên một host bằng Docker Compose, có job
+              backup và diễn tập phục hồi (`make restore-drill`).
             </dd>
           </div>
           <div>
@@ -169,8 +170,8 @@ export default function RoadmapPage() {
           <div>
             <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Chưa có</dt>
             <dd className="mt-1 text-sm">
-              Kéo thả trên canvas, OIDC, read model analytics, tích hợp thật, SLA và escalation,
-              deployment — phần còn lại của MVP V1 và V1.x.
+              Kéo thả trên canvas, OIDC (chờ IdP của tổ chức), read model analytics (chờ chốt D06),
+              tích hợp thật, SLA và escalation — phần còn lại của MVP V1 và V1.x.
             </dd>
           </div>
         </dl>
@@ -204,9 +205,11 @@ export default function RoadmapPage() {
         <Card>
           <CardDescription>
             Danh sách tiêu chí từ playbook để một bản phát hành được coi là dùng được — khác với
-            tiêu chuẩn của bản demo. Hiện đã đáp ứng mục 3 (approval, nhánh điều kiện, reject /
-            return) và mục 4 (kiểm tra quyền ở server, có audit); mục 1–2 đúng nhưng thao tác qua
-            API chứ chưa có trình thiết kế trong web; mục 5–7 còn thiếu.
+            tiêu chuẩn của bản demo. Hiện đã đáp ứng mục 1–4 (admin dựng object, form và quy trình
+            ngay trong web; nhân viên tạo bản ghi và theo dõi trạng thái; có approval, nhánh điều
+            kiện, reject/return; quyền và phạm vi kiểm tra ở server kèm audit). Mục 5–7 còn thiếu:
+            tích hợp API thật, read model analytics (chờ chốt D06), và bằng chứng restart/retry
+            không mất state.
           </CardDescription>
           <ol className="mt-4 space-y-2.5">
             {MVP_ACCEPTANCE.map((item, index) => (

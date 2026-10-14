@@ -212,6 +212,18 @@ func (s *Store) FindSession(ctx context.Context, tokenHash []byte, now time.Time
 	return session, true, nil
 }
 
+// DeleteExpiredSessions removes every session whose expiry has passed and returns how
+// many rows went away. Expired sessions are already unusable (lookup filters on
+// expires_at), so this is housekeeping — but it is the kind that otherwise never
+// happens and leaves the table growing forever.
+func (s *Store) DeleteExpiredSessions(ctx context.Context, now time.Time) (int64, error) {
+	tag, err := s.pool.Exec(ctx, `DELETE FROM sessions WHERE expires_at <= $1`, now)
+	if err != nil {
+		return 0, classify(fmt.Errorf("delete expired sessions: %w", err))
+	}
+	return tag.RowsAffected(), nil
+}
+
 // DeleteSession ends one session by token hash.
 func (s *Store) DeleteSession(ctx context.Context, tokenHash []byte) error {
 	if _, err := s.pool.Exec(ctx, `DELETE FROM sessions WHERE token_hash = $1`, tokenHash); err != nil {

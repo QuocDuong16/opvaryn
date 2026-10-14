@@ -122,7 +122,36 @@ curl -s localhost:21501/readyz
 Sau khi phục hồi: chạy lại `make restore-drill` để chắc chắn bản vừa dùng cũng qua được kiểm tra,
 và ghi lại thời điểm phục hồi vào nhật ký vận hành.
 
-## 6. Sự cố thường gặp
+## 6. Bảo trì định kỳ
+
+```bash
+# Dọn session hết hạn (API không có scheduler; chạy tay hoặc bằng cron trên host)
+docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/useradm -prune-sessions
+
+# Xem tài khoản và role đang có
+docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/useradm -list
+```
+
+Session hết hạn vốn đã không dùng được (truy vấn lọc theo `expires_at`), nên đây thuần là dọn dẹp —
+nhưng không dọn thì bảng chỉ lớn thêm. Một dòng cron mỗi ngày là đủ.
+
+## 7. Checklist trước khi cho người thật dùng
+
+- [ ] `.env` trên host: `POSTGRES_PASSWORD` đã đổi, `API_ENV=production`, `CORS_ALLOWED_ORIGINS` là
+      origin thật.
+- [ ] HTTPS đã dựng trước mặt host (nếu chưa, xem ghi chú ở mục 3 — cookie `Secure` sẽ không được gửi).
+- [ ] Mỗi người dùng thật có tài khoản riêng qua `useradm` (không dùng chung, không dùng tài khoản
+      `seed_*`), và role của họ khớp với role mà quy trình giao việc — mở trang định nghĩa để xem
+      cảnh báo "role chưa có ai giữ".
+- [ ] `make backup` chạy thành công và `BACKUP_DIR` trỏ ra **ngoài** host (ổ thứ hai hoặc thư mục
+      đồng bộ).
+- [ ] `make restore-drill` **PASS** sau lần thay đổi schema/backup gần nhất.
+- [ ] Đã thử một quy trình thật từ đầu tới cuối trên môi trường này (chạy từ bản ghi → duyệt → hoàn
+      tất) và thấy nó trong event log.
+- [ ] `make pilot-logs` không có lỗi lặp lại; log xoay vòng theo compose.
+- [ ] Đã biết ai gọi khi database hỏng, và lệnh phục hồi ở mục 5 đã được đọc một lần.
+
+## 8. Sự cố thường gặp
 
 | Triệu chứng | Nguyên nhân và cách xử lý |
 | --- | --- |

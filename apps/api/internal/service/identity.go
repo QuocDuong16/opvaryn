@@ -61,6 +61,7 @@ type identityStore interface {
 	CreateSession(ctx context.Context, session domain.Session) error
 	FindSession(ctx context.Context, tokenHash []byte, now time.Time) (domain.Session, bool, error)
 	DeleteSession(ctx context.Context, tokenHash []byte) error
+	DeleteExpiredSessions(ctx context.Context, now time.Time) (int64, error)
 }
 
 // Credentials is what a provider needs to identify a person. Password auth uses
@@ -355,6 +356,14 @@ func (s *Identity) ListRoles(ctx context.Context, principal domain.Principal) ([
 		return nil, err
 	}
 	return s.store.ListRoles(ctx)
+}
+
+// PruneSessions deletes expired sessions and reports how many were removed. Expired
+// sessions are already unusable (the lookup filters on expires_at), so this is
+// housekeeping: without it the table grows forever. It runs from the CLI, because the
+// API has no scheduler and one is not worth adding for this (ADR 0008).
+func (s *Identity) PruneSessions(ctx context.Context) (int64, error) {
+	return s.store.DeleteExpiredSessions(ctx, s.now().UTC())
 }
 
 // EnsureDepartment creates or renames one department (CLI/administration work).
