@@ -41,8 +41,16 @@
 - `/objects/[key]` also carries `StartInstanceForm` (only definitions bound to that object are
   offered — conditions read its fields) and `InstanceList` for its records, backed by
   `listProcessInstances({objectKey})`; `/workflows/[key]` reuses `InstanceList` with
-  `{definitionKey}`. `components/process/instance-list.tsx` is the shared row view (state, version ·
+  `{definitionKey}` and passes `recordLabels` (built per object from `listObjectRecords` +
+  `listBusinessObjectVersions`) so a row names the record it runs on — the label uses each record's
+  own definition version (`components/objects/record-labels.ts`, `fieldsForVersionNumber`).
+  `components/process/instance-list.tsx` is the shared row view (record, state, definition version ·
   attempt, current node, who holds it up).
+- Roles in the designer come from `GET /api/v1/roles` (roles at least one user holds):
+  `/workflows` feeds them to the editor's datalist, and `/workflows/[key]` warns when a definition
+  names a role nobody holds — a valid definition whose instance would stop at that node and appear in
+  no inbox. Keep that warning: it is the difference between a pilot that stalls silently and one that
+  says why.
 - `/tasks` **live**: the inbox is `GET /api/v1/tasks` read through `createServerApiClient()` (open
   tasks of the roles the signed-in user holds; no session → a sign-in card). `/tasks/[instanceId]`
   shows the instance, its tasks and its event log, and renders the record with the definition

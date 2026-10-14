@@ -26,7 +26,9 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   `GET /api/v1/process-instances/{id}` (instance + tasks + event log) and
   `POST /api/v1/process-instances/{id}/tasks/{taskId}/decisions`.
 - Identity (ADR 0008): `POST /api/v1/auth/login` (sets the httpOnly `opvaryn.session` cookie),
-  `POST /api/v1/auth/logout` (204) and `GET /api/v1/me`. `sessionMiddleware` resolves the cookie
+  `POST /api/v1/auth/logout` (204), `GET /api/v1/me` and `GET /api/v1/roles` (the role catalogue:
+  `SELECT DISTINCT role FROM user_roles`, sorted — what the designer offers, so a definition cannot
+  silently name a role nobody holds). `sessionMiddleware` resolves the cookie
   once per request into the request context; `requireUser` answers 401. The runtime endpoints
   (start instance, decide task, read instance) require a session, and the decision's actor and
   roles come from the authenticated user — `actorRole`/`actor` are gone from the request bodies.
