@@ -10,9 +10,10 @@ All workflows are root Makefile targets; `make help` lists everything.
   API :21501, PostgreSQL :21532.
 - The migration command must run from `apps/api` — the runner's default `-dir` is `sql/migrations`
   relative to the working directory.
-- Demo dataset: `make seed-demo` (needs the API running) seeds `purchase_request` and
-  `it_incident` with sample records through the public API. Idempotent; it warns and skips when an
-  object already exists with a different schema.
+- Demo dataset: `make seed-demo` (needs the API running) seeds the three pilot objects
+  (`purchase_request`, `it_incident`, `hr_onboarding`), publishes the three pilot definitions and
+  starts one instance per process for the role that must act next. Idempotent; it warns and skips
+  when an object already exists with a different schema.
 - Accounts and departments: `make useradm ARGS="-create-department -key ky_thuat -department-name 'Kỹ thuật'"`,
   `make useradm ARGS="-create -email lan@opvaryn.local -name 'Lan' -password '...' -department ky_thuat -roles truong_bo_phan"`,
   `make useradm ARGS="-list"`, `make useradm ARGS="-set-password -email ... -password ..."`.
@@ -38,7 +39,15 @@ All workflows are root Makefile targets; `make help` lists everything.
 ## Database / infra
 
 - `make docker-up | docker-down | docker-logs | docker-config | docker-clean`
-  (compose file `deployments/docker-compose.yml`, project name `opvaryn`).
+  (compose file `deployments/docker-compose.yml`, project name `opvaryn`). Without a profile this
+  starts PostgreSQL only, which is what local development needs.
+- Deployment on one host (profile `pilot`, ADR 0009): `make images-build`,
+  `make pilot-up | pilot-down | pilot-logs`. Backups: `make backup` (writes and re-reads a dump),
+  `make restore-drill` (restores the newest dump into a scratch DB and proves the API signs in
+  against it — run it after schema/backup changes and before a pilot). Operator guide:
+  `docs/ops-runbook.md`.
+- `make pilot-up` occupies 21500/21501/21532, so stop it before `make smoke-api` or
+  `make smoke-demo-flows`, which refuse to start while those ports answer.
 
 ## Linux / process notes
 

@@ -1,9 +1,10 @@
 # OPVARYN — top-level map
 
 Business Operations Platform. This repository implements the **interactive demo** (8-week plan,
-playbook page `demo-mvp.html`) and then **MVP V1** on the same codebase (ADR 0005–0008). The demo
-screens all exist; the MVP work in progress is the rest of the pilot scope: workflow designer UI,
-OIDC, an instance list, analytics read models, deployment.
+playbook page `demo-mvp.html`) and then **MVP V1** on the same codebase (ADR 0005–0009). The demo
+screens and the main MVP surfaces all exist (workflow designer, live inbox, instance lists,
+deployment with a tested restore). What is left: analytics read models (blocked on **D06**, the one
+open playbook decision), OIDC when the organisation has an IdP, and drag-and-drop on the canvas.
 
 ## Layout
 
@@ -11,7 +12,9 @@ OIDC, an instance list, analytics read models, deployment.
 - `apps/web` — Next.js App Router admin shell (demo screens). Detail: `mem:web/core`.
 - `packages/contracts` — TypeScript types generated from OpenAPI + typed API client
   (`createApiClient`, `ApiError`).
-- `deployments/docker-compose.yml` — local PostgreSQL 18 only (image pinned by digest).
+- `deployments/docker-compose.yml` — two modes in one file: PostgreSQL only for local dev, and the
+  whole product under the `pilot` profile (migrate → api → web → backup). Images and the restore
+  drill: `mem:deployment`, operator page `docs/ops-runbook.md`.
 - `operations-playbook/` — requirements source: standalone offline HTML notebook, NOT code.
 - `docs/adr/` — decisions binding for this repository (0001 stack, 0002 demo scope + labels,
   0003 demo data slice + mock surfaces, 0004 dashboard layout storage + demo-flow tests).
