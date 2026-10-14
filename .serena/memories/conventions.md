@@ -26,6 +26,13 @@
   never updated. Records store the version they were created under and are always read with it —
   never re-render or rewrite old data with a newer schema. The version table is the single source
   of truth; do not reintroduce a fields column on the object row.
+- The process engine follows ADR 0007: one transaction per decision with compare-and-swap on the
+  task and the instance (the second caller gets 409, never a second transition), reject terminal,
+  return resets to a new attempt, instances bound to the version they started with, every
+  transition appended to `process_events`, and a task decidable only with its assigned role.
+  Conditions are the JSON subset of D04 (eq/ne/gt/gte/lt/lte); anything richer needs a new ADR.
+  What ADR 0007 lists as deferred (parallel/join, timers/SLA, subprocess, delegation, service
+  actions, cancellation, context snapshots) must not appear as tables or endpoints.
 
 ## Web (`apps/web`)
 

@@ -13,9 +13,9 @@ playbook page `demo-mvp.html`), not MVP V1.
 - `operations-playbook/` — requirements source: standalone offline HTML notebook, NOT code.
 - `docs/adr/` — decisions binding for this repository (0001 stack, 0002 demo scope + labels,
   0003 demo data slice + mock surfaces, 0004 dashboard layout storage + demo-flow tests).
-  0005 is **Proposed**: the execution-contract decision brief for D04/D05/D08 — the workflow
-  runtime must not be written until the owner answers it. 0006 is the first MVP item done
-  (definition versioning + publish).
+  0005 is **Accepted**: the owner settled D04/D05/D08 (self-built runtime on PostgreSQL, JSON
+  conditions, reject terminal / return resets, role resolver). 0006 is definition versioning +
+  publish; 0007 is the process execution contract the runtime implements.
 - `scripts/` — quality gates (`check-docs.mjs`), `smoke-api.sh` (end-to-end API smoke test),
   `smoke-demo-flows.sh` (web flows: builds both servers, replays the demo forms),
   `seed-demo.sh` (idempotent demo dataset through the public API) and `playbook-rename.py`
@@ -37,9 +37,10 @@ playbook page `demo-mvp.html`), not MVP V1.
   (`apps/api/internal/api/v1/types.gen.go`) and TS types
   (`packages/contracts/src/generated/schema.ts`) are generated and committed; never hand-edit
   them; regenerate with `make contract-generate`.
-- Workflow runtime is deliberately absent: no process/task/event tables, no approval state
-  machine, until playbook decisions D05/D08 (Process Execution Contract) are settled. Do not
-  implement it speculatively; `domain` holds only implemented entities.
+- The workflow runtime exists since the owner settled D04/D05/D08 (ADR 0005): self-built on
+  PostgreSQL, JSON conditions, reject terminal / return resets, role resolver. Its contract is
+  ADR 0007 and `mem:conventions` lists the invariants that must not be broken. What ADR 0007 marks
+  as deferred stays out until its own ADR.
 - Every screen/feature declares a stage via `StatusBadge`: `live` (real API+DB), `mock`
   (simulated), `concept` (vision). ADR 0002; where a screen mixes live and simulated parts,
   each part is labeled (ADR 0003).

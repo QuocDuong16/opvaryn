@@ -15,7 +15,9 @@
   it verbatim.
 - End-to-end checks available locally: `make smoke-api` (requires Postgres running and migrations
   applied; it builds and starts its own API instance, so stop any dev server first) covers business
-  objects, records and the error branches; `make smoke-demo-flows` builds and starts both servers
+  objects, records, the error branches, definition versioning and the process runtime (start →
+  approve → condition branch → complete, return → attempt 2, reject terminal, wrong role 403,
+  double decision 409); `make smoke-demo-flows` builds and starts both servers
   and replays the web forms (record entry, object builder, dashboard layout) against a production
   build; `make seed-demo` (needs the API running) loads the demo dataset through the same
   endpoints.

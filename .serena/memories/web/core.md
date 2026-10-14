@@ -29,10 +29,13 @@
 - `/forms` **live** + concept list: object picker via `?object=key` (defaults to the first
   object), the same entry form as a preview, schema table, and the not-yet-built capabilities.
 - `/workflows` **mock**: `WorkflowCanvas` (SVG graph, clickable/keyboard-selectable nodes,
-  inspector) over `demo-definitions.ts`; read-only by design, and the page explains D05/D08.
+  inspector) over `demo-definitions.ts`; read-only by design. The page must keep saying the canvas
+  is a design preview while the engine lives in the API — claiming "no runtime exists" is now as
+  wrong as claiming the canvas is live.
 - `/tasks` **mock**: `TaskInbox` reduces `demo-tasks.ts` through the pure `inbox-reducer.ts`
   (approve/reject/return/reset, reason required, only pending tasks can transition); no server
-  call.
+  call. The page lists what the engine already provides and that wiring the inbox needs identity
+  (D09).
 - `/analytics` **mock numbers + live layout**: `DashboardStudio` renders a widget grid over
   `demo-metrics.ts` (`seriesFor`, `formatMetricValue`, `deltaBetween`) arranged with the pure
   `dashboard-layout.ts` module (add/remove/move/resize via drag-and-drop and ↑↓ buttons). The

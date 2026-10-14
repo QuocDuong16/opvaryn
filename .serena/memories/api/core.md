@@ -17,6 +17,15 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   `GET/PUT /api/v1/business-objects/{key}` (PUT publishes the next immutable version),
   `GET /api/v1/business-objects/{key}/versions` (newest first) and
   `GET/POST /api/v1/business-objects/{key}/records` (each record reports `objectVersion`).
+- Process runtime (ADR 0007): `GET/POST /api/v1/process-definitions`,
+  `GET/PUT /api/v1/process-definitions/{key}`, `GET .../versions`,
+  `POST /api/v1/process-instances` (start from a stored record),
+  `GET /api/v1/process-instances/{id}` (instance + tasks + event log) and
+  `POST /api/v1/process-instances/{id}/tasks/{taskId}/decisions`.
+- Error mapping lives in `writeStoreError`: `ValidationError` → 400, `store.ErrNotFound` → 404,
+  `store.ErrConflict`/`ErrTaskClosed`/`service.ErrStateConflict` → 409, `service.ErrForbidden` → 403
+  (`done by role`, D08b), `store.ErrUnavailable` → 503. `parseUUIDParam` turns a malformed path id
+  into a 400 instead of a zero UUID.
 - `system.go` = health/readiness/meta handlers; `businessobject.go` = list/create/get handlers
   plus the domain ↔ `apiv1` mapping helpers (`toAPIBusinessObject` including optional select
   `options`, `toDomainFields`, `pointerOrNil`/`stringValue` for optional fields);
@@ -36,6 +45,21 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
 - `FieldDefinition.Options` rules (only the `select` type carries options): select must declare
   at least one option, values must be non-empty/unique after trimming, options on other types are
   rejected.
+- `ProcessDefinitions` validates the graph (`validateProcessGraph`: exactly one start, ≥1 end and
+  ≥1 human task, DAG with cycle and reachability checks, condition nodes with one `true` and one
+  `false` branch, roles on human tasks) and validates each condition against the bound business
+  object's field definitions (`validateProcessCondition`: field must exist, operator must suit the
+  type, ordering ops only for number/date, select literals must be declared options). Create
+  publishes v1; Update publishes the next version.
+- `ProcessRuntime` is the engine: `Start` binds an instance to the definition version current at
+  that moment and walks to the first waiting human task (or straight to an end node). `Decide`
+  checks the actor role against the task's role (D08b), requires a reason for return/reject, and
+  builds one `domain.CompleteTaskWrite` that the store applies atomically. Approve advances, return
+  resets to a new attempt (cancelling the other open tasks), reject is terminal. Conditions are
+  evaluated inside the same call against the record's current values and what they saw is written
+  into the event log. `EvaluateCondition` treats a missing/null value as false for every operator.
+- `processGraph` indexes a published version (nodes, unconditional successors, condition branches);
+  a broken stored graph is an internal error because publishing validates it.
 - `ObjectRecords` wraps `recordStore` (look up definition → validate values → insert). Validation
   (`validateRecordValues` → `validateFieldValue`) rejects unknown keys, missing required fields,
   wrong types per field type (text/file string ≤4000, number, date `YYYY-MM-DD`, select must be a
@@ -70,7 +94,15 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   (`object_id` FK with ON DELETE CASCADE, `values` JSONB object, index on `(object_id,
   created_at DESC)`), `0003_definition_versions.sql` (version table, backfills every existing
   definition as v1 keeping `created_at` as `published_at`, binds existing records to their v1,
-  then drops `business_objects.fields`).
+  then drops `business_objects.fields`), `0004_process_runtime.sql` (`process_definitions`,
+  `process_definition_versions`, `process_instances` with a state/finished_at consistency check,
+  `process_tasks` with a partial unique index on one open task per node+attempt and a CHECK that
+  returned/rejected tasks carry a reason, `process_events`).
+- `store/process.go` owns the atomic writes: `StartProcessInstance` (instance + tasks + events in
+  one transaction) and `CompleteProcessTask` (task CAS then instance CAS then cancels/creates/events;
+  a failed CAS returns `ErrTaskClosed` or `ErrConflict`, and `explainTaskMiss` tells a missing task
+  apart from a decided one). `FindBusinessObject`/`FindObjectRecord` answer `found bool` so the
+  service can report bad input instead of a missing resource.
 
 ## Contract and tests
 
