@@ -62,12 +62,17 @@
   (`decideProcessTaskAction`). Each submit button carries its own `name="decision"` value, which
   both a JS submit and a plain HTML POST include — the role, reason requirement and
   compare-and-swap stay in the Go service.
-- `/analytics` **mock numbers + live layout**: `DashboardStudio` renders a widget grid over
-  `demo-metrics.ts` (`seriesFor`, `formatMetricValue`, `deltaBetween`) arranged with the pure
-  `dashboard-layout.ts` module (add/remove/move/resize via drag-and-drop and ↑↓ buttons). The
-  layout is stored in the `opvaryn.dashboard` httpOnly cookie through
-  `app/analytics/actions.ts` (`lib/dashboard.ts` reads it; ADR 0004 explains why a cookie instead
-  of a table). Numbers stay fixtures and are labeled `mock`; the layout is labeled `live`.
+- `/analytics` **live**: metric definitions come from `GET /api/v1/metrics`, and the page answers
+  each one server-side (`getMetricResult`) before rendering, so a number is always scoped to the
+  signed-in user (ADR 0008) — say that out loud, it is a feature. `DashboardStudio` draws the saved
+  layout: one widget per metric key with a total, "trên N bản ghi bạn được đọc", and a breakdown of
+  bars in the `bars` view; drag/↑↓/resize/remove plus **Lưu bố cục**. `components/analytics/
+  create-metric-form.tsx` creates metrics from the object's own fields. The fixture
+  (`demo-metrics.ts`) is deleted; `dashboard-layout.ts` was rewritten around `{id, metricKey, view,
+  span}` and now **takes the allowed metric keys as a parameter** (metrics are server data, so the
+  module must not import a catalog) — keep that shape. Layout storage is unchanged: the
+  `opvaryn.dashboard` httpOnly cookie through `app/analytics/actions.ts` (`lib/dashboard.ts`;
+  ADR 0004). Process-time metrics (cycle time, SLA) are listed as `concept`.
 - `/apps` **mock + live**: `MiniApp` switches view — list/detail read live records, kanban groups
   by the first `select` field (mock policy), `Cấu hình` is the administration preview (concept:
   every control is disabled and the copy says nothing is stored), integration panel lists mock

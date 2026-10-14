@@ -7,7 +7,15 @@ This memory holds only what is easy to get wrong when changing the deployment.
 
 - **One compose file, two modes** (`deployments/docker-compose.yml`): no profile = PostgreSQL only
   (`make docker-up`, local dev with `make dev` on the host); profile `pilot` = `migrate` → `api` →
-  `web` → `backup` (`make pilot-up`). Do not split into two files: the two topologies must not drift.
+  `web` → `caddy` → `backup` (`make pilot-up`). Do not split into two files: the two topologies must
+  not drift.
+- **Caddy is the only service published to the network** (`deployments/caddy/Caddyfile`): it terminates
+  TLS for `OPVARYN_HOSTNAME` using Caddy's own CA (`tls internal`, the honest option for a hostname no
+  public CA can validate), adds a few security headers and redirects HTTP→HTTPS. `api` and `web` bind
+  to the host **loopback** only; the API is deliberately not routed, because the browser never calls it
+  directly (BFF, ADR 0008). Its healthcheck speaks TLS to the served hostname via `extra_hosts`, so a
+  broken handshake is unhealthy instead of silent. With TLS in front, `API_ENV=production` is safe to
+  set (cookie `Secure`) — the runbook's section 3 explains installing the root CA on clients.
 - Two images built from this repository, base images pinned by digest, both Dockerfiles watched by
   Dependabot: `apps/api/Dockerfile` (static Go binaries + `sql/`, non-root) and `apps/web/Dockerfile`
   (Next.js **standalone**; build context is the repository root because the app consumes the

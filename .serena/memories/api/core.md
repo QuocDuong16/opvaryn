@@ -99,6 +99,12 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   carries user/department/roles; `domain.RecordScopeFor(principal)` builds the read scope. A
   deliberate non-rule: admin cannot decide a task assigned to another role (approval belongs to
   that role). An instance is visible exactly when its record is; hidden means 404, never 403.
+- `Metrics` (D06, ADR 0010) owns metric definitions and answers them: one object, one aggregation
+  (count/sum/avg), at most one filter (the D04 condition shape, through the *same* validator as
+  process branches) and at most one grouping. Field kinds are resolved on save and stored, so a
+  later schema edit does not change what a metric measures. `Result` runs the metric with
+  `RecordScopeFor(principal)`, so two people can legitimately see different numbers. Create/update
+  need a designer; list/get/result need a session.
 - `ObjectRecords` wraps `recordStore` (look up definition → validate values → insert). Validation
   (`validateRecordValues` → `validateFieldValue`) rejects unknown keys, missing required fields,
   wrong types per field type (text/file string ≤4000, number, date `YYYY-MM-DD`, select must be a
@@ -147,6 +153,12 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   record whose instance has an open task for a role the caller holds — that last clause is what
   keeps cross-department approval working. `FindObjectRecord` returns the object key and the scope
   columns the service needs to stamp and check.
+- `store/metric.go` (D06): metric CRUD plus `MetricValue`, which builds SQL from a `domain.MetricQuery`
+  plan — aggregation, operators and columns come from allowlists, every value is a bind parameter, and
+  the query joins `business_object_records` to apply `recordVisibleToScope`. The total is always its
+  own query (summing bucket averages would be wrong for `avg`); buckets are capped at 50 and ordered
+  biggest first. `CreateObjectRecord` now takes the record's `[]domain.RecordFieldValue` and writes
+  them in the same transaction, so no record exists without its projection.
 - `store/process.go` owns the atomic writes: `StartProcessInstance` (instance + tasks + events in
   one transaction) and `CompleteProcessTask` (task CAS then instance CAS then cancels/creates/events;
   a failed CAS returns `ErrTaskClosed` or `ErrConflict`, and `explainTaskMiss` tells a missing task
