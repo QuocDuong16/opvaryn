@@ -279,7 +279,7 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
 
       <fieldset className="space-y-2">
         <legend className="text-xs font-medium tracking-wide uppercase">
-          Đường chuyển ({edges.length})
+          Đường nối ({edges.length})
         </legend>
         {edges.map((draft, index) => (
           <div
@@ -290,14 +290,14 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
               value={draft.from}
               onChange={(event) => updateEdge(index, { from: event.target.value })}
               placeholder="từ bước"
-              aria-label={`Node nguồn của đường chuyển ${index + 1}`}
+              aria-label={`Bước bắt đầu của đường nối ${index + 1}`}
               className={cn(INPUT_CLASS, 'font-mono')}
             />
             <input
               value={draft.to}
               onChange={(event) => updateEdge(index, { to: event.target.value })}
               placeholder="đến bước"
-              aria-label={`Node đích của đường chuyển ${index + 1}`}
+              aria-label={`Bước kết thúc của đường nối ${index + 1}`}
               className={cn(INPUT_CLASS, 'font-mono')}
             />
             <select
@@ -305,7 +305,7 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
               onChange={(event) =>
                 updateEdge(index, { when: event.target.value as EdgeDraft['when'] })
               }
-              aria-label={`Nhánh của đường chuyển ${index + 1}`}
+              aria-label={`Nhánh của đường nối ${index + 1}`}
               className={INPUT_CLASS}
             >
               <option value="">luôn</option>

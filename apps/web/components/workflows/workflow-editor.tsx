@@ -258,7 +258,7 @@ export function WorkflowEditor({
               ref={svgRef}
               viewBox={`0 0 ${size.width} ${size.height}`}
               role="application"
-              aria-label={`Trình soạn ${canvasLabel}: ${draft.nodes.length} node, ${draft.edges.length} đường chuyển`}
+              aria-label={`Trình soạn ${canvasLabel}: ${draft.nodes.length} bước, ${draft.edges.length} đường nối`}
               className="w-full touch-none select-none"
               onPointerMove={continueDrag}
               onPointerUp={endDrag}
@@ -297,7 +297,7 @@ export function WorkflowEditor({
                     key={edge.id}
                     role="button"
                     tabIndex={0}
-                    aria-label={`Đường chuyển ${edge.from} → ${edge.to}${edge.when ? ` (${edge.when})` : ''}, xoá`}
+                    aria-label={`Đường nối ${edge.from} → ${edge.to}${edge.when ? ` (${edge.when})` : ''}, xoá`}
                     onClick={(event) => {
                       event.stopPropagation();
                       setDraft((current) => removeEdge(current, edge.id));
@@ -682,7 +682,7 @@ export function WorkflowEditor({
 
                 <dl className="mt-4 space-y-2 text-xs">
                   <div className="flex items-start justify-between gap-3">
-                    <dt className="text-on-surface-muted">Đường chuyển tiếp</dt>
+                    <dt className="text-on-surface-muted">Đường nối</dt>
                     <dd className="space-y-1 text-right">
                       {outgoingEdges({ nodes: draft.nodes, edges: draft.edges }, selected.key).map(
                         ({ edge, label }) => (

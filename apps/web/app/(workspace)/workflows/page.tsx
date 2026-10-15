@@ -305,23 +305,25 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
         </section>
       ) : null}
 
-      <section className="grid gap-4 sm:grid-cols-2">
-        <Card>
-          <CardTitle>Định nghĩa và lần chạy là hai thứ khác nhau</CardTitle>
-          <CardDescription>
-            Một instance khi chạy gắn chặt với version definition đã publish tại thời điểm khởi tạo.
-            Sửa definition tạo version mới; instance đang xử lý không tự đổi hành vi.
-          </CardDescription>
-        </Card>
-        <Card>
-          <CardTitle>Quy trình đang chạy không tự đổi</CardTitle>
-          <CardDescription>
-            Phiên bản đã publish không đổi; một bước chỉ có hiệu lực đúng một lần (hai người quyết
-            cùng lúc thì người sau được báo việc đã xử lý); quyết định đã ghi không bị đảo ngược bởi
-            lỗi phía sau.
-          </CardDescription>
-        </Card>
-      </section>
+      {showAdvanced ? (
+        <section className="grid gap-4 sm:grid-cols-2">
+          <Card>
+            <CardTitle>Định nghĩa và lần chạy là hai thứ khác nhau</CardTitle>
+            <CardDescription>
+              Một instance khi chạy gắn chặt với version definition đã publish tại thời điểm khởi
+              tạo. Sửa definition tạo version mới; instance đang xử lý không tự đổi hành vi.
+            </CardDescription>
+          </Card>
+          <Card>
+            <CardTitle>Quy trình đang chạy không tự đổi</CardTitle>
+            <CardDescription>
+              Phiên bản đã publish không đổi; một bước chỉ có hiệu lực đúng một lần (hai người quyết
+              cùng lúc thì người sau được báo việc đã xử lý); quyết định đã ghi không bị đảo ngược
+              bởi lỗi phía sau.
+            </CardDescription>
+          </Card>
+        </section>
+      ) : null}
     </>
   );
 }
