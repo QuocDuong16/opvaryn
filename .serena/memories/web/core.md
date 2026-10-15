@@ -15,7 +15,11 @@
   `index` values stay sequential and the shell test enforces both. `navItemFor` matches nested routes
   by longest prefix, so `/objects/it_incident` resolves to the Objects area.
 - Root layout (`app/layout.tsx`) reads the theme cookie server-side, sets `data-theme` on `<html>`
-  (no flash, no client theme script) and loads Inter via `next/font`; the shell itself (`Sidebar`
+  (no flash, no client theme script) and loads **Be Vietnam Pro** via `next/font` — subsets
+  `latin` + `vietnamese`, weights 400/500/600 only, because the face is static on Google Fonts and
+  the interface uses just `font-medium` and `font-semibold` (add a weight in the layout before using
+  a heavier one). It exposes `--font-be-vietnam-pro`, which `globals.css` maps into `--font-sans`;
+  `font-mono` stays the system monospace stack. The shell itself (`Sidebar`
   lg+ / `Topbar` with breadcrumb, stage chip and compact mobile nav, plus the footer) lives in
   `(workspace)/layout.tsx`. The session cookie name/options live in `lib/session-cookie.ts` — no
   `next/headers` import, so the edge proxy can name the cookie — and `lib/session.ts` re-exports

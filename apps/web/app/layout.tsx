@@ -1,14 +1,21 @@
 import type { Metadata } from 'next';
 import type { ReactNode } from 'react';
-import { Inter } from 'next/font/google';
+import { Be_Vietnam_Pro } from 'next/font/google';
 
 import { getTheme } from '@/lib/theme';
 
 import './globals.css';
 
-const inter = Inter({
+/**
+ * Be Vietnam Pro is the product face: it is drawn for Vietnamese, so diacritics sit
+ * correctly at every weight. Only the weights the interface uses are downloaded (400
+ * body, 500 `font-medium`, 600 `font-semibold`) — a heavier weight has to be added here
+ * first, or the browser synthesises it.
+ */
+const beVietnamPro = Be_Vietnam_Pro({
   subsets: ['latin', 'vietnamese'],
-  variable: '--font-inter',
+  weight: ['400', '500', '600'],
+  variable: '--font-be-vietnam-pro',
   display: 'swap',
 });
 
@@ -34,7 +41,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
 
   return (
     <html lang="vi" data-theme={theme}>
-      <body className={`${inter.variable} font-sans antialiased`}>{children}</body>
+      <body className={`${beVietnamPro.variable} font-sans antialiased`}>{children}</body>
     </html>
   );
 }
