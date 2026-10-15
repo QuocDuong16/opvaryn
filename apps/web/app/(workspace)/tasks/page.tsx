@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { ApiError, type InboxItem, type Me } from '@opvaryn/contracts';
 
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+import { ListSearch, Pagination, pageOffset } from '@/components/ui/list-controls';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
@@ -29,17 +30,30 @@ const RUNTIME_GAPS: readonly { title: string; body: string }[] = [
   },
 ];
 
-export default async function TasksPage() {
+interface PageProps {
+  searchParams: Promise<{ q?: string; offset?: string }>;
+}
+
+/** One page of the inbox; the API slices and reports the total. */
+const PER_PAGE = 25;
+
+export default async function TasksPage({ searchParams }: PageProps) {
+  const { q, offset: rawOffset } = await searchParams;
+  const query = (q ?? '').trim();
+  const offset = pageOffset(rawOffset, PER_PAGE);
   const api = createServerApiClient();
 
   let me: Me | null = null;
   let items: InboxItem[] = [];
+  let total = 0;
   let error: string | null = null;
   let needsSignIn = false;
 
   try {
     me = await api.getMe();
-    items = await api.listInboxTasks();
+    const page = await api.listInboxTasks({ q: query || undefined, limit: PER_PAGE, offset });
+    items = page.data;
+    total = page.total;
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'unauthorized') {
       needsSignIn = true;
@@ -86,7 +100,7 @@ export default async function TasksPage() {
           <dl className="flex flex-wrap gap-x-6 gap-y-1 text-sm">
             <div className="flex items-center gap-2">
               <dt className="text-on-surface-muted">Đang chờ bạn</dt>
-              <dd className="font-semibold text-warning">{items.length}</dd>
+              <dd className="font-semibold text-warning">{total}</dd>
             </div>
             <div className="flex items-center gap-2">
               <dt className="text-on-surface-muted">Vai trò của bạn</dt>
@@ -103,7 +117,7 @@ export default async function TasksPage() {
         </div>
       ) : null}
 
-      {me && items.length === 0 ? (
+      {me && total === 0 ? (
         <div className="mt-6 rounded-xl border border-dashed border-border-strong px-5 py-10 text-center">
           <p className="text-sm font-medium">Không có việc nào đang chờ bạn</p>
           <p className="mx-auto mt-1 max-w-lg text-sm text-on-surface-muted">
@@ -113,8 +127,22 @@ export default async function TasksPage() {
         </div>
       ) : null}
 
+      {me ? (
+        <div className="mt-6 mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold tracking-tight">
+            {query ? `Kết quả cho “${query}”` : 'Việc đang mở'}
+          </h2>
+          <ListSearch
+            basePath="/tasks"
+            value={query}
+            placeholder="Tìm theo tên việc hoặc quy trình"
+            label="Tìm việc"
+          />
+        </div>
+      ) : null}
+
       {me && items.length > 0 ? (
-        <ul className="mt-6 space-y-4">
+        <ul className="space-y-4">
           {items.map((item) => (
             <li
               key={item.task.id}
@@ -161,6 +189,14 @@ export default async function TasksPage() {
           ))}
         </ul>
       ) : null}
+
+      <Pagination
+        total={total}
+        limit={PER_PAGE}
+        offset={offset}
+        basePath="/tasks"
+        params={{ q: query || undefined }}
+      />
 
       {me ? (
         <section className="mt-8">

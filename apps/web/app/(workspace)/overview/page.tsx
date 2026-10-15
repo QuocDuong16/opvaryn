@@ -189,14 +189,21 @@ async function loadOverview(): Promise<Overview> {
 
   // Each part fails on its own: a slow list must not blank the whole page.
   const [inbox, instances] = await Promise.all([
-    api.listInboxTasks().catch(() => []),
-    api.listProcessInstances().catch(() => []),
+    api
+      .listInboxTasks({ limit: RECENT_LIMIT })
+      .then((page) => page.data)
+      .catch(() => []),
+    api
+      .listProcessInstances({}, { limit: RECENT_LIMIT })
+      .then((page) => page.data)
+      .catch(() => []),
   ]);
 
   // A screen names things: the process by its name, the record by its own label (built from
   // the version it was created under, ADR 0006). Both lookups are best-effort — a missing
   // name falls back to the key rather than blanking the table.
-  const definitions = await api.listProcessDefinitions().catch(() => []);
+  const definitions = (await api.listProcessDefinitions({ limit: 100 }).catch(() => ({ data: [] })))
+    .data;
   const definitionNames = Object.fromEntries(definitions.map((item) => [item.key, item.name]));
 
   const objectKeys = [...new Set(instances.map((summary) => summary.instance.objectKey))];
@@ -205,7 +212,7 @@ async function loadOverview(): Promise<Overview> {
       try {
         const [versions, records] = await Promise.all([
           api.listBusinessObjectVersions(objectKey),
-          api.listObjectRecords(objectKey),
+          api.listObjectRecords(objectKey, { limit: 100 }).then((page) => page.data),
         ]);
         return recordLabels(records, versions);
       } catch {

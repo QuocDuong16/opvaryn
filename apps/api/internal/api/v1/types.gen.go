@@ -336,6 +336,11 @@ type BusinessObject struct {
 // BusinessObjectList defines model for BusinessObjectList.
 type BusinessObjectList struct {
 	Data []BusinessObject `json:"data"`
+
+	// Total Definitions behind the page. A caller paginates with it instead of asking for everything.
+	//
+	// Example: 42
+	Total int `json:"total"`
 }
 
 // BusinessObjectVersion defines model for BusinessObjectVersion.
@@ -493,6 +498,11 @@ type InboxItem struct {
 type InboxList struct {
 	// Data Open tasks of the signed-in user, oldest first.
 	Data []InboxItem `json:"data"`
+
+	// Total Open tasks behind the page. A caller paginates with it instead of asking for everything.
+	//
+	// Example: 42
+	Total int `json:"total"`
 }
 
 // InstanceCounts defines model for InstanceCounts.
@@ -674,6 +684,11 @@ type ObjectRecord struct {
 // ObjectRecordList defines model for ObjectRecordList.
 type ObjectRecordList struct {
 	Data []ObjectRecord `json:"data"`
+
+	// Total Records behind the page. A caller paginates with it instead of asking for everything.
+	//
+	// Example: 42
+	Total int `json:"total"`
 }
 
 // ProcessCondition The whole rule language of MVP (D04): a field of the bound business object,
@@ -714,6 +729,11 @@ type ProcessDefinition struct {
 // ProcessDefinitionList defines model for ProcessDefinitionList.
 type ProcessDefinitionList struct {
 	Data []ProcessDefinition `json:"data"`
+
+	// Total Definitions behind the page. A caller paginates with it instead of asking for everything.
+	//
+	// Example: 42
+	Total int `json:"total"`
 }
 
 // ProcessDefinitionVersion defines model for ProcessDefinitionVersion.
@@ -781,6 +801,11 @@ type ProcessInstance struct {
 type ProcessInstanceList struct {
 	// Data Visible instances, newest first.
 	Data []ProcessInstanceSummary `json:"data"`
+
+	// Total Visible instances behind the page. A caller paginates with it instead of asking for everything.
+	//
+	// Example: 42
+	Total int `json:"total"`
 }
 
 // ProcessInstanceState defines model for ProcessInstanceState.
@@ -973,6 +998,42 @@ type ServiceUnavailable = ErrorResponse
 // it and never on the human-readable message.
 type Unauthorized = ErrorResponse
 
+// ListBusinessObjectsParams defines parameters for ListBusinessObjects.
+type ListBusinessObjectsParams struct {
+	// Q Search term matched against the name and the key. Empty means no filter.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Limit Rows per page (default 25, maximum 100).
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Rows to skip.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
+// ListObjectRecordsParams defines parameters for ListObjectRecords.
+type ListObjectRecordsParams struct {
+	// Q Search term matched against the stored values. Empty means no filter.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Limit Rows per page (default 25, maximum 100).
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Rows to skip.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
+// ListProcessDefinitionsParams defines parameters for ListProcessDefinitions.
+type ListProcessDefinitionsParams struct {
+	// Q Search term matched against the name and the key. Empty means no filter.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Limit Rows per page (default 25, maximum 100).
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Rows to skip.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
 // ListProcessInstancesParams defines parameters for ListProcessInstances.
 type ListProcessInstancesParams struct {
 	// ObjectKey Only instances of this business object.
@@ -980,6 +1041,12 @@ type ListProcessInstancesParams struct {
 
 	// DefinitionKey Only instances of this process definition.
 	DefinitionKey *string `form:"definitionKey,omitempty" json:"definitionKey,omitempty"`
+
+	// Limit Rows per page (default 25, maximum 100).
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Rows to skip.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
 // GetProcessMetricsParams defines parameters for GetProcessMetrics.
@@ -989,6 +1056,18 @@ type GetProcessMetricsParams struct {
 
 	// WindowDays How far back to look; 1–365, default 30.
 	WindowDays *int `form:"windowDays,omitempty" json:"windowDays,omitempty"`
+}
+
+// ListInboxTasksParams defines parameters for ListInboxTasks.
+type ListInboxTasksParams struct {
+	// Q Search term matched against the task title and the process name. Empty means no filter.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Limit Rows per page (default 25, maximum 100).
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Rows to skip.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
 // ListWebhookDeliveriesParams defines parameters for ListWebhookDeliveries.

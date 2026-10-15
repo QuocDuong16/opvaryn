@@ -41,7 +41,7 @@ export default async function FormsPage({ searchParams }: PageProps) {
   let objects: BusinessObject[] = [];
   let error: string | null = null;
   try {
-    objects = await api.listBusinessObjects();
+    objects = (await api.listBusinessObjects({ limit: 100 })).data;
   } catch (cause) {
     error = describeApiError(cause);
   }

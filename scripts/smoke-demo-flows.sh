@@ -564,6 +564,8 @@ check_surface() {
 check_surface "/overview" "overview" "Việc đang chờ bạn" "Lần chạy gần đây"
 # A department head sees the product, never the plumbing: no build status, no endpoint table.
 assert_not_contains "$tmp_dir/surface.html" "Thông tin hệ thống" "overview for a non-admin"
+# The Data screen leads with the definitions in use and offers the search that goes with it.
+check_surface "/objects" "objects" "Đang dùng" "Tìm theo tên hoặc key"
 check_surface "/forms?object=$object_key" "forms" "Preview form" 'name="priority"'
 check_surface "/workflows" "workflows" "Tạo quy trình mới" "Node catalog theo lộ trình"
 # No process was started yet, so the live inbox is empty for this role — and it says so.

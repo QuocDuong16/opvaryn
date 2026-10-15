@@ -22,7 +22,13 @@ const (
 // recordStore is the slice of the persistence layer this service needs.
 type recordStore interface {
 	GetBusinessObjectByKey(ctx context.Context, key string) (domain.BusinessObject, error)
-	ListObjectRecords(ctx context.Context, objectID uuid.UUID, scope domain.RecordScope) ([]domain.ObjectRecord, error)
+	ListObjectRecords(
+		ctx context.Context,
+		objectID uuid.UUID,
+		scope domain.RecordScope,
+		query string,
+		page domain.Page,
+	) (domain.Paged[domain.ObjectRecord], error)
 	CreateObjectRecord(ctx context.Context, record domain.ObjectRecord, projection []domain.RecordFieldValue) (domain.ObjectRecord, error)
 }
 
@@ -42,21 +48,33 @@ func NewObjectRecords(st recordStore) *ObjectRecords {
 
 // List returns the records of the addressed object that the caller may see, newest
 // first: the department rule of ADR 0008 is applied in the query, not in the UI.
-func (s *ObjectRecords) List(ctx context.Context, objectKey string, principal domain.Principal) ([]domain.ObjectRecord, error) {
+func (s *ObjectRecords) List(
+	ctx context.Context,
+	objectKey string,
+	principal domain.Principal,
+	opts ListOptions,
+) (domain.Paged[domain.ObjectRecord], error) {
 	if err := requireAuthenticated(principal); err != nil {
-		return nil, err
+		return domain.Paged[domain.ObjectRecord]{}, err
+	}
+	opts, err := opts.normalized()
+	if err != nil {
+		return domain.Paged[domain.ObjectRecord]{}, err
 	}
 	object, err := s.lookup(ctx, objectKey)
 	if err != nil {
-		return nil, err
+		return domain.Paged[domain.ObjectRecord]{}, err
 	}
 
-	records, err := s.store.ListObjectRecords(ctx, object.ID, domain.RecordScopeFor(principal))
+	records, err := s.store.ListObjectRecords(
+		ctx, object.ID, domain.RecordScopeFor(principal), opts.Query, opts.Page)
 	if err != nil {
-		return nil, err
+		return domain.Paged[domain.ObjectRecord]{}, err
 	}
-	for i := range records {
-		records[i].ObjectKey = object.Key
+	// Every row belongs to the object that was asked for; the key is stamped here so the
+	// store never has to join for it.
+	for i := range records.Items {
+		records.Items[i].ObjectKey = object.Key
 	}
 	return records, nil
 }

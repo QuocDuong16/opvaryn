@@ -17,39 +17,60 @@ import { StartInstanceForm } from '@/components/process/start-instance-form';
 import { RecordList } from '@/components/objects/record-list';
 import { UpdateObjectForm } from '@/components/objects/update-object-form';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+import { ListSearch, Pagination, pageOffset } from '@/components/ui/list-controls';
 import { PageHeader } from '@/components/ui/page-header';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatTimestamp } from '@/lib/format';
 
 interface PageProps {
   params: Promise<{ key: string }>;
+  searchParams: Promise<{ q?: string; offset?: string; ioffset?: string }>;
 }
+
+/** Records per page on the detail screen; the API does the slicing. */
+const RECORDS_PER_PAGE = 25;
+const INSTANCES_PER_PAGE = 10;
 
 export async function generateMetadata({ params }: PageProps) {
   const { key } = await params;
   return { title: `Business object ${key}` };
 }
 
-export default async function ObjectDetailPage({ params }: PageProps) {
+export default async function ObjectDetailPage({ params, searchParams }: PageProps) {
   const { key } = await params;
+  const { q, offset: rawOffset, ioffset: rawInstanceOffset } = await searchParams;
   const api = createServerApiClient();
+
+  const query = (q ?? '').trim();
+  const offset = pageOffset(rawOffset, RECORDS_PER_PAGE);
+  const instanceOffset = pageOffset(rawInstanceOffset, INSTANCES_PER_PAGE);
 
   let object: BusinessObject | null = null;
   let versions: BusinessObjectVersion[] = [];
   let records: ObjectRecord[] = [];
+  let recordTotal = 0;
   let definitions: ProcessDefinition[] = [];
   let instances: ProcessInstanceSummary[] = [];
+  let instanceTotal = 0;
   let error: string | null = null;
 
   try {
     object = await api.getBusinessObject(key);
-    [versions, records, definitions, instances] = await Promise.all([
+    const [versionList, recordPage, definitionPage, instancePage] = await Promise.all([
       api.listBusinessObjectVersions(key),
-      api.listObjectRecords(key),
-      api.listProcessDefinitions(),
-      api.listProcessInstances({ objectKey: key }),
+      api.listObjectRecords(key, { q: query || undefined, limit: RECORDS_PER_PAGE, offset }),
+      api.listProcessDefinitions({ limit: 100 }),
+      api.listProcessInstances(
+        { objectKey: key },
+        { limit: INSTANCES_PER_PAGE, offset: instanceOffset },
+      ),
     ]);
+    versions = versionList;
+    records = recordPage.data;
+    recordTotal = recordPage.total;
+    definitions = definitionPage.data;
+    instances = instancePage.data;
+    instanceTotal = instancePage.total;
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'not_found') {
       notFound();
@@ -166,27 +187,54 @@ export default async function ObjectDetailPage({ params }: PageProps) {
           </section>
 
           <section>
-            <h2 className="mb-3 text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
-              Bản ghi đã lưu ({records.length})
-            </h2>
-            <RecordList versions={versions} records={records} />
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+              <h2 className="text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
+                {`Bản ghi đã lưu (${recordTotal})`}
+              </h2>
+              <ListSearch
+                basePath={`/objects/${object.key}`}
+                value={query}
+                placeholder="Tìm trong giá trị của bản ghi"
+                label="Tìm bản ghi"
+                keep={{ ioffset: instanceOffset > 0 ? String(instanceOffset) : undefined }}
+              />
+            </div>
+            <RecordList versions={versions} records={records} filtered={query !== ''} />
+            <Pagination
+              total={recordTotal}
+              limit={RECORDS_PER_PAGE}
+              offset={offset}
+              basePath={`/objects/${object.key}`}
+              params={{
+                q: query || undefined,
+                ioffset: instanceOffset > 0 ? String(instanceOffset) : undefined,
+              }}
+            />
           </section>
 
           <section>
-            <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-              <h2 className="text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
-                Quy trình trên các bản ghi này ({instances.length})
-              </h2>
-              <StatusBadge kind="live" />
-            </div>
+            <h2 className="mb-3 text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
+              {`Quy trình trên các bản ghi này (${instanceTotal})`}
+            </h2>
             <p className="mb-3 text-xs text-on-surface-muted">
-              Danh sách instance đọc theo phạm vi của bạn: instance hiện khi bản ghi của nó hiện.
-              Instance đã kết thúc vẫn nằm đây và mở được, kể cả khi không còn việc nào trong inbox.
+              Danh sách này đọc theo phạm vi của bạn: một lần chạy hiện khi bản ghi của nó hiện. Lần
+              chạy đã kết thúc vẫn nằm đây và mở được, kể cả khi không còn việc nào trong hộp việc.
             </p>
             <InstanceList
               instances={instances}
               recordLabels={recordLabels(records, versions)}
-              emptyHint="Chạy một quy trình ở biểu mẫu bên phải để thấy instance, bước đang chờ và người giữ việc."
+              emptyHint="Chạy một quy trình ở biểu mẫu bên phải để thấy một lần chạy, bước đang chờ và người giữ việc."
+            />
+            <Pagination
+              total={instanceTotal}
+              limit={INSTANCES_PER_PAGE}
+              offset={instanceOffset}
+              basePath={`/objects/${object.key}`}
+              offsetParam="ioffset"
+              params={{
+                q: query || undefined,
+                offset: offset > 0 ? String(offset) : undefined,
+              }}
             />
           </section>
         </div>

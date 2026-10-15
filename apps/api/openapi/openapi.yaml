@@ -78,7 +78,34 @@ paths:
       operationId: listBusinessObjects
       tags: [business-objects]
       summary: List business object definitions
-      description: Returns every business object definition known to this environment.
+      description: |
+        Returns one page of business object definitions, with the total behind it, so a
+        screen can paginate without a second request. `q` searches the name and the key.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Search term matched against the name and the key. Empty means no filter.
+          schema:
+            type: string
+            maxLength: 100
+        - name: limit
+          in: query
+          required: false
+          description: Rows per page (default 25, maximum 100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: offset
+          in: query
+          required: false
+          description: Rows to skip.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         '200':
           description: Business object definitions
@@ -192,9 +219,35 @@ paths:
       operationId: listObjectRecords
       tags: [object-records]
       summary: List records of a business object
-      description: Returns the stored records, newest first.
+      description: |-
+        Returns one page of the stored records, newest first, with the total behind it.
+        `q` searches inside the stored values.
       parameters:
         - $ref: '#/components/parameters/ObjectKey'
+        - name: q
+          in: query
+          required: false
+          description: Search term matched against the stored values. Empty means no filter.
+          schema:
+            type: string
+            maxLength: 100
+        - name: limit
+          in: query
+          required: false
+          description: Rows per page (default 25, maximum 100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: offset
+          in: query
+          required: false
+          description: Rows to skip.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         '200':
           description: Records of the business object
@@ -554,8 +607,34 @@ paths:
       tags: [task-inbox]
       summary: Open tasks of the signed-in user
       description: |
-        Every open task whose role the signed-in user holds, oldest first, together with
-        the instance it belongs to. This is the inbox the Tasks screen will render.
+        One page of the open tasks whose role the signed-in user holds, oldest first,
+        together with the instance it belongs to, and the total behind the page. `q`
+        searches the task title and the process name.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Search term matched against the task title and the process name. Empty means no filter.
+          schema:
+            type: string
+            maxLength: 100
+        - name: limit
+          in: query
+          required: false
+          description: Rows per page (default 25, maximum 100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: offset
+          in: query
+          required: false
+          description: Rows to skip.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       security:
         - sessionCookie: []
       responses:
@@ -574,6 +653,33 @@ paths:
       operationId: listProcessDefinitions
       tags: [process-definitions]
       summary: List process definitions
+      description: |-
+        One page of definitions with the total behind it. `q` searches the name and the key.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Search term matched against the name and the key. Empty means no filter.
+          schema:
+            type: string
+            maxLength: 100
+        - name: limit
+          in: query
+          required: false
+          description: Rows per page (default 25, maximum 100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: offset
+          in: query
+          required: false
+          description: Rows to skip.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         '200':
           description: Process definitions
@@ -683,7 +789,8 @@ paths:
         Scoped exactly like the record each instance runs on (ADR 0008): an instance is
         listed only when its record is visible to the caller, and a caller who holds the
         role of an open task sees it through that task. Optional filters narrow the list
-        to one business object or one process definition; newest first, capped at 200.
+        to one business object or one process definition; newest first, one page at a
+        time, with the total behind the page.
       security:
         - sessionCookie: []
       parameters:
@@ -701,6 +808,23 @@ paths:
           schema:
             type: string
             example: purchase_approval
+        - name: limit
+          in: query
+          required: false
+          description: Rows per page (default 25, maximum 100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: offset
+          in: query
+          required: false
+          description: Rows to skip.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         '200':
           description: The visible instances, newest first
@@ -997,8 +1121,12 @@ components:
           format: date-time
     BusinessObjectList:
       type: object
-      required: [data]
+      required: [data, total]
       properties:
+        total:
+          type: integer
+          description: Definitions behind the page. A caller paginates with it instead of asking for everything.
+          example: 42
         data:
           type: array
           items:
@@ -1050,8 +1178,12 @@ components:
           format: date-time
     ObjectRecordList:
       type: object
-      required: [data]
+      required: [data, total]
       properties:
+        total:
+          type: integer
+          description: Records behind the page. A caller paginates with it instead of asking for everything.
+          example: 42
         data:
           type: array
           items:
@@ -1205,8 +1337,12 @@ components:
           format: date-time
     ProcessDefinitionList:
       type: object
-      required: [data]
+      required: [data, total]
       properties:
+        total:
+          type: integer
+          description: Definitions behind the page. A caller paginates with it instead of asking for everything.
+          example: 42
         data:
           type: array
           items:
@@ -1396,8 +1532,12 @@ components:
           $ref: '#/components/schemas/ProcessInstance'
     InboxList:
       type: object
-      required: [data]
+      required: [data, total]
       properties:
+        total:
+          type: integer
+          description: Open tasks behind the page. A caller paginates with it instead of asking for everything.
+          example: 42
         data:
           type: array
           description: Open tasks of the signed-in user, oldest first.
@@ -1431,8 +1571,12 @@ components:
             $ref: '#/components/schemas/ProcessTask'
     ProcessInstanceList:
       type: object
-      required: [data]
+      required: [data, total]
       properties:
+        total:
+          type: integer
+          description: Visible instances behind the page. A caller paginates with it instead of asking for everything.
+          example: 42
         data:
           type: array
           description: Visible instances, newest first.

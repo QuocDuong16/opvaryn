@@ -14,6 +14,7 @@ import { ProcessCanvas } from '@/components/workflows/process-canvas';
 import { WorkflowEditor } from '@/components/workflows/workflow-editor';
 import { draftFromGraph } from '@/components/workflows/definition-draft-model';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+import { Pagination, pageOffset } from '@/components/ui/list-controls';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
@@ -24,8 +25,11 @@ import { cn } from '@/lib/utils';
 
 interface PageProps {
   params: Promise<{ key: string }>;
-  searchParams: Promise<{ version?: string }>;
+  searchParams: Promise<{ version?: string; offset?: string }>;
 }
+
+/** Instances per page on this screen; the API slices. */
+const INSTANCES_PER_PAGE = 10;
 
 export async function generateMetadata({ params }: PageProps) {
   const { key } = await params;
@@ -34,23 +38,32 @@ export async function generateMetadata({ params }: PageProps) {
 
 export default async function WorkflowDetailPage({ params, searchParams }: PageProps) {
   const { key } = await params;
-  const { version: requestedVersion } = await searchParams;
+  const { version: requestedVersion, offset: rawOffset } = await searchParams;
+  const instanceOffset = pageOffset(rawOffset, INSTANCES_PER_PAGE);
   const api = createServerApiClient();
 
   let definition: ProcessDefinition | null = null;
   let versions: ProcessDefinitionVersion[] = [];
   let instances: ProcessInstanceSummary[] = [];
+  let instanceTotal = 0;
   let roleCatalogue: RoleEntry[] = [];
   let labels: Record<string, string> = {};
   let error: string | null = null;
 
   try {
     definition = await api.getProcessDefinition(key);
-    [versions, instances, roleCatalogue] = await Promise.all([
+    const [versionList, instancePage, roles] = await Promise.all([
       api.listProcessDefinitionVersions(key),
-      api.listProcessInstances({ definitionKey: key }),
+      api.listProcessInstances(
+        { definitionKey: key },
+        { limit: INSTANCES_PER_PAGE, offset: instanceOffset },
+      ),
       api.listRoles(),
     ]);
+    versions = versionList;
+    instances = instancePage.data;
+    instanceTotal = instancePage.total;
+    roleCatalogue = roles;
 
     // An instance row should name the record it runs on. Records are read per object
     // (the list is scoped like everything else), and the label uses each record's own
@@ -60,7 +73,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
       objectKeys.map(async (objectKey) => {
         const [objectVersions, records] = await Promise.all([
           api.listBusinessObjectVersions(objectKey),
-          api.listObjectRecords(objectKey),
+          api.listObjectRecords(objectKey, { limit: 100 }).then((page) => page.data),
         ]);
         return recordLabels(records, objectVersions);
       }),
@@ -235,7 +248,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
           <section>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
-                {`Instance của quy trình này (${instances.length})`}
+                {`Instance của quy trình này (${instanceTotal})`}
               </h2>
               <StatusBadge kind="live" />
             </div>
@@ -246,7 +259,14 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
             <InstanceList
               instances={instances}
               recordLabels={labels}
-              emptyHint="Chạy quy trình này từ màn hình bản ghi của business object để thấy instance ở đây."
+              emptyHint="Chạy quy trình này từ màn hình bản ghi của business object để thấy một lần chạy ở đây."
+            />
+            <Pagination
+              total={instanceTotal}
+              limit={INSTANCES_PER_PAGE}
+              offset={instanceOffset}
+              basePath={`/workflows/${key}`}
+              params={{ version: requestedVersion }}
             />
           </section>
 

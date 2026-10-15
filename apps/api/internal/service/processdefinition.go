@@ -20,7 +20,11 @@ const (
 
 // processDefinitionStore is the persistence this service needs.
 type processDefinitionStore interface {
-	ListProcessDefinitions(ctx context.Context) ([]domain.ProcessDefinition, error)
+	ListProcessDefinitions(
+		ctx context.Context,
+		query string,
+		page domain.Page,
+	) (domain.Paged[domain.ProcessDefinition], error)
 	GetProcessDefinitionByKey(ctx context.Context, key string) (domain.ProcessDefinition, error)
 	ListProcessDefinitionVersions(ctx context.Context, definitionID uuid.UUID) ([]domain.ProcessDefinitionVersion, error)
 	CreateProcessDefinition(ctx context.Context, definition domain.ProcessDefinition) (domain.ProcessDefinition, error)
@@ -77,11 +81,19 @@ type UpdateProcessDefinitionInput struct {
 
 // List returns every process definition ordered by key. Readable by any signed-in
 // user; changing one needs a designer role.
-func (s *ProcessDefinitions) List(ctx context.Context, principal domain.Principal) ([]domain.ProcessDefinition, error) {
+func (s *ProcessDefinitions) List(
+	ctx context.Context,
+	principal domain.Principal,
+	opts ListOptions,
+) (domain.Paged[domain.ProcessDefinition], error) {
 	if err := requireAuthenticated(principal); err != nil {
-		return nil, err
+		return domain.Paged[domain.ProcessDefinition]{}, err
 	}
-	return s.store.ListProcessDefinitions(ctx)
+	opts, err := opts.normalized()
+	if err != nil {
+		return domain.Paged[domain.ProcessDefinition]{}, err
+	}
+	return s.store.ListProcessDefinitions(ctx, opts.Query, opts.Page)
 }
 
 // Get returns one definition with its newest published version.

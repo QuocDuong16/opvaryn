@@ -113,6 +113,11 @@ Working agreement for agents and contributors in this repository.
   that grants nothing (`lib/advanced.ts`, ADR 0015). New nav entries pick an `audience`; the
   default is `everyone`. The workspace home is a dashboard of the person's own work, never a
   status board of the build.
+- Lists are paginated by the API, never by the browser (ADR 0017): a list endpoint takes
+  `limit`/`offset` (and `q` when a person would search) and answers `{data, total}`; a screen
+  keeps its page and search in the URL and uses `components/ui/list-controls.tsx`. A screen that
+  needs a sample asks for that sample — never fetch a whole table and `slice()` it. New list
+  endpoints get the same treatment; a whole-table response is a design bug.
 - Screens show names, never keys (ADR 0016). A department, a role, a process definition and a
   record all have a human name — use `lib/names.ts` (`labelOrKey`) instead of printing the key,
   and where nobody has named something yet, show the key rather than inventing a name. New

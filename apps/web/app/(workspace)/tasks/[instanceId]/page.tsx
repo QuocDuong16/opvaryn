@@ -349,7 +349,7 @@ async function loadRecordContext(objectKey: string, recordId: string): Promise<R
   try {
     const [versions, records] = await Promise.all([
       api.listBusinessObjectVersions(objectKey),
-      api.listObjectRecords(objectKey),
+      api.listObjectRecords(objectKey, { limit: 100 }).then((page) => page.data),
     ]);
     const record = records.find((candidate) => candidate.id === recordId) ?? null;
     if (!record) {

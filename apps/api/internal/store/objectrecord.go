@@ -43,35 +43,50 @@ const recordVisibleToScope = `(
 	   )
 	)`
 
-// ListObjectRecords returns the records of one object that the scope may see,
-// newest first.
+// objectRecordFilter narrows one object's records to what the scope may see and to a search
+// term. $1 is the object, $2..$4 are the scope (see recordVisibleToScope) and $5 the search
+// term: an empty term matches everything, and a non-empty one looks inside the stored values.
+const objectRecordFilter = `
+		 WHERE r.object_id = $1 AND ` + recordVisibleToScope + `
+		   AND ($5 = '' OR r.values::text ILIKE '%' || $5 || '%')`
+
+// ListObjectRecords returns one page of the records of one object that the scope may see,
+// newest first, with the total behind the page.
 func (s *Store) ListObjectRecords(
 	ctx context.Context,
 	objectID uuid.UUID,
 	scope domain.RecordScope,
-) ([]domain.ObjectRecord, error) {
-	rows, err := s.pool.Query(ctx,
-		objectRecordSelect+`
-		 WHERE r.object_id = $1 AND `+recordVisibleToScope+`
-		 ORDER BY r.created_at DESC, r.id`,
-		objectID, scope.All, scope.DepartmentKey, scope.UserID)
+	query string,
+	page domain.Page,
+) (domain.Paged[domain.ObjectRecord], error) {
+	var total int
+	if err := s.pool.QueryRow(ctx,
+		`SELECT count(*) FROM business_object_records r`+objectRecordFilter,
+		objectID, scope.All, scope.DepartmentKey, scope.UserID, query).Scan(&total); err != nil {
+		return domain.Paged[domain.ObjectRecord]{}, classify(fmt.Errorf("count object records: %w", err))
+	}
+
+	rows, err := s.pool.Query(ctx, objectRecordSelect+objectRecordFilter+`
+		 ORDER BY r.created_at DESC, r.id
+		 LIMIT $6 OFFSET $7`,
+		objectID, scope.All, scope.DepartmentKey, scope.UserID, query, page.Limit, page.Offset)
 	if err != nil {
-		return nil, classify(fmt.Errorf("query object records: %w", err))
+		return domain.Paged[domain.ObjectRecord]{}, classify(fmt.Errorf("query object records: %w", err))
 	}
 	defer rows.Close()
 
-	records := make([]domain.ObjectRecord, 0)
+	records := make([]domain.ObjectRecord, 0, page.Limit)
 	for rows.Next() {
 		record, err := scanObjectRecordWithVersion(rows)
 		if err != nil {
-			return nil, classify(err)
+			return domain.Paged[domain.ObjectRecord]{}, classify(err)
 		}
 		records = append(records, record)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, classify(fmt.Errorf("iterate object records: %w", err))
+		return domain.Paged[domain.ObjectRecord]{}, classify(fmt.Errorf("iterate object records: %w", err))
 	}
-	return records, nil
+	return domain.Paged[domain.ObjectRecord]{Items: records, Total: total}, nil
 }
 
 // CreateObjectRecord inserts one record and returns the stored row. The caller
@@ -189,26 +204,42 @@ func (s *Store) FindObjectRecord(ctx context.Context, id uuid.UUID) (domain.Obje
 
 // ListOpenTasksForRoles returns the open tasks of an instance the given user holds a
 // role on: the per-user inbox (ADR 0008), oldest first.
-func (s *Store) ListOpenTasksForRoles(ctx context.Context, userID uuid.UUID) ([]domain.InboxItem, error) {
-	rows, err := s.pool.Query(ctx, `
-		SELECT t.id, t.instance_id, t.node_key, t.title, t.assignee_role, t.attempt,
-		       t.status, t.reason, t.decided_by, t.created_at, t.decided_at,
-		       i.id, i.definition_id, i.definition_version_id, d.key, v.version,
-		       i.object_key, i.record_id, i.state, i.current_node, i.attempt,
-		       i.started_at, i.finished_at, i.updated_at
-		  FROM process_tasks t
+func (s *Store) ListOpenTasksForRoles(
+	ctx context.Context,
+	userID uuid.UUID,
+	query string,
+	page domain.Page,
+) (domain.Paged[domain.InboxItem], error) {
+	const filter = `
 		  JOIN process_instances i ON i.id = t.instance_id
 		  JOIN process_definitions d ON d.id = i.definition_id
 		  JOIN process_definition_versions v ON v.id = i.definition_version_id
 		  JOIN user_roles ur ON ur.user_id = $1 AND ur.role = t.assignee_role
 		 WHERE t.status = 'open'
-		 ORDER BY t.created_at, t.id`, userID)
+		   AND ($2 = '' OR t.title ILIKE '%' || $2 || '%' OR d.name ILIKE '%' || $2 || '%')`
+	const columns = `
+		SELECT t.id, t.instance_id, t.node_key, t.title, t.assignee_role, t.attempt,
+		       t.status, t.reason, t.decided_by, t.created_at, t.decided_at,
+		       i.id, i.definition_id, i.definition_version_id, d.key, v.version,
+		       i.object_key, i.record_id, i.state, i.current_node, i.attempt,
+		       i.started_at, i.finished_at, i.updated_at
+		  FROM process_tasks t`
+
+	var total int
+	if err := s.pool.QueryRow(ctx,
+		`SELECT count(*) FROM process_tasks t`+filter, userID, query).Scan(&total); err != nil {
+		return domain.Paged[domain.InboxItem]{}, classify(fmt.Errorf("count inbox tasks: %w", err))
+	}
+
+	rows, err := s.pool.Query(ctx, columns+filter+`
+		 ORDER BY t.created_at, t.id
+		 LIMIT $3 OFFSET $4`, userID, query, page.Limit, page.Offset)
 	if err != nil {
-		return nil, classify(fmt.Errorf("query inbox tasks: %w", err))
+		return domain.Paged[domain.InboxItem]{}, classify(fmt.Errorf("query inbox tasks: %w", err))
 	}
 	defer rows.Close()
 
-	items := make([]domain.InboxItem, 0)
+	items := make([]domain.InboxItem, 0, page.Limit)
 	for rows.Next() {
 		var (
 			item            domain.InboxItem
@@ -227,7 +258,7 @@ func (s *Store) ListOpenTasksForRoles(ctx context.Context, userID uuid.UUID) ([]
 			&item.Instance.CurrentNode, &instanceAttempt,
 			&item.Instance.StartedAt, &item.Instance.FinishedAt, &item.Instance.UpdatedAt,
 		); err != nil {
-			return nil, classify(fmt.Errorf("scan inbox item: %w", err))
+			return domain.Paged[domain.InboxItem]{}, classify(fmt.Errorf("scan inbox item: %w", err))
 		}
 		item.Task.Status = domain.ProcessTaskStatus(taskStatus)
 		if decidedBy != nil {
@@ -238,9 +269,9 @@ func (s *Store) ListOpenTasksForRoles(ctx context.Context, userID uuid.UUID) ([]
 		items = append(items, item)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, classify(fmt.Errorf("iterate inbox items: %w", err))
+		return domain.Paged[domain.InboxItem]{}, classify(fmt.Errorf("iterate inbox items: %w", err))
 	}
-	return items, nil
+	return domain.Paged[domain.InboxItem]{Items: items, Total: total}, nil
 }
 
 func scanObjectRecord(row rowScanner) (domain.ObjectRecord, error) {

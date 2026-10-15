@@ -44,26 +44,44 @@ const processInstanceSelect = `
 
 // ---------------------------------------------------------------- definitions ----
 
-// ListProcessDefinitions returns every definition ordered by key.
-func (s *Store) ListProcessDefinitions(ctx context.Context) ([]domain.ProcessDefinition, error) {
-	rows, err := s.pool.Query(ctx, processDefinitionSelect+` ORDER BY d.key`)
+// processDefinitionSearch matches the key or the name of a definition; an empty term is
+// "no filter".
+const processDefinitionSearch = `
+		 WHERE ($1 = '' OR d.key ILIKE '%' || $1 || '%' OR d.name ILIKE '%' || $1 || '%')`
+
+// ListProcessDefinitions returns one page of definitions ordered by key, with the total
+// behind the page.
+func (s *Store) ListProcessDefinitions(
+	ctx context.Context,
+	query string,
+	page domain.Page,
+) (domain.Paged[domain.ProcessDefinition], error) {
+	var total int
+	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM process_definitions d`+processDefinitionSearch,
+		query).Scan(&total); err != nil {
+		return domain.Paged[domain.ProcessDefinition]{}, classify(fmt.Errorf("count process definitions: %w", err))
+	}
+
+	rows, err := s.pool.Query(ctx, processDefinitionSelect+processDefinitionSearch+`
+		 ORDER BY d.key
+		 LIMIT $2 OFFSET $3`, query, page.Limit, page.Offset)
 	if err != nil {
-		return nil, classify(fmt.Errorf("query process definitions: %w", err))
+		return domain.Paged[domain.ProcessDefinition]{}, classify(fmt.Errorf("query process definitions: %w", err))
 	}
 	defer rows.Close()
 
-	definitions := make([]domain.ProcessDefinition, 0)
+	definitions := make([]domain.ProcessDefinition, 0, page.Limit)
 	for rows.Next() {
 		definition, err := scanProcessDefinition(rows)
 		if err != nil {
-			return nil, classify(err)
+			return domain.Paged[domain.ProcessDefinition]{}, classify(err)
 		}
 		definitions = append(definitions, definition)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, classify(fmt.Errorf("iterate process definitions: %w", err))
+		return domain.Paged[domain.ProcessDefinition]{}, classify(fmt.Errorf("iterate process definitions: %w", err))
 	}
-	return definitions, nil
+	return domain.Paged[domain.ProcessDefinition]{Items: definitions, Total: total}, nil
 }
 
 // GetProcessDefinitionByKey returns one definition. ErrNotFound when the key is unknown.
@@ -467,36 +485,50 @@ func (s *Store) ListVisibleProcessInstances(
 	ctx context.Context,
 	filter domain.ProcessInstanceFilter,
 	scope domain.RecordScope,
-	limit int,
-) ([]domain.ProcessInstanceSummary, error) {
+	page domain.Page,
+) (domain.Paged[domain.ProcessInstanceSummary], error) {
+	var total int
+	if err := s.pool.QueryRow(ctx,
+		`SELECT count(*)
+		   FROM process_instances i
+		   JOIN business_object_records r ON r.id = i.record_id
+		   JOIN process_definitions d ON d.id = i.definition_id
+		  WHERE `+recordVisibleToScope+`
+		    AND ($1::text = '' OR i.object_key = $1)
+		    AND ($5::text = '' OR d.key = $5)`,
+		filter.ObjectKey, scope.All, scope.DepartmentKey, scope.UserID, filter.DefinitionKey).Scan(&total); err != nil {
+		return domain.Paged[domain.ProcessInstanceSummary]{}, classify(fmt.Errorf("count process instances: %w", err))
+	}
+
 	rows, err := s.pool.Query(ctx, processInstanceSelect+`
 		  JOIN business_object_records r ON r.id = i.record_id
 		 WHERE `+recordVisibleToScope+`
 		   AND ($1::text = '' OR i.object_key = $1)
 		   AND ($5::text = '' OR d.key = $5)
 		 ORDER BY i.started_at DESC, i.id
-		 LIMIT $6`,
-		filter.ObjectKey, scope.All, scope.DepartmentKey, scope.UserID, filter.DefinitionKey, limit)
+		 LIMIT $6 OFFSET $7`,
+		filter.ObjectKey, scope.All, scope.DepartmentKey, scope.UserID, filter.DefinitionKey,
+		page.Limit, page.Offset)
 	if err != nil {
-		return nil, classify(fmt.Errorf("query process instances: %w", err))
+		return domain.Paged[domain.ProcessInstanceSummary]{}, classify(fmt.Errorf("query process instances: %w", err))
 	}
 	defer rows.Close()
 
-	summaries := make([]domain.ProcessInstanceSummary, 0)
+	summaries := make([]domain.ProcessInstanceSummary, 0, page.Limit)
 	index := make(map[uuid.UUID]int)
 	for rows.Next() {
 		instance, err := scanProcessInstance(rows)
 		if err != nil {
-			return nil, classify(fmt.Errorf("scan process instance: %w", err))
+			return domain.Paged[domain.ProcessInstanceSummary]{}, classify(fmt.Errorf("scan process instance: %w", err))
 		}
 		index[instance.ID] = len(summaries)
 		summaries = append(summaries, domain.ProcessInstanceSummary{Instance: instance})
 	}
 	if err := rows.Err(); err != nil {
-		return nil, classify(fmt.Errorf("read process instances: %w", err))
+		return domain.Paged[domain.ProcessInstanceSummary]{}, classify(fmt.Errorf("read process instances: %w", err))
 	}
 	if len(summaries) == 0 {
-		return summaries, nil
+		return domain.Paged[domain.ProcessInstanceSummary]{Items: summaries, Total: total}, nil
 	}
 
 	// One extra query for the open tasks of exactly these instances, so the list can
@@ -508,7 +540,7 @@ func (s *Store) ListVisibleProcessInstances(
 		 WHERE instance_id = ANY($1) AND status = 'open'
 		 ORDER BY created_at, id`, instanceIDs(summaries))
 	if err != nil {
-		return nil, classify(fmt.Errorf("query open tasks of instances: %w", err))
+		return domain.Paged[domain.ProcessInstanceSummary]{}, classify(fmt.Errorf("query open tasks of instances: %w", err))
 	}
 	defer taskRows.Close()
 
@@ -522,7 +554,7 @@ func (s *Store) ListVisibleProcessInstances(
 			&task.ID, &task.InstanceID, &task.NodeKey, &task.Title, &task.AssigneeRole,
 			&task.Attempt, &status, &task.Reason, &decidedBy, &task.CreatedAt, &task.DecidedAt,
 		); err != nil {
-			return nil, classify(fmt.Errorf("scan open task of instance: %w", err))
+			return domain.Paged[domain.ProcessInstanceSummary]{}, classify(fmt.Errorf("scan open task of instance: %w", err))
 		}
 		task.Status = domain.ProcessTaskStatus(status)
 		if decidedBy != nil {
@@ -533,9 +565,9 @@ func (s *Store) ListVisibleProcessInstances(
 		}
 	}
 	if err := taskRows.Err(); err != nil {
-		return nil, classify(fmt.Errorf("read open tasks of instances: %w", err))
+		return domain.Paged[domain.ProcessInstanceSummary]{}, classify(fmt.Errorf("read open tasks of instances: %w", err))
 	}
-	return summaries, nil
+	return domain.Paged[domain.ProcessInstanceSummary]{Items: summaries, Total: total}, nil
 }
 
 func instanceIDs(summaries []domain.ProcessInstanceSummary) []uuid.UUID {

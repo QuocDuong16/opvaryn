@@ -43,3 +43,4 @@
 - [0014 — Trang giới thiệu công khai, workspace nằm sau đăng nhập](adr/0014-public-landing-and-workspace.md)
 - [0015 — Màn hình cho người dùng, thông tin kỹ thuật cho quản trị viên ở chế độ nâng cao](adr/0015-role-based-surfaces-and-advanced-mode.md)
 - [0016 — Khoá máy không bao giờ hiện trên màn hình: tên hiển thị cho role và bộ phận](adr/0016-display-names-instead-of-keys.md)
+- [0017 — Danh sách phân trang ở API; màn hình không bao giờ tải cả bảng](adr/0017-server-side-list-pagination.md)

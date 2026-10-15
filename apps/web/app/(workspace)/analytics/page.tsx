@@ -41,11 +41,14 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
   let needsSignIn = false;
 
   try {
-    [metrics, objects, definitions] = await Promise.all([
+    const [metricList, objectList, definitionList] = await Promise.all([
       api.listMetrics(),
-      api.listBusinessObjects(),
-      api.listProcessDefinitions(),
+      api.listBusinessObjects({ limit: 100 }),
+      api.listProcessDefinitions({ limit: 100 }),
     ]);
+    metrics = metricList;
+    objects = objectList.data;
+    definitions = definitionList.data;
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'unauthorized') {
       needsSignIn = true;

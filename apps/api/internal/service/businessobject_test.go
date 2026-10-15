@@ -21,8 +21,12 @@ type fakeStore struct {
 	err      error
 }
 
-func (f *fakeStore) ListBusinessObjects(context.Context) ([]domain.BusinessObject, error) {
-	return nil, f.err
+func (f *fakeStore) ListBusinessObjects(
+	context.Context,
+	string,
+	domain.Page,
+) (domain.Paged[domain.BusinessObject], error) {
+	return domain.Paged[domain.BusinessObject]{}, f.err
 }
 
 func (f *fakeStore) GetBusinessObjectByKey(context.Context, string) (domain.BusinessObject, error) {

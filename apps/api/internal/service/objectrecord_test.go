@@ -14,6 +14,7 @@ import (
 
 // fakeRecordStore is the persistence double for the records service.
 type fakeRecordStore struct {
+	page    domain.Page
 	object  domain.BusinessObject
 	records []domain.ObjectRecord
 	created domain.ObjectRecord
@@ -32,12 +33,19 @@ func (f *fakeRecordStore) GetBusinessObjectByKey(context.Context, string) (domai
 	return f.object, nil
 }
 
-func (f *fakeRecordStore) ListObjectRecords(_ context.Context, _ uuid.UUID, scope domain.RecordScope) ([]domain.ObjectRecord, error) {
+func (f *fakeRecordStore) ListObjectRecords(
+	_ context.Context,
+	_ uuid.UUID,
+	scope domain.RecordScope,
+	_ string,
+	page domain.Page,
+) (domain.Paged[domain.ObjectRecord], error) {
 	f.scope = scope
+	f.page = page
 	if f.err != nil {
-		return nil, f.err
+		return domain.Paged[domain.ObjectRecord]{}, f.err
 	}
-	return f.records, nil
+	return domain.Paged[domain.ObjectRecord]{Items: f.records, Total: len(f.records)}, nil
 }
 
 func (f *fakeRecordStore) CreateObjectRecord(
@@ -220,11 +228,11 @@ func TestListRecordsAttachesObjectKey(t *testing.T) {
 		records: []domain.ObjectRecord{{ID: uuid.New(), ObjectID: object.ID}},
 	}
 
-	records, err := NewObjectRecords(st).List(context.Background(), object.Key, testPrincipal())
+	page, err := NewObjectRecords(st).List(context.Background(), object.Key, testPrincipal(), ListOptions{})
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
 	}
-	if len(records) != 1 || records[0].ObjectKey != object.Key {
-		t.Fatalf("records are not labelled with their object key: %+v", records)
+	if len(page.Items) != 1 || page.Items[0].ObjectKey != object.Key {
+		t.Fatalf("records are not labelled with their object key: %+v", page)
 	}
 }

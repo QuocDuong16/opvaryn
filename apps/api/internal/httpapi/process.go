@@ -19,12 +19,20 @@ func handleListProcessDefinitions(definitions *service.ProcessDefinitions, log *
 		if !ok {
 			return
 		}
-		list, err := definitions.List(r.Context(), domain.NewPrincipal(user))
+		opts, err := listQuery(r)
+		if err != nil {
+			writeError(w, log, http.StatusBadRequest, codeInvalidRequest, err.Error())
+			return
+		}
+		list, err := definitions.List(r.Context(), domain.NewPrincipal(user), opts)
 		if err != nil {
 			writeStoreError(w, log, err, "list process definitions")
 			return
 		}
-		writeJSON(w, log, http.StatusOK, apiv1.ProcessDefinitionList{Data: toAPIProcessDefinitions(list)})
+		writeJSON(w, log, http.StatusOK, apiv1.ProcessDefinitionList{
+			Data:  toAPIProcessDefinitions(list.Items),
+			Total: list.Total,
+		})
 	}
 }
 
@@ -129,16 +137,25 @@ func handleListProcessInstances(runtime *service.ProcessRuntime, log *slog.Logge
 		if !ok {
 			return
 		}
+		opts, err := listQuery(r)
+		if err != nil {
+			writeError(w, log, http.StatusBadRequest, codeInvalidRequest, err.Error())
+			return
+		}
 		summaries, err := runtime.List(r.Context(), service.ListInput{
 			ObjectKey:     r.URL.Query().Get("objectKey"),
 			DefinitionKey: r.URL.Query().Get("definitionKey"),
 			Principal:     domain.NewPrincipal(user),
+			Page:          opts.Page,
 		})
 		if err != nil {
 			writeStoreError(w, log, err, "list process instances")
 			return
 		}
-		writeJSON(w, log, http.StatusOK, apiv1.ProcessInstanceList{Data: toAPIInstanceSummaries(summaries)})
+		writeJSON(w, log, http.StatusOK, apiv1.ProcessInstanceList{
+			Data:  toAPIInstanceSummaries(summaries.Items),
+			Total: summaries.Total,
+		})
 	}
 }
 
@@ -233,12 +250,20 @@ func handleInbox(runtime *service.ProcessRuntime, log *slog.Logger) http.Handler
 		if !ok {
 			return
 		}
-		items, err := runtime.Inbox(r.Context(), domain.NewPrincipal(user))
+		opts, err := listQuery(r)
+		if err != nil {
+			writeError(w, log, http.StatusBadRequest, codeInvalidRequest, err.Error())
+			return
+		}
+		items, err := runtime.Inbox(r.Context(), domain.NewPrincipal(user), opts)
 		if err != nil {
 			writeStoreError(w, log, err, "read inbox")
 			return
 		}
-		writeJSON(w, log, http.StatusOK, apiv1.InboxList{Data: toAPIInboxItems(items)})
+		writeJSON(w, log, http.StatusOK, apiv1.InboxList{
+			Data:  toAPIInboxItems(items.Items),
+			Total: items.Total,
+		})
 	}
 }
 

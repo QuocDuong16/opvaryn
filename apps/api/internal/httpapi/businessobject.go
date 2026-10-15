@@ -19,12 +19,20 @@ func handleListBusinessObjects(objects *service.BusinessObjects, log *slog.Logge
 		if !ok {
 			return
 		}
-		list, err := objects.List(r.Context(), domain.NewPrincipal(user))
+		opts, err := listQuery(r)
+		if err != nil {
+			writeError(w, log, http.StatusBadRequest, codeInvalidRequest, err.Error())
+			return
+		}
+		list, err := objects.List(r.Context(), domain.NewPrincipal(user), opts)
 		if err != nil {
 			writeStoreError(w, log, err, "list business objects")
 			return
 		}
-		writeJSON(w, log, http.StatusOK, apiv1.BusinessObjectList{Data: toAPIBusinessObjects(list)})
+		writeJSON(w, log, http.StatusOK, apiv1.BusinessObjectList{
+			Data:  toAPIBusinessObjects(list.Items),
+			Total: list.Total,
+		})
 	}
 }
 

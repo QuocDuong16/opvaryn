@@ -18,11 +18,14 @@ export default async function ApplicationsPage() {
   let error: string | null = null;
 
   try {
-    const objects: BusinessObject[] = await api.listBusinessObjects();
+    const objects: BusinessObject[] = (await api.listBusinessObjects({ limit: 100 })).data;
     const withRecords = await Promise.all(
       objects.map(async (object) => {
-        const records: ObjectRecord[] = await api.listObjectRecords(object.key);
-        return { object, records: records.slice(0, RECORDS_PER_APP) };
+        // The showcase shows a sample, not a dump: the API page is the sample.
+        const records: ObjectRecord[] = (
+          await api.listObjectRecords(object.key, { limit: RECORDS_PER_APP })
+        ).data;
+        return { object, records };
       }),
     );
     apps = withRecords;

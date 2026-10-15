@@ -48,8 +48,18 @@ type processRuntimeStore interface {
 	CompleteProcessTask(ctx context.Context, in domain.CompleteTaskWrite) error
 	GetProcessInstance(ctx context.Context, id uuid.UUID) (domain.ProcessInstance, error)
 	FindVisibleProcessInstance(ctx context.Context, id uuid.UUID, scope domain.RecordScope) (domain.ProcessInstance, bool, error)
-	ListOpenTasksForRoles(ctx context.Context, userID uuid.UUID) ([]domain.InboxItem, error)
-	ListVisibleProcessInstances(ctx context.Context, filter domain.ProcessInstanceFilter, scope domain.RecordScope, limit int) ([]domain.ProcessInstanceSummary, error)
+	ListOpenTasksForRoles(
+		ctx context.Context,
+		userID uuid.UUID,
+		query string,
+		page domain.Page,
+	) (domain.Paged[domain.InboxItem], error)
+	ListVisibleProcessInstances(
+		ctx context.Context,
+		filter domain.ProcessInstanceFilter,
+		scope domain.RecordScope,
+		page domain.Page,
+	) (domain.Paged[domain.ProcessInstanceSummary], error)
 	ListProcessTasks(ctx context.Context, instanceID uuid.UUID) ([]domain.ProcessTask, error)
 	ListProcessEvents(ctx context.Context, instanceID uuid.UUID) ([]domain.ProcessEvent, error)
 }
@@ -365,34 +375,43 @@ func (r *ProcessRuntime) Decide(ctx context.Context, in DecideInput) (InstanceVi
 // Inbox returns the open tasks of the signed-in user: the tasks of every role they
 // hold, oldest first (ADR 0008). It is the per-user view the demo's Tasks screen
 // will read once it is wired to the engine.
-func (r *ProcessRuntime) Inbox(ctx context.Context, principal domain.Principal) ([]domain.InboxItem, error) {
+func (r *ProcessRuntime) Inbox(
+	ctx context.Context,
+	principal domain.Principal,
+	opts ListOptions,
+) (domain.Paged[domain.InboxItem], error) {
 	if err := requireAuthenticated(principal); err != nil {
-		return nil, err
+		return domain.Paged[domain.InboxItem]{}, err
 	}
-	items, err := r.store.ListOpenTasksForRoles(ctx, principal.UserID)
+	opts, err := opts.normalized()
 	if err != nil {
-		return nil, err
+		return domain.Paged[domain.InboxItem]{}, err
 	}
-	return items, nil
+	return r.store.ListOpenTasksForRoles(ctx, principal.UserID, opts.Query, opts.Page)
 }
 
-// maxInstanceList bounds the instance list: it backs a screen, not an export.
-const maxInstanceList = 200
-
 // ListInput is the request to list instances, optionally narrowed to one business
-// object or one process definition.
+// object or one process definition, one page at a time.
 type ListInput struct {
 	ObjectKey     string
 	DefinitionKey string
 	Principal     domain.Principal
+	Page          domain.Page
 }
 
 // List returns the instances the caller may see, newest first. Visibility is the
 // record's visibility (ADR 0008), so this never widens what a person may read: it
 // is the same rule as reading one instance, applied to a screen-sized list.
-func (r *ProcessRuntime) List(ctx context.Context, in ListInput) ([]domain.ProcessInstanceSummary, error) {
+func (r *ProcessRuntime) List(
+	ctx context.Context,
+	in ListInput,
+) (domain.Paged[domain.ProcessInstanceSummary], error) {
 	if err := requireAuthenticated(in.Principal); err != nil {
-		return nil, err
+		return domain.Paged[domain.ProcessInstanceSummary]{}, err
+	}
+	page, err := in.Page.Normalize()
+	if err != nil {
+		return domain.Paged[domain.ProcessInstanceSummary]{}, &ValidationError{Problems: []string{err.Error()}}
 	}
 
 	filter := domain.ProcessInstanceFilter{
@@ -413,14 +432,11 @@ func (r *ProcessRuntime) List(ctx context.Context, in ListInput) ([]domain.Proce
 		}
 	}
 	if len(problems) > 0 {
-		return nil, &ValidationError{Problems: problems}
+		return domain.Paged[domain.ProcessInstanceSummary]{}, &ValidationError{Problems: problems}
 	}
 
-	summaries, err := r.store.ListVisibleProcessInstances(ctx, filter, domain.RecordScopeFor(in.Principal), maxInstanceList)
-	if err != nil {
-		return nil, err
-	}
-	return summaries, nil
+	return r.store.ListVisibleProcessInstances(
+		ctx, filter, domain.RecordScopeFor(in.Principal), page)
 }
 
 // Get returns the instance with its tasks and its log, if the caller may see the

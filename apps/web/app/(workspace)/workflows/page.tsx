@@ -8,6 +8,7 @@ import {
 
 import { CreateDefinitionForm } from '@/components/workflows/definition-editor';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+import { ListSearch, Pagination, pageOffset } from '@/components/ui/list-controls';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
@@ -51,21 +52,36 @@ const NODE_CATALOG: readonly { node: string; behavior: string; phase: string }[]
   { node: 'Timer / Escalation', behavior: 'Timeout, SLA, chuyển cấp hoặc giao lại', phase: 'V1.x' },
 ];
 
-export default async function WorkflowsPage() {
+interface PageProps {
+  searchParams: Promise<{ q?: string; offset?: string }>;
+}
+
+/** One page of definitions; the API slices and reports the total. */
+const PER_PAGE = 25;
+
+export default async function WorkflowsPage({ searchParams }: PageProps) {
+  const { q, offset: rawOffset } = await searchParams;
+  const query = (q ?? '').trim();
+  const offset = pageOffset(rawOffset, PER_PAGE);
   const api = createServerApiClient();
 
   let definitions: ProcessDefinition[] = [];
+  let definitionTotal = 0;
   let objects: BusinessObject[] = [];
   let roleCatalogue: RoleEntry[] = [];
   let error: string | null = null;
   let needsSignIn = false;
 
   try {
-    [definitions, objects, roleCatalogue] = await Promise.all([
-      api.listProcessDefinitions(),
-      api.listBusinessObjects(),
+    const [definitionPage, objectPage, roles] = await Promise.all([
+      api.listProcessDefinitions({ q: query || undefined, limit: PER_PAGE, offset }),
+      api.listBusinessObjects({ limit: 100 }),
       api.listRoles(),
     ]);
+    definitions = definitionPage.data;
+    definitionTotal = definitionPage.total;
+    objects = objectPage.data;
+    roleCatalogue = roles;
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'unauthorized') {
       needsSignIn = true;
@@ -128,18 +144,28 @@ export default async function WorkflowsPage() {
 
       <section className="mb-8">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
-            {`Định nghĩa đã publish (${definitions.length})`}
+          <h2 className="text-lg font-semibold tracking-tight">
+            {query
+              ? `Kết quả cho “${query}” (${definitionTotal})`
+              : `Đang dùng (${definitionTotal})`}
           </h2>
-          <StatusBadge kind="live" />
+          <ListSearch
+            basePath="/workflows"
+            value={query}
+            placeholder="Tìm theo tên hoặc key"
+            label="Tìm quy trình"
+          />
         </div>
 
         {definitions.length === 0 && !error && !needsSignIn ? (
           <div className="rounded-xl border border-dashed border-border-strong px-5 py-8 text-center">
-            <p className="text-sm font-medium">Chưa có quy trình nào</p>
+            <p className="text-sm font-medium">
+              {query ? 'Không có quy trình nào khớp từ khoá' : 'Chưa có quy trình nào'}
+            </p>
             <p className="mx-auto mt-1 max-w-lg text-sm text-on-surface-muted">
-              Tạo định nghĩa đầu tiên ở biểu mẫu bên dưới. Bộ dữ liệu mẫu có ba quy trình pilot để
-              bạn tham khảo.
+              {query
+                ? 'Thử từ khoá khác, hoặc xoá lọc để xem tất cả.'
+                : 'Tạo định nghĩa đầu tiên ở biểu mẫu bên dưới. Bộ dữ liệu mẫu có ba quy trình pilot để bạn tham khảo.'}
             </p>
           </div>
         ) : null}
@@ -205,6 +231,14 @@ export default async function WorkflowsPage() {
             </table>
           </div>
         ) : null}
+
+        <Pagination
+          total={definitionTotal}
+          limit={PER_PAGE}
+          offset={offset}
+          basePath="/workflows"
+          params={{ q: query || undefined }}
+        />
       </section>
 
       <section className="mb-8">

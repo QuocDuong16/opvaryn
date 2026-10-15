@@ -80,18 +80,49 @@ export type Meta = components['schemas']['Meta'];
 /** Liveness/readiness answer. `ok` or `unavailable`. */
 export type HealthStatus = components['schemas']['HealthStatus'];
 
+/**
+ * One page of a list, with the total behind it: a screen paginates with this instead of
+ * asking for every row. The API applies the page; the browser never slices a full table.
+ */
+export interface Paged<T> {
+  data: T[];
+  total: number;
+}
+
+/** Query a list endpoint accepts: a search term and one page. */
+export interface PageQuery {
+  q?: string;
+  limit?: number;
+  offset?: number;
+}
+
+/** pageParams turns a query into the URL parameters the API expects. */
+export function pageParams(query: PageQuery = {}): string {
+  const params = new URLSearchParams();
+  if (query.q) {
+    params.set('q', query.q);
+  }
+  if (query.limit !== undefined) {
+    params.set('limit', String(query.limit));
+  }
+  if (query.offset !== undefined) {
+    params.set('offset', String(query.offset));
+  }
+  return params.size > 0 ? `?${params.toString()}` : '';
+}
+
 export interface ApiClient {
   getMeta(): Promise<Meta>;
   getMe(): Promise<Me>;
   getReadiness(): Promise<HealthStatus>;
-  listBusinessObjects(): Promise<BusinessObject[]>;
+  listBusinessObjects(query?: PageQuery): Promise<Paged<BusinessObject>>;
   getBusinessObject(key: string): Promise<BusinessObject>;
   createBusinessObject(input: CreateBusinessObjectRequest): Promise<BusinessObject>;
   updateBusinessObject(key: string, input: UpdateBusinessObjectRequest): Promise<BusinessObject>;
   listBusinessObjectVersions(key: string): Promise<BusinessObjectVersion[]>;
-  listObjectRecords(key: string): Promise<ObjectRecord[]>;
+  listObjectRecords(key: string, query?: PageQuery): Promise<Paged<ObjectRecord>>;
   createObjectRecord(key: string, input: CreateObjectRecordRequest): Promise<ObjectRecord>;
-  listProcessDefinitions(): Promise<ProcessDefinition[]>;
+  listProcessDefinitions(query?: PageQuery): Promise<Paged<ProcessDefinition>>;
   getProcessDefinition(key: string): Promise<ProcessDefinition>;
   createProcessDefinition(input: CreateProcessDefinitionRequest): Promise<ProcessDefinition>;
   updateProcessDefinition(
@@ -99,7 +130,7 @@ export interface ApiClient {
     input: UpdateProcessDefinitionRequest,
   ): Promise<ProcessDefinition>;
   listProcessDefinitionVersions(key: string): Promise<ProcessDefinitionVersion[]>;
-  listInboxTasks(): Promise<InboxItem[]>;
+  listInboxTasks(query?: PageQuery): Promise<Paged<InboxItem>>;
   /** Role keys held by at least one user: what the workflow designer offers. */
   listRoles(): Promise<RoleEntry[]>;
   listMetrics(): Promise<MetricDefinition[]>;
@@ -113,10 +144,10 @@ export interface ApiClient {
   }): Promise<ProcessMetricsOverview>;
   listWebhookDeliveries(limit?: number): Promise<WebhookDeliveryList>;
   getProcessInstance(instanceId: string): Promise<ProcessInstanceView>;
-  listProcessInstances(filter?: {
-    objectKey?: string;
-    definitionKey?: string;
-  }): Promise<ProcessInstanceSummary[]>;
+  listProcessInstances(
+    filter?: { objectKey?: string; definitionKey?: string },
+    query?: PageQuery,
+  ): Promise<Paged<ProcessInstanceSummary>>;
   startProcessInstance(input: StartProcessInstanceRequest): Promise<ProcessInstanceView>;
   decideProcessTask(
     instanceId: string,
@@ -191,9 +222,8 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
       throw new ApiError(response.status, 'unknown', 'readiness probe returned an unexpected body');
     },
 
-    async listBusinessObjects() {
-      const payload = await request<{ data: BusinessObject[] }>('/api/v1/business-objects');
-      return payload.data;
+    async listBusinessObjects(query) {
+      return request<Paged<BusinessObject>>(`/api/v1/business-objects${pageParams(query)}`);
     },
 
     getBusinessObject: (key) =>
@@ -215,11 +245,10 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
       return payload.data;
     },
 
-    async listObjectRecords(key) {
-      const payload = await request<{ data: ObjectRecord[] }>(
-        `/api/v1/business-objects/${encodeURIComponent(key)}/records`,
+    async listObjectRecords(key, query) {
+      return request<Paged<ObjectRecord>>(
+        `/api/v1/business-objects/${encodeURIComponent(key)}/records${pageParams(query)}`,
       );
-      return payload.data;
     },
 
     createObjectRecord: (key, input) =>
@@ -228,9 +257,8 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
         body: input,
       }),
 
-    async listInboxTasks() {
-      const payload = await request<{ data: InboxItem[] }>('/api/v1/tasks');
-      return payload.data;
+    async listInboxTasks(query) {
+      return request<Paged<InboxItem>>(`/api/v1/tasks${pageParams(query)}`);
     },
 
     async listRoles() {
@@ -274,9 +302,8 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
       return request<ProcessMetricsOverview>(`/api/v1/process-metrics${query}`);
     },
 
-    async listProcessDefinitions() {
-      const payload = await request<{ data: ProcessDefinition[] }>('/api/v1/process-definitions');
-      return payload.data;
+    async listProcessDefinitions(query) {
+      return request<Paged<ProcessDefinition>>(`/api/v1/process-definitions${pageParams(query)}`);
     },
 
     getProcessDefinition: (key) =>
@@ -301,19 +328,16 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
     getProcessInstance: (instanceId) =>
       request<ProcessInstanceView>(`/api/v1/process-instances/${encodeURIComponent(instanceId)}`),
 
-    async listProcessInstances(filter = {}) {
-      const params = new URLSearchParams();
+    async listProcessInstances(filter = {}, query) {
+      const params = new URLSearchParams(pageParams(query).replace(/^\?/, ''));
       if (filter.objectKey) {
         params.set('objectKey', filter.objectKey);
       }
       if (filter.definitionKey) {
         params.set('definitionKey', filter.definitionKey);
       }
-      const query = params.size > 0 ? `?${params.toString()}` : '';
-      const payload = await request<{ data: ProcessInstanceSummary[] }>(
-        `/api/v1/process-instances${query}`,
-      );
-      return payload.data;
+      const suffix = params.size > 0 ? `?${params.toString()}` : '';
+      return request<Paged<ProcessInstanceSummary>>(`/api/v1/process-instances${suffix}`);
     },
 
     startProcessInstance: (input) =>

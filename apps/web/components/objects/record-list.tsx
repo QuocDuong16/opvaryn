@@ -12,17 +12,23 @@ import { formatFieldValue, formatTimestamp } from '@/lib/format';
 export function RecordList({
   versions,
   records,
+  filtered = false,
 }: {
   versions: readonly BusinessObjectVersion[];
   records: ObjectRecord[];
+  /** True when a search is narrowing the list, so the empty state can say so. */
+  filtered?: boolean;
 }) {
   if (records.length === 0) {
     return (
       <div className="rounded-xl border border-dashed border-border-strong px-5 py-10 text-center">
-        <p className="text-sm font-medium">Chưa có bản ghi nào</p>
+        <p className="text-sm font-medium">
+          {filtered ? 'Không có bản ghi nào khớp từ khoá' : 'Chưa có bản ghi nào'}
+        </p>
         <p className="mx-auto mt-1 max-w-md text-sm text-on-surface-muted">
-          Nhập bản ghi đầu tiên ở biểu mẫu phía trên. Dữ liệu sẽ được validate theo schema của phiên
-          bản mới nhất trước khi lưu.
+          {filtered
+            ? 'Thử từ khoá khác, hoặc xoá lọc để xem tất cả.'
+            : 'Nhập bản ghi đầu tiên ở biểu mẫu bên cạnh. Dữ liệu được kiểm tra theo định nghĩa mới nhất trước khi lưu.'}
         </p>
       </div>
     );

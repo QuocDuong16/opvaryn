@@ -168,6 +168,13 @@
 - Tokens: two layers in `app/globals.css` — raw CSS variables under `[data-theme='dark'|'light']`,
   then `@theme inline` mapping them to Tailwind color utilities. Dark is the default. Add tokens
   there; never hard-code hex in components.
+- **Pagination rule** (ADR 0017): list endpoints take `limit`/`offset` (+ `q`) and answer
+  `{data, total}`; the API slices, never the browser. `components/ui/list-controls.tsx` holds
+  `ListSearch` (a GET form, so the term lives in the URL), `Pagination` (`offsetParam` when a
+  screen paginates two lists, e.g. records `offset` vs instances `ioffset`) and `pageOffset`.
+  Screens that need a sample ask for one (`{limit: RECENT_LIMIT}` in the dashboard, `RECORDS_PER_APP`
+  in the showcase) — no `.slice()` after a full fetch anywhere. The client returns `Paged<T>`, so
+  call sites read `.data`. Limits: default 25, max 100, refused by name when out of range.
 - **Names, never keys** (ADR 0016): a department, a role, a definition and a record are shown by
   their human name. `lib/names.ts` holds the pure, tested rule — `labelOrKey(label, key)` returns
   the name when there is one and the key otherwise (never an invented name); `roleLabels(entries)`,

@@ -439,27 +439,32 @@ func (f *fakeRuntimeStore) FindVisibleProcessInstance(
 	return f.instance, true, nil
 }
 
-func (f *fakeRuntimeStore) ListOpenTasksForRoles(context.Context, uuid.UUID) ([]domain.InboxItem, error) {
+func (f *fakeRuntimeStore) ListOpenTasksForRoles(
+	context.Context,
+	uuid.UUID,
+	string,
+	domain.Page,
+) (domain.Paged[domain.InboxItem], error) {
 	items := make([]domain.InboxItem, 0, len(f.tasks))
 	for _, task := range f.tasks {
 		if task.Status == domain.TaskOpen {
 			items = append(items, domain.InboxItem{Task: task, Instance: f.instance})
 		}
 	}
-	return items, nil
+	return domain.Paged[domain.InboxItem]{Items: items, Total: len(items)}, nil
 }
 
 func (f *fakeRuntimeStore) ListVisibleProcessInstances(
 	_ context.Context,
 	filter domain.ProcessInstanceFilter,
 	scope domain.RecordScope,
-	limit int,
-) ([]domain.ProcessInstanceSummary, error) {
+	page domain.Page,
+) (domain.Paged[domain.ProcessInstanceSummary], error) {
 	f.scope = scope
 	f.listFilter = filter
-	f.listLimit = limit
+	f.listLimit = page.Limit
 	if f.hidden || f.instance.ID == uuid.Nil {
-		return nil, nil
+		return domain.Paged[domain.ProcessInstanceSummary]{}, nil
 	}
 	summary := domain.ProcessInstanceSummary{Instance: f.instance}
 	for _, task := range f.tasks {
@@ -467,7 +472,10 @@ func (f *fakeRuntimeStore) ListVisibleProcessInstances(
 			summary.OpenTasks = append(summary.OpenTasks, task)
 		}
 	}
-	return []domain.ProcessInstanceSummary{summary}, nil
+	return domain.Paged[domain.ProcessInstanceSummary]{
+		Items: []domain.ProcessInstanceSummary{summary},
+		Total: 1,
+	}, nil
 }
 
 func openTaskFor(t *testing.T, store *fakeRuntimeStore, nodeKey string) domain.ProcessTask {

@@ -73,7 +73,8 @@ export interface paths {
         };
         /**
          * List business object definitions
-         * @description Returns every business object definition known to this environment.
+         * @description Returns one page of business object definitions, with the total behind it, so a
+         *     screen can paginate without a second request. `q` searches the name and the key.
          */
         get: operations["listBusinessObjects"];
         put?: never;
@@ -145,7 +146,8 @@ export interface paths {
         };
         /**
          * List records of a business object
-         * @description Returns the stored records, newest first.
+         * @description Returns one page of the stored records, newest first, with the total behind it.
+         *     `q` searches inside the stored values.
          */
         get: operations["listObjectRecords"];
         put?: never;
@@ -374,8 +376,9 @@ export interface paths {
         };
         /**
          * Open tasks of the signed-in user
-         * @description Every open task whose role the signed-in user holds, oldest first, together with
-         *     the instance it belongs to. This is the inbox the Tasks screen will render.
+         * @description One page of the open tasks whose role the signed-in user holds, oldest first,
+         *     together with the instance it belongs to, and the total behind the page. `q`
+         *     searches the task title and the process name.
          */
         get: operations["listInboxTasks"];
         put?: never;
@@ -393,7 +396,10 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        /** List process definitions */
+        /**
+         * List process definitions
+         * @description One page of definitions with the total behind it. `q` searches the name and the key.
+         */
         get: operations["listProcessDefinitions"];
         put?: never;
         /**
@@ -460,7 +466,8 @@ export interface paths {
          * @description Scoped exactly like the record each instance runs on (ADR 0008): an instance is
          *     listed only when its record is visible to the caller, and a caller who holds the
          *     role of an open task sees it through that task. Optional filters narrow the list
-         *     to one business object or one process definition; newest first, capped at 200.
+         *     to one business object or one process definition; newest first, one page at a
+         *     time, with the total behind the page.
          */
         get: operations["listProcessInstances"];
         put?: never;
@@ -588,6 +595,11 @@ export interface components {
             updatedAt: string;
         };
         BusinessObjectList: {
+            /**
+             * @description Definitions behind the page. A caller paginates with it instead of asking for everything.
+             * @example 42
+             */
+            total: number;
             data: components["schemas"]["BusinessObject"][];
         };
         CreateBusinessObjectRequest: {
@@ -618,6 +630,11 @@ export interface components {
             updatedAt: string;
         };
         ObjectRecordList: {
+            /**
+             * @description Records behind the page. A caller paginates with it instead of asking for everything.
+             * @example 42
+             */
+            total: number;
             data: components["schemas"]["ObjectRecord"][];
         };
         CreateObjectRecordRequest: {
@@ -714,6 +731,11 @@ export interface components {
             updatedAt: string;
         };
         ProcessDefinitionList: {
+            /**
+             * @description Definitions behind the page. A caller paginates with it instead of asking for everything.
+             * @example 42
+             */
+            total: number;
             data: components["schemas"]["ProcessDefinition"][];
         };
         ProcessDefinitionVersion: {
@@ -808,6 +830,11 @@ export interface components {
             instance: components["schemas"]["ProcessInstance"];
         };
         InboxList: {
+            /**
+             * @description Open tasks behind the page. A caller paginates with it instead of asking for everything.
+             * @example 42
+             */
+            total: number;
             /** @description Open tasks of the signed-in user, oldest first. */
             data: components["schemas"]["InboxItem"][];
         };
@@ -823,6 +850,11 @@ export interface components {
             openTasks: components["schemas"]["ProcessTask"][];
         };
         ProcessInstanceList: {
+            /**
+             * @description Visible instances behind the page. A caller paginates with it instead of asking for everything.
+             * @example 42
+             */
+            total: number;
             /** @description Visible instances, newest first. */
             data: components["schemas"]["ProcessInstanceSummary"][];
         };
@@ -1181,7 +1213,14 @@ export interface operations {
     };
     listBusinessObjects: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Search term matched against the name and the key. Empty means no filter. */
+                q?: string;
+                /** @description Rows per page (default 25, maximum 100). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1317,7 +1356,14 @@ export interface operations {
     };
     listObjectRecords: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Search term matched against the stored values. Empty means no filter. */
+                q?: string;
+                /** @description Rows per page (default 25, maximum 100). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path: {
                 /** @description Stable machine key of the business object. */
@@ -1676,7 +1722,14 @@ export interface operations {
     };
     listInboxTasks: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Search term matched against the task title and the process name. Empty means no filter. */
+                q?: string;
+                /** @description Rows per page (default 25, maximum 100). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1698,7 +1751,14 @@ export interface operations {
     };
     listProcessDefinitions: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Search term matched against the name and the key. Empty means no filter. */
+                q?: string;
+                /** @description Rows per page (default 25, maximum 100). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -1831,6 +1891,10 @@ export interface operations {
                 objectKey?: string;
                 /** @description Only instances of this process definition. */
                 definitionKey?: string;
+                /** @description Rows per page (default 25, maximum 100). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
             };
             header?: never;
             path?: never;

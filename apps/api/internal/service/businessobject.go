@@ -36,7 +36,7 @@ func (e *ValidationError) Error() string { return strings.Join(e.Problems, "; ")
 
 // businessObjectStore is the slice of the persistence layer this service needs.
 type businessObjectStore interface {
-	ListBusinessObjects(ctx context.Context) ([]domain.BusinessObject, error)
+	ListBusinessObjects(ctx context.Context, query string, page domain.Page) (domain.Paged[domain.BusinessObject], error)
 	GetBusinessObjectByKey(ctx context.Context, key string) (domain.BusinessObject, error)
 	ListBusinessObjectVersions(ctx context.Context, objectID uuid.UUID) ([]domain.BusinessObjectVersion, error)
 	CreateBusinessObject(ctx context.Context, object domain.BusinessObject) (domain.BusinessObject, error)
@@ -77,11 +77,19 @@ type UpdateBusinessObjectInput struct {
 
 // List returns every business object definition ordered by key. Definitions are
 // readable by any signed-in user: the forms are generated from them.
-func (s *BusinessObjects) List(ctx context.Context, principal domain.Principal) ([]domain.BusinessObject, error) {
+func (s *BusinessObjects) List(
+	ctx context.Context,
+	principal domain.Principal,
+	opts ListOptions,
+) (domain.Paged[domain.BusinessObject], error) {
 	if err := requireAuthenticated(principal); err != nil {
-		return nil, err
+		return domain.Paged[domain.BusinessObject]{}, err
 	}
-	return s.store.ListBusinessObjects(ctx)
+	opts, err := opts.normalized()
+	if err != nil {
+		return domain.Paged[domain.BusinessObject]{}, err
+	}
+	return s.store.ListBusinessObjects(ctx, opts.Query, opts.Page)
 }
 
 // Get returns one definition. A missing key surfaces as the store's ErrNotFound,

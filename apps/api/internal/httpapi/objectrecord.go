@@ -17,12 +17,20 @@ func handleListObjectRecords(records *service.ObjectRecords, log *slog.Logger) h
 		if !ok {
 			return
 		}
-		list, err := records.List(r.Context(), chi.URLParam(r, "key"), domain.NewPrincipal(user))
+		opts, err := listQuery(r)
+		if err != nil {
+			writeError(w, log, http.StatusBadRequest, codeInvalidRequest, err.Error())
+			return
+		}
+		list, err := records.List(r.Context(), chi.URLParam(r, "key"), domain.NewPrincipal(user), opts)
 		if err != nil {
 			writeStoreError(w, log, err, "list object records")
 			return
 		}
-		writeJSON(w, log, http.StatusOK, apiv1.ObjectRecordList{Data: toAPIObjectRecords(list)})
+		writeJSON(w, log, http.StatusOK, apiv1.ObjectRecordList{
+			Data:  toAPIObjectRecords(list.Items),
+			Total: list.Total,
+		})
 	}
 }
 

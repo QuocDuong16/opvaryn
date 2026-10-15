@@ -1,39 +1,41 @@
-import Link from 'next/link';
 import type { BusinessObject } from '@opvaryn/contracts';
 
 import { CreateObjectForm } from '@/components/objects/create-object-form';
 import { ObjectList } from '@/components/objects/object-list';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+import { ListSearch, Pagination, pageOffset } from '@/components/ui/list-controls';
 import { PageHeader } from '@/components/ui/page-header';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 
 export const metadata = { title: 'Dữ liệu' };
 
 interface PageProps {
-  searchParams: Promise<{ q?: string }>;
+  searchParams: Promise<{ q?: string; offset?: string }>;
 }
 
+/** One page of definitions; the API slices, the screen never loads the whole table. */
+const PER_PAGE = 25;
+
 export default async function ObjectsPage({ searchParams }: PageProps) {
-  const { q } = await searchParams;
-  const needle = (q ?? '').trim().toLowerCase();
+  const { q, offset: rawOffset } = await searchParams;
+  const query = (q ?? '').trim();
+  const offset = pageOffset(rawOffset, PER_PAGE);
 
   let objects: BusinessObject[] = [];
+  let total = 0;
   let error: string | null = null;
 
   try {
-    objects = await createServerApiClient().listBusinessObjects();
+    const page = await createServerApiClient().listBusinessObjects({
+      q: query || undefined,
+      limit: PER_PAGE,
+      offset,
+    });
+    objects = page.data;
+    total = page.total;
   } catch (cause) {
     error = describeApiError(cause);
   }
-
-  // The filter runs on the server and travels in the URL, so a search can be shared and
-  // works without JavaScript.
-  const shown = needle
-    ? objects.filter(
-        (object) =>
-          object.name.toLowerCase().includes(needle) || object.key.toLowerCase().includes(needle),
-      )
-    : objects;
 
   return (
     <>
@@ -56,32 +58,24 @@ export default async function ObjectsPage({ searchParams }: PageProps) {
       <section className="mb-8">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold tracking-tight">
-            {needle ? `Kết quả cho “${q}” (${shown.length})` : `Đang dùng (${shown.length})`}
+            {query ? `Kết quả cho “${query}” (${total})` : `Đang dùng (${total})`}
           </h2>
-          <form method="get" className="flex items-center gap-2">
-            <input
-              type="search"
-              name="q"
-              defaultValue={q ?? ''}
-              placeholder="Tìm theo tên hoặc key"
-              aria-label="Tìm định nghĩa dữ liệu"
-              className="w-56 rounded-lg border border-border bg-surface px-3 py-1.5 text-sm placeholder:text-on-surface-muted/60 focus:border-accent-strong focus:outline-none"
-            />
-            <button
-              type="submit"
-              className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-overlay"
-            >
-              Tìm
-            </button>
-            {needle ? (
-              <Link href="/objects" className="text-sm text-accent-strong hover:underline">
-                Xoá lọc
-              </Link>
-            ) : null}
-          </form>
+          <ListSearch
+            basePath="/objects"
+            value={query}
+            placeholder="Tìm theo tên hoặc key"
+            label="Tìm định nghĩa dữ liệu"
+          />
         </div>
 
-        <ObjectList objects={shown} filtered={needle !== ''} />
+        <ObjectList objects={objects} filtered={query !== ''} />
+        <Pagination
+          total={total}
+          limit={PER_PAGE}
+          offset={offset}
+          basePath="/objects"
+          params={{ q: query || undefined }}
+        />
       </section>
 
       <details className="rounded-xl border border-border bg-surface-raised/40 px-5 py-4">

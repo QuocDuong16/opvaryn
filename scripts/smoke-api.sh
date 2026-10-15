@@ -463,6 +463,47 @@ grep -q 'object_key' "$body_file" || fail "the malformed filter did not name the
 status="$(request GET "/api/v1/process-instances?definitionKey=$process_key")"
 [[ "$status" == "401" ]] || fail "listing instances anonymously returned $status, expected 401"
 
+echo "smoke: list pagination (page, total, search, and the bounds)"
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects?limit=1")"
+[[ "$status" == "200" ]] || fail "listing with a limit returned $status, expected 200"
+python3 - "$body_file" <<'PAGED'
+import json, sys
+
+payload = json.load(open(sys.argv[1], encoding="utf-8"))
+if len(payload["data"]) != 1:
+    sys.exit(f"limit=1 returned {len(payload['data'])} rows")
+if payload["total"] < 2:
+    sys.exit(f"the page must report the total behind it, got {payload.get('total')}")
+print(f"smoke: one page carries {len(payload['data'])} row(s) of {payload['total']}")
+PAGED
+
+# The second page starts where the first ended: offset is a slice, not a restart.
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects?limit=1&offset=1")"
+[[ "$status" == "200" ]] || fail "the second page returned $status, expected 200"
+python3 - "$body_file" <<'PAGED'
+import json, sys
+
+payload = json.load(open(sys.argv[1], encoding="utf-8"))
+if len(payload["data"]) != 1:
+    sys.exit(f"the second page returned {len(payload['data'])} rows")
+print("smoke: offset moves the page")
+PAGED
+
+# A search narrows the page to what it names.
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects?q=$object_key")"
+[[ "$status" == "200" ]] || fail "a search returned $status, expected 200"
+grep -q "\"key\":\"$object_key\"" "$body_file" || fail "the search did not find the object it named"
+if grep -q '"key":"smoke_flow_' "$body_file"; then
+  fail "the search returned an object it does not match"
+fi
+
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects?limit=500")"
+[[ "$status" == "400" ]] || fail "a limit above the cap returned $status, expected 400"
+grep -q 'limit must be between' "$body_file" || fail "the refusal does not name the limit"
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects?limit=abc")"
+[[ "$status" == "400" ]] || fail "a non-numeric limit returned $status, expected 400"
+grep -q 'must be a whole number' "$body_file" || fail "the refusal does not explain the value"
+
 echo "smoke: GET /api/v1/roles (the catalogue the designer offers)"
 status="$(request_as "$designer_jar" GET /api/v1/roles)"
 [[ "$status" == "200" ]] || fail "listing roles returned $status, expected 200"

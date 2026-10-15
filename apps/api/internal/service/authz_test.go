@@ -40,17 +40,17 @@ func TestAnonymousCallersAreRefused(t *testing.T) {
 
 	ctx := context.Background()
 
-	if _, err := NewBusinessObjects(&fakeStore{}).List(ctx, anonymous()); !errors.Is(err, ErrUnauthorized) {
+	if _, err := NewBusinessObjects(&fakeStore{}).List(ctx, anonymous(), ListOptions{}); !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("listing definitions anonymously must be refused, got %v", err)
 	}
 
 	recordStore := &fakeRecordStore{object: recordObject()}
-	if _, err := NewObjectRecords(recordStore).List(ctx, "purchase_request", anonymous()); !errors.Is(err, ErrUnauthorized) {
+	if _, err := NewObjectRecords(recordStore).List(ctx, "purchase_request", anonymous(), ListOptions{}); !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("listing records anonymously must be refused, got %v", err)
 	}
 
 	runtime := NewProcessRuntime(newFakeRuntimeStore(t, nil))
-	if _, err := runtime.Inbox(ctx, anonymous()); !errors.Is(err, ErrUnauthorized) {
+	if _, err := runtime.Inbox(ctx, anonymous(), ListOptions{}); !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("reading the inbox anonymously must be refused, got %v", err)
 	}
 	if _, err := runtime.Start(ctx, StartInput{DefinitionKey: "purchase_approval", Principal: anonymous()}); !errors.Is(err, ErrUnauthorized) {
@@ -108,7 +108,7 @@ func TestRecordQueriesCarryTheDepartmentScope(t *testing.T) {
 
 	manager := managerPrincipal()
 	store := &fakeRecordStore{object: recordObject()}
-	if _, err := NewObjectRecords(store).List(ctx, "purchase_request", manager); err != nil {
+	if _, err := NewObjectRecords(store).List(ctx, "purchase_request", manager, ListOptions{}); err != nil {
 		t.Fatalf("List returned error: %v", err)
 	}
 	want := domain.RecordScope{UserID: manager.UserID, DepartmentKey: "ky_thuat"}
@@ -117,7 +117,7 @@ func TestRecordQueriesCarryTheDepartmentScope(t *testing.T) {
 	}
 
 	admin := adminPrincipal()
-	if _, err := NewObjectRecords(store).List(ctx, "purchase_request", admin); err != nil {
+	if _, err := NewObjectRecords(store).List(ctx, "purchase_request", admin, ListOptions{}); err != nil {
 		t.Fatalf("List returned error: %v", err)
 	}
 	if !store.scope.All {
@@ -183,12 +183,12 @@ func TestInboxAnswersOnlyForTheCallersRoles(t *testing.T) {
 		t.Fatalf("Start returned error: %v", err)
 	}
 
-	items, err := runtime.Inbox(context.Background(), principal)
+	page, err := runtime.Inbox(context.Background(), principal, ListOptions{})
 	if err != nil {
 		t.Fatalf("Inbox returned error: %v", err)
 	}
-	if len(items) != 1 || items[0].Task.AssigneeRole != managerRole {
-		t.Fatalf("expected the caller's own open task, got %+v", items)
+	if page.Total != 1 || len(page.Items) != 1 || page.Items[0].Task.AssigneeRole != managerRole {
+		t.Fatalf("expected the caller's own open task, got %+v", page)
 	}
 }
 
@@ -215,18 +215,18 @@ func TestInstanceListIsScopedAndBounded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List returned error: %v", err)
 	}
-	if len(summaries) != 1 || summaries[0].Instance.ID != view.Instance.ID {
+	if summaries.Total != 1 || len(summaries.Items) != 1 || summaries.Items[0].Instance.ID != view.Instance.ID {
 		t.Fatalf("expected the started instance in the list, got %+v", summaries)
 	}
-	if len(summaries[0].OpenTasks) != 1 || summaries[0].OpenTasks[0].Status != domain.TaskOpen {
-		t.Fatalf("a list row must carry its open tasks, got %+v", summaries[0].OpenTasks)
+	if len(summaries.Items[0].OpenTasks) != 1 || summaries.Items[0].OpenTasks[0].Status != domain.TaskOpen {
+		t.Fatalf("a list row must carry its open tasks, got %+v", summaries.Items[0].OpenTasks)
 	}
-	// The filter is trimmed and carried to the store, and the list is bounded.
+	// The filter is trimmed and carried to the store, and the page size is the default.
 	if store.listFilter.ObjectKey != "purchase_request" {
 		t.Fatalf("expected the trimmed object key to reach the store, got %q", store.listFilter.ObjectKey)
 	}
-	if store.listLimit != maxInstanceList {
-		t.Fatalf("expected the store limit %d, got %d", maxInstanceList, store.listLimit)
+	if store.listLimit != domain.DefaultPageSize {
+		t.Fatalf("expected the default page size %d, got %d", domain.DefaultPageSize, store.listLimit)
 	}
 	if store.scope != (domain.RecordScope{UserID: principal.UserID, DepartmentKey: "ky_thuat"}) {
 		t.Fatalf("the instance list must use the principal scope, got %+v", store.scope)
@@ -238,7 +238,7 @@ func TestInstanceListIsScopedAndBounded(t *testing.T) {
 	if err != nil {
 		t.Fatalf("List returned error for a hidden record: %v", err)
 	}
-	if len(hidden) != 0 {
+	if len(hidden.Items) != 0 || hidden.Total != 0 {
 		t.Fatalf("expected no visible instances, got %+v", hidden)
 	}
 }
@@ -284,8 +284,12 @@ type fakeDefinitionStore struct {
 	err     error
 }
 
-func (f *fakeDefinitionStore) ListProcessDefinitions(context.Context) ([]domain.ProcessDefinition, error) {
-	return nil, f.err
+func (f *fakeDefinitionStore) ListProcessDefinitions(
+	context.Context,
+	string,
+	domain.Page,
+) (domain.Paged[domain.ProcessDefinition], error) {
+	return domain.Paged[domain.ProcessDefinition]{}, f.err
 }
 
 func (f *fakeDefinitionStore) GetProcessDefinitionByKey(context.Context, string) (domain.ProcessDefinition, error) {
