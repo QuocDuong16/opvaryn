@@ -197,7 +197,7 @@ export default async function ObjectDetailPage({ params }: PageProps) {
             <CardTitle>Nhập bản ghi</CardTitle>
             <CardDescription>
               Form sinh từ v{object.version}, validate ở server theo đúng field definition trước khi
-              ghi vào PostgreSQL.
+              được lưu lại.
             </CardDescription>
             <div className="mt-4">
               <ObjectForm object={object} />

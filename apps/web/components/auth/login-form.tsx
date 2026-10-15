@@ -18,10 +18,7 @@ export function LoginForm({ next = '' }: { next?: string }) {
   return (
     <Card>
       <CardTitle>Đăng nhập</CardTitle>
-      <CardDescription>
-        Dùng tài khoản do quản trị tạo bằng <code className="font-mono text-xs">make useradm</code>.
-        Session lưu trong cookie httpOnly của web app và chỉ server mới đọc được.
-      </CardDescription>
+      <CardDescription>Dùng tài khoản nội bộ do quản trị của tổ chức cấp.</CardDescription>
 
       <form action={formAction} className="mt-4 space-y-4">
         {next ? <input type="hidden" name="next" value={next} /> : null}

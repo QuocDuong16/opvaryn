@@ -70,9 +70,7 @@ export default async function ProcessInstancePage({ params }: PageProps) {
           />
           <Card className="border-warning/40">
             <CardTitle className="text-warning">Chưa có session hợp lệ</CardTitle>
-            <CardDescription>
-              Session nằm trong cookie httpOnly của web app và được API xác thực ở mọi request.
-            </CardDescription>
+            <CardDescription>Đăng nhập lại để tiếp tục.</CardDescription>
             <Link
               href="/login"
               className="mt-4 inline-block rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:opacity-90"
@@ -88,7 +86,7 @@ export default async function ProcessInstancePage({ params }: PageProps) {
         <PageHeader
           eyebrow="05 / Task inbox"
           title="Không đọc được quy trình"
-          lead="API không trả được instance này. Kiểm tra server Go và PostgreSQL rồi thử lại."
+          lead="Không tải được lần chạy này. Thử lại sau ít phút."
         />
         <Card className="border-warning/40">
           <CardTitle className="text-warning">Lỗi khi đọc instance</CardTitle>
@@ -116,7 +114,7 @@ export default async function ProcessInstancePage({ params }: PageProps) {
       <PageHeader
         eyebrow={`05 / Task inbox · ${instance.definitionKey} v${instance.definitionVersion}`}
         title={`Phiên chạy ${instance.id.slice(0, 8)}…`}
-        lead={`Instance chạy trên bản ghi của ${instance.objectKey}, gắn với đúng phiên bản định nghĩa ${instance.definitionVersion} lúc khởi động. Mọi thay đổi bên dưới đi qua engine và để lại dấu trong event log.`}
+        lead={`Chạy trên bản ghi của ${instance.objectKey} theo định nghĩa phiên bản ${instance.definitionVersion}. Mọi quyết định bên dưới đều được ghi lại.`}
         aside={<StatusBadge kind="live" />}
       />
 
@@ -293,9 +291,8 @@ export default async function ProcessInstancePage({ params }: PageProps) {
 
             {!recordContext.record && !recordContext.error ? (
               <p className="mt-4 text-sm text-on-surface-muted">
-                Bạn đang thấy quy trình này vì giữ role của một việc đang mở, nhưng bản ghi không
-                nằm trong phạm vi đọc của bạn (bộ phận khác). Quyết định vẫn dựa trên dữ liệu engine
-                đã đọc.
+                Bạn thấy quy trình này vì đang giữ role của một việc mở, nhưng bản ghi thuộc bộ phận
+                khác nên không hiển thị với bạn. Bạn vẫn ra được quyết định trên việc đó.
               </p>
             ) : null}
           </Card>

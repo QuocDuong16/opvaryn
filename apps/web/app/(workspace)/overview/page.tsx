@@ -5,6 +5,7 @@ import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge, type StatusKind } from '@/components/ui/status-badge';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
+import { stageLabel } from '@/lib/stage';
 
 export const metadata = { title: 'Tổng quan' };
 
@@ -45,76 +46,49 @@ const SURFACES: readonly {
     href: '/objects',
     stage: 'live',
     title: 'Business Objects & bản ghi',
-    body: 'Khai schema với field có kiểu, publish định nghĩa theo phiên bản bất biến và nhập bản ghi thật vào PostgreSQL.',
+    body: 'Tự định nghĩa dữ liệu với field có kiểu; sửa định nghĩa bằng cách publish phiên bản mới, và nhập bản ghi ngay trên đó.',
   },
   {
     href: '/forms',
     stage: 'live',
     title: 'Form builder',
-    body: 'Form nhập liệu sinh trực tiếp từ schema; validate ở server theo đúng phiên bản định nghĩa mà bản ghi được tạo dưới.',
+    body: 'Mỗi định nghĩa có sẵn màn hình nhập liệu, dữ liệu được kiểm tra theo đúng phiên bản định nghĩa của bản ghi.',
   },
   {
     href: '/workflows',
     stage: 'live',
     title: 'Workflow designer',
-    body: 'Canvas kéo thả trên bản nháp của trình duyệt rồi publish thành phiên bản mới; bản đã publish là bất biến và instance giữ phiên bản lúc start.',
+    body: 'Kéo thả để vẽ quy trình, lưu nháp trong trình duyệt rồi publish thành phiên bản mới; quy trình đang chạy giữ nguyên phiên bản của nó.',
   },
   {
     href: '/tasks',
     stage: 'live',
     title: 'Task inbox',
-    body: 'Việc đang mở thuộc đúng các role người đăng nhập giữ; mở một việc để xem bản ghi, timeline sự kiện và quyết định duyệt / trả về / từ chối.',
+    body: 'Chỉ hiện việc thuộc role của bạn; mở một việc để xem bản ghi, diễn biến và quyết định duyệt / trả về / từ chối.',
   },
   {
     href: '/analytics',
     stage: 'live',
     title: 'Analytics',
-    body: 'Metric tự định nghĩa trên field của object (đếm / tổng / trung bình, lọc, nhóm) chạy trên projection có kiểu, cộng số liệu vận hành của engine — tất cả theo phạm vi đọc.',
+    body: 'Tự định nghĩa metric trên field của bản ghi (đếm, tổng, trung bình, lọc, nhóm) cùng số liệu vận hành của quy trình — con số chỉ tính trên dữ liệu bạn được đọc.',
   },
   {
     href: '/apps',
     stage: 'live',
     title: 'Application showcase',
-    body: 'Cùng một object dưới nhiều dạng xem: danh sách và chi tiết đọc dữ liệu thật; kanban và panel connector là mô phỏng, tab cấu hình là concept — mỗi view gắn nhãn riêng.',
+    body: 'Cùng một dữ liệu dưới nhiều dạng xem: danh sách và chi tiết đọc dữ liệu thật; kanban và panel tích hợp chỉ là minh hoạ, tab cấu hình chưa hoạt động — mỗi dạng xem gắn nhãn riêng.',
   },
   {
     href: '/settings',
     stage: 'live',
     title: 'Cài đặt',
-    body: 'Endpoint đang chạy, cổng và toolchain được pin, cùng nhật ký giao webhook ra ngoài (kể cả lần thử lại).',
+    body: 'Thông tin cho người vận hành: endpoint, cổng, và nhật ký gửi sự kiện ra hệ thống ngoài (kể cả các lần thử lại).',
   },
   {
     href: '/roadmap',
     stage: 'concept',
     title: 'Roadmap',
     body: 'Bốn phase, điều kiện nghiệm thu MVP V1 và những gì còn thiếu — kế hoạch, không phải tính năng đã có.',
-  },
-];
-
-const PRINCIPLES: readonly { title: string; body: string }[] = [
-  {
-    title: 'Không giới hạn trong "phiếu"',
-    body: 'Form chỉ là một giao diện nhập liệu; quy trình có thể khởi tạo từ người dùng, lịch, webhook, event hoặc API.',
-  },
-  {
-    title: 'Definition ≠ Instance',
-    body: 'Định nghĩa và lần chạy là hai thực thể riêng, có versioning để thay đổi cấu hình không phá quy trình đang xử lý.',
-  },
-  {
-    title: 'Platform-first, không over-engineer',
-    body: 'Domain và interface đủ mở rộng, nhưng V1 chỉ hiện thực hóa một tập use case an toàn và dùng được.',
-  },
-  {
-    title: 'Data & security by design',
-    body: 'Field có kiểu rõ ràng, audit, quyền theo dữ liệu và analytics-ready được tính từ đầu, không bổ sung về sau.',
-  },
-  {
-    title: 'MVP phải xử lý nghiệp vụ thật',
-    body: 'V1 không phải một bộ UI: workflow phải chạy đúng, quyền hợp lệ, dữ liệu bền vững và theo dõi được.',
-  },
-  {
-    title: 'Nhãn trạng thái phải trung thực',
-    body: 'Phần mô phỏng được gắn nhãn rõ ràng và không bao giờ được trình bày như chức năng thật — theo cả hai chiều.',
   },
 ];
 
@@ -125,34 +99,34 @@ const PRINCIPLES: readonly { title: string; body: string }[] = [
 const NOT_YET: readonly { title: string; body: string }[] = [
   {
     title: 'OIDC / SSO',
-    body: 'Đăng nhập hiện dùng tài khoản nội bộ có role và bộ phận. Cắm IdP của tổ chức đang chờ chính IdP đó.',
+    body: 'Đăng nhập hiện dùng tài khoản nội bộ. Kết nối với hệ thống đăng nhập của tổ chức (SSO) đang chờ chính hệ thống đó.',
   },
   {
     title: 'SLA và escalation',
-    body: 'Hạn xử lý, timer và tự động chuyển cấp cần một chính sách thời gian làm việc — thuộc V1.x, nên không có hạn giả nào được hiển thị.',
+    body: 'Hạn xử lý và tự động chuyển cấp cần một chính sách thời gian làm việc; chưa có, nên hệ thống không hiển thị hạn giả.',
   },
   {
     title: 'Integration Hub đầy đủ',
-    body: 'Hiện có webhook ra ngoài kèm retry và nhật ký giao; adapter hai chiều với mapping thì chưa.',
+    body: 'Hiện gửi được sự kiện ra hệ thống khác kèm thử lại và nhật ký; chiều ngược lại (đọc dữ liệu từ hệ thống ngoài) thì chưa.',
   },
   {
     title: 'Kanban và connector thật',
-    body: 'Hai dạng xem này trong Application showcase là mô phỏng để minh hoạ Application Builder (V2).',
+    body: 'Kanban và panel tích hợp trong màn Ứng dụng chỉ là minh hoạ cho phần sẽ làm ở V2.',
   },
   {
     title: 'Tiện ích của trình soạn quy trình',
-    body: 'Undo/redo và nhiều người cùng sửa một định nghĩa cần khoá lạc quan — chưa nằm trong V1.',
+    body: 'Hoàn tác (undo/redo) và nhiều người cùng sửa một định nghĩa chưa có.',
   },
   {
     title: 'Song song và join',
-    body: 'Nhiều nhánh cùng lúc, gộp nhánh và điều kiện join nằm ngoài phạm vi đã chốt của ADR 0007.',
+    body: 'Chưa hỗ trợ nhiều nhánh chạy song song và gộp nhánh.',
   },
 ];
 
 const STATUS_LEGEND: readonly { kind: StatusKind; body: string }[] = [
   {
     kind: 'live',
-    body: 'Chạy thật: dữ liệu đi qua API Go và PostgreSQL, thao tác có hiệu lực thật.',
+    body: 'Chạy thật: dữ liệu được lưu lại, thao tác có hiệu lực thật.',
   },
   {
     kind: 'mock',
@@ -172,7 +146,7 @@ export default async function OverviewPage() {
       <PageHeader
         eyebrow="01 / Tổng quan"
         title="OPVARYN — Business Operations Platform"
-        lead="Một nền tảng xây dựng và điều phối hoạt động nội bộ, nơi tổ chức tự định nghĩa dữ liệu, quy trình, ứng dụng nghiệp vụ và báo cáo của mình. MVP V1 đang chạy trong repo này: ba quy trình pilot, engine duyệt thật, phân quyền theo role và bộ phận, analytics trên projection có kiểu, và triển khai một host có backup."
+        lead="Một nền tảng xây dựng và điều phối hoạt động nội bộ, nơi tổ chức tự định nghĩa dữ liệu, quy trình, ứng dụng nghiệp vụ và báo cáo của mình. Bản MVP V1 đang chạy: ba quy trình pilot, phê duyệt thật, phân quyền theo role và bộ phận, báo cáo trên dữ liệu thật, và triển khai trong hạ tầng của tổ chức."
       />
 
       <Card className="mb-6">
@@ -197,22 +171,24 @@ export default async function OverviewPage() {
           </div>
           <div>
             <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Giai đoạn</dt>
-            <dd className="mt-1 font-mono text-sm">{status.meta?.stage ?? '—'}</dd>
+            <dd className="mt-1 font-mono text-sm">
+              {status.meta ? stageLabel(status.meta.stage) : '—'}
+            </dd>
           </div>
         </dl>
 
         <div className="mt-5 flex flex-wrap gap-2 text-sm">
-          <DependencyChip label="API (Go)" up={status.api} />
-          <DependencyChip label="PostgreSQL" up={status.database} />
+          <DependencyChip label="Máy chủ API" up={status.api} />
+          <DependencyChip label="Cơ sở dữ liệu" up={status.database} />
         </div>
 
         {status.message ? (
           <div className="mt-5 rounded-lg border border-warning/40 bg-warning/5 px-4 py-3 text-sm">
             <p className="font-medium text-warning">API chưa sẵn sàng</p>
             <p className="mt-1 text-on-surface-muted">{status.message}</p>
-            <pre className="mt-3 overflow-x-auto rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-on-surface-muted">
-              make docker-up{'\n'}cd apps/api &amp;&amp; go run ./cmd/migrate
-            </pre>
+            <p className="mt-2 text-sm text-on-surface-muted">
+              Nếu tình trạng này kéo dài, báo cho người quản trị hệ thống.
+            </p>
           </div>
         ) : null}
       </Card>
@@ -221,17 +197,17 @@ export default async function OverviewPage() {
         <KpiCard
           label="Quy trình pilot"
           value="3"
-          note="Duyệt mua hàng, xử lý sự cố IT và onboarding nhân sự (D07)."
+          note="Duyệt mua hàng, xử lý sự cố IT và onboarding nhân sự."
         />
         <KpiCard
           label="Điều kiện nghiệm thu MVP V1"
           value="1–7"
-          note="Có bằng chứng chạy được trong repo; chi tiết ở trang Roadmap."
+          note="Chi tiết ở trang Lộ trình."
         />
         <KpiCard
           label="Triển khai"
           value="1 host"
-          note="Docker Compose, TLS qua Caddy, backup có diễn tập phục hồi (ADR 0009)."
+          note="Một host nội bộ, có TLS, sao lưu định kỳ và đã diễn tập phục hồi."
         />
       </div>
 
@@ -267,20 +243,6 @@ export default async function OverviewPage() {
             <Card key={item.title}>
               <h3 className="text-sm font-semibold">{item.title}</h3>
               <p className="mt-1.5 text-sm leading-relaxed text-on-surface-muted">{item.body}</p>
-            </Card>
-          ))}
-        </div>
-      </section>
-
-      <section className="mb-6">
-        <h2 className="mb-3 text-lg font-semibold tracking-tight">Nguyên tắc đã thống nhất</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {PRINCIPLES.map((principle) => (
-            <Card key={principle.title}>
-              <h3 className="text-sm font-semibold">{principle.title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-on-surface-muted">
-                {principle.body}
-              </p>
             </Card>
           ))}
         </div>

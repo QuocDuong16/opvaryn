@@ -19,7 +19,7 @@ export default function WorkspaceLayout({ children }: { children: ReactNode }) {
           {children}
         </main>
         <footer className="border-t border-border px-4 py-5 text-xs text-on-surface-muted sm:px-6 lg:px-8">
-          OPVARYN · MVP V1 · Yêu cầu: operations-playbook/ · Quyết định: docs/adr/
+          OPVARYN · Bản MVP V1 · đang hoàn thiện theo phản hồi từ pilot.
         </footer>
       </div>
     </div>

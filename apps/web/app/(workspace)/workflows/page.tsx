@@ -87,7 +87,7 @@ export default async function WorkflowsPage() {
       <PageHeader
         eyebrow="04 / Workflow designer"
         title="Workflows"
-        lead="Định nghĩa quy trình là dữ liệu thật: graph được publish theo phiên bản bất biến, instance gắn với phiên bản lúc start, và engine duyệt theo role với event log append-only. Trang này đọc và ghi chính những định nghĩa đó qua API."
+        lead="Thiết kế quy trình phê duyệt: vẽ các bước, giao việc theo role và đặt điều kiện rẽ nhánh. Sửa một định nghĩa là publish phiên bản mới; quy trình đang chạy vẫn giữ phiên bản cũ."
         aside={error || needsSignIn ? undefined : <StatusBadge kind="live" />}
       />
 
@@ -112,11 +112,9 @@ export default async function WorkflowsPage() {
         <Card className="mb-6 border-warning/40">
           <CardTitle className="text-warning">Không đọc được process definition</CardTitle>
           <CardDescription>{error}</CardDescription>
-          <pre className="mt-4 overflow-x-auto rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-on-surface-muted">
-            make docker-up{'\n'}cd apps/api &amp;&amp; go run ./cmd/migrate{'\n'}make seed-demo
-            {'\n'}
-            make dev
-          </pre>
+          <p className="mt-4 text-sm text-on-surface-muted">
+            Thử lại sau ít phút. Nếu vẫn không được, báo cho người quản trị hệ thống.
+          </p>
         </Card>
       ) : null}
 
@@ -132,8 +130,8 @@ export default async function WorkflowsPage() {
           <div className="rounded-xl border border-dashed border-border-strong px-5 py-8 text-center">
             <p className="text-sm font-medium">Chưa có quy trình nào</p>
             <p className="mx-auto mt-1 max-w-lg text-sm text-on-surface-muted">
-              Tạo định nghĩa đầu tiên ở biểu mẫu bên dưới, hoặc nạp bộ dữ liệu mẫu bằng{' '}
-              <code className="font-mono text-xs">make seed-demo</code> (ba quy trình pilot).
+              Tạo định nghĩa đầu tiên ở biểu mẫu bên dưới. Bộ dữ liệu mẫu có ba quy trình pilot để
+              bạn tham khảo.
             </p>
           </div>
         ) : null}
@@ -264,9 +262,9 @@ export default async function WorkflowsPage() {
         <Card>
           <CardTitle>Ba bất biến đang giữ</CardTitle>
           <CardDescription>
-            Version đã publish là bất biến; một transition có hiệu lực đúng một lần
-            (compare-and-swap ở server, người thứ hai nhận 409); quyết định đã commit không bị đảo
-            ngược bởi lỗi phía sau.
+            Phiên bản đã publish không đổi; một bước chỉ có hiệu lực đúng một lần (hai người quyết
+            cùng lúc thì người sau được báo việc đã xử lý); quyết định đã ghi không bị đảo ngược bởi
+            lỗi phía sau.
           </CardDescription>
         </Card>
       </section>

@@ -165,6 +165,13 @@
 - Tokens: two layers in `app/globals.css` — raw CSS variables under `[data-theme='dark'|'light']`,
   then `@theme inline` mapping them to Tailwind color utilities. Dark is the default. Add tokens
   there; never hard-code hex in components.
+- **Copy rule** (AGENTS.md, ADR 0014): product screens speak to the person doing the work. No ADR
+  numbers, decision codes, repo paths, `make` commands or database/HTTP words ("PostgreSQL", "cookie
+  httpOnly", "event log", "engine") — those live in code comments, docs and `/settings`, the one
+  screen written for whoever operates the system (it keeps endpoints, ports and the seed/smoke
+  commands). A screen that cannot load data says so in one sentence and points at the administrator;
+  it does not print shell commands. The workspace home carries no team charter or decision register
+  either — those are docs.
 - `components/ui/`: `status-badge.tsx` (mandatory `live`/`mock`/`concept` labeling with tooltips),
   `page-header.tsx` (eyebrow/title/lead/aside rhythm), `card.tsx`
   (`Card`/`CardTitle`/`CardDescription`), `module-placeholder.tsx` (kept for future

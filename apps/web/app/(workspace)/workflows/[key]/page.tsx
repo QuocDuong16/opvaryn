@@ -153,11 +153,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
         <Card className="mb-6 border-warning/40">
           <CardTitle className="text-warning">Role chưa có ai giữ</CardTitle>
           <CardDescription>
-            {`Quy trình này giao việc cho ${unheldRoles.map((role) => `"${role}"`).join(', ')}, nhưng hiện không tài khoản nào giữ role đó. Instance sẽ dừng ở bước ấy và không xuất hiện trong inbox của ai — gán role bằng `}
-            <code className="font-mono text-xs">
-              {`make useradm ARGS="-add-role -email <email> -roles ${unheldRoles[0]}"`}
-            </code>
-            {', rồi tải lại trang này.'}
+            {`Quy trình này giao việc cho ${unheldRoles.map((role) => `"${role}"`).join(', ')}, nhưng hiện không tài khoản nào giữ role đó. Quy trình chạy tới bước ấy sẽ dừng lại và không xuất hiện trong hộp việc của ai — hãy gán role này cho ít nhất một người, rồi tải lại trang.`}
           </CardDescription>
         </Card>
       ) : null}
@@ -304,15 +300,14 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
             <CardTitle>Cách bản nháp hoạt động</CardTitle>
             <CardDescription>
               Canvas ở trên sửa một <strong>bản nháp</strong>: kéo node, nối đường chuyển, thêm hoặc
-              xoá node — tất cả nằm trong trình duyệt này và không bao giờ tới engine. Chỉ khi bấm
-              <strong> Publish phiên bản mới</strong> graph mới được gửi cho service kiểm tra;
-              version đã publish là bất biến và instance đang chạy giữ version của nó (ADR 0013).
+              xoá node — tất cả chỉ nằm trong trình duyệt này. Chỉ khi bấm
+              <strong> Publish phiên bản mới</strong> quy trình mới được kiểm tra và lưu thành phiên
+              bản mới; phiên bản đã publish không đổi, và quy trình đang chạy giữ nguyên phiên bản
+              của nó.
             </CardDescription>
             <ul className="mt-4 space-y-2 text-xs text-on-surface-muted">
-              <li>
-                Lưu nháp giữ bản đang sửa cho lần mở sau (cookie httpOnly của trình duyệt này).
-              </li>
-              <li>Bỏ nháp đưa canvas về đúng bản engine đang chạy.</li>
+              <li>Lưu nháp giữ bản đang sửa cho lần mở sau, chỉ trong trình duyệt này.</li>
+              <li>Bỏ nháp đưa canvas về đúng bản đã publish.</li>
               <li>
                 Publish cần role <code className="font-mono">process_designer</code> hoặc{' '}
                 <code className="font-mono">admin</code>.

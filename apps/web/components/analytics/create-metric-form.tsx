@@ -179,8 +179,8 @@ export function CreateMetricForm({ objects }: { objects: readonly BusinessObject
       <div className="flex flex-wrap items-center gap-3">
         <SubmitButton />
         <p className="text-xs text-on-surface-muted">
-          Metric chạy trên projection có kiểu và theo phạm vi đọc của bạn: hai người có thể thấy hai
-          con số khác nhau, và đó là đúng thiết kế.
+          Con số chỉ tính trên dữ liệu bạn được đọc: hai người có thể thấy hai con số khác nhau, và
+          đó là đúng thiết kế.
         </p>
       </div>
 

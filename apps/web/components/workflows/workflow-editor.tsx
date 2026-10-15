@@ -718,9 +718,10 @@ export function WorkflowEditor({
           </div>
 
           <p className="mt-3 rounded-lg border border-dashed border-border-strong px-3 py-2 text-xs leading-relaxed text-on-surface-muted">
-            Bản nháp chỉ nằm ở trình duyệt này và không bao giờ tới engine: chỉ khi bấm
+            Bản nháp chỉ nằm ở trình duyệt này và không ảnh hưởng tới quy trình đang chạy: chỉ khi
+            bấm
             <strong> Publish phiên bản mới</strong> graph mới được gửi đi, version đã publish là bất
-            biến, và instance đang chạy vẫn giữ version của nó (ADR 0013).
+            biến, và quy trình đang chạy vẫn giữ phiên bản của nó.
           </p>
         </aside>
       </div>

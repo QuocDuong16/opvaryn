@@ -24,7 +24,7 @@ export function Sidebar() {
       </div>
 
       <div className="border-t border-border px-5 py-4 text-[11px] leading-relaxed text-on-surface-muted">
-        MVP V1. Yêu cầu: <code>operations-playbook/</code> · Quyết định: <code>docs/adr/</code>
+        Bản MVP V1 · đang hoàn thiện theo phản hồi từ pilot.
       </div>
     </aside>
   );

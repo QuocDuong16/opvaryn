@@ -28,7 +28,7 @@ const CAPABILITIES: readonly { title: string; body: string }[] = [
   },
   {
     title: 'Quy trình phê duyệt chạy thật',
-    body: 'Việc giao cho người theo vai trò, rẽ nhánh bằng điều kiện trên dữ liệu, duyệt / trả về / từ chối. Mọi thay đổi đi qua engine và để lại dấu trong event log append-only.',
+    body: 'Việc giao cho người theo vai trò, rẽ nhánh bằng điều kiện trên dữ liệu, duyệt / trả về / từ chối. Mọi thay đổi đều được ghi lại và không sửa được về sau.',
   },
   {
     title: 'Hộp việc theo vai trò',
@@ -36,22 +36,22 @@ const CAPABILITIES: readonly { title: string; body: string }[] = [
   },
   {
     title: 'Báo cáo không cần SQL',
-    body: 'Metric tự định nghĩa trên field của object (đếm, tổng, trung bình, lọc, nhóm) cùng số liệu vận hành của quy trình: thời gian một vòng, tỉ lệ duyệt, tỉ lệ làm lại. Con số luôn theo phạm vi dữ liệu người đọc được.',
+    body: 'Metric tự định nghĩa trên field của bản ghi (đếm, tổng, trung bình, lọc, nhóm) cùng số liệu vận hành của quy trình: thời gian một vòng, tỉ lệ duyệt, tỉ lệ làm lại. Con số luôn theo phạm vi dữ liệu người đọc được.',
   },
   {
     title: 'Nối ra hệ thống khác',
-    body: 'Sự kiện của engine được thông báo ra ngoài bằng webhook ký HMAC, có thử lại và nhật ký giao. Quyết định của người dùng không bao giờ phụ thuộc vào việc gửi thành công.',
+    body: 'Sự kiện của quy trình được gửi ra hệ thống khác dưới dạng webhook có ký xác thực, tự thử lại và có nhật ký giao. Quyết định của người dùng không bao giờ phụ thuộc vào việc gửi thành công.',
   },
 ];
 
 const TRUST: readonly { title: string; body: string }[] = [
   {
     title: 'Phân quyền kiểm tra ở server',
-    body: 'Quyền theo vai trò và bộ phận được kiểm tra ở API cho mọi lần đọc và ghi. Bản ghi ngoài phạm vi trả về "không tồn tại" thay vì tiết lộ rằng nó có ở đó.',
+    body: 'Quyền theo vai trò và bộ phận được kiểm tra ở máy chủ cho mọi lần đọc và ghi. Bản ghi ngoài phạm vi trả về "không tồn tại" thay vì tiết lộ rằng nó có ở đó.',
   },
   {
     title: 'Định nghĩa bất biến theo phiên bản',
-    body: 'Sửa một định nghĩa là publish phiên bản mới. Quy trình đang chạy và bản ghi đã nhập giữ nguyên phiên bản chúng bắt đầu, nên thay đổi không làm sai lệch lịch sử.',
+    body: 'Sửa một định nghĩa là publish phiên bản mới. Quy trình đang chạy và bản ghi đã nhập giữ nguyên phiên bản chúng bắt đầu, nên thay đổi không làm sai lệch dữ liệu cũ.',
   },
   {
     title: 'Chạy trong hạ tầng của bạn',
@@ -66,7 +66,7 @@ const TRUST: readonly { title: string; body: string }[] = [
 const STATUS: readonly { title: string; body: string }[] = [
   {
     title: 'Đang chạy (MVP V1)',
-    body: 'Business object và bản ghi, biểu mẫu sinh từ schema, engine quy trình với hộp việc, phân quyền theo vai trò và bộ phận, metric tự định nghĩa cùng số liệu vận hành, webhook ra ngoài, và triển khai một host có sao lưu.',
+    body: 'Business object và bản ghi, biểu mẫu sinh từ định nghĩa, quy trình phê duyệt với hộp việc, phân quyền theo vai trò và bộ phận, metric tự định nghĩa cùng số liệu vận hành, gửi sự kiện ra hệ thống ngoài, và triển khai một host có sao lưu.',
   },
   {
     title: 'Chưa có',
@@ -174,13 +174,15 @@ export default async function LandingPage() {
                 Quy trình pilot
               </dt>
               <dd className="mt-1 text-sm">
-                Duyệt mua hàng, xử lý sự cố IT và onboarding nhân sự — chạy trên engine thật.
+                Duyệt mua hàng, xử lý sự cố IT và onboarding nhân sự — chạy thật, không phải minh
+                hoạ.
               </dd>
             </div>
             <div>
               <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Kiểm soát</dt>
               <dd className="mt-1 text-sm">
-                Phân quyền theo vai trò và bộ phận, audit append-only, định nghĩa theo phiên bản.
+                Phân quyền theo vai trò và bộ phận, lịch sử thao tác không sửa được, định nghĩa theo
+                phiên bản.
               </dd>
             </div>
             <div>
@@ -252,10 +254,7 @@ export default async function LandingPage() {
           <p>
             OPVARYN · {meta ? `${stageLabel(meta.stage)} · phiên bản ${meta.version}` : 'MVP V1'}
           </p>
-          <p>
-            Yêu cầu &amp; phạm vi: <code className="font-mono">operations-playbook/</code> · Quyết
-            định kỹ thuật: <code className="font-mono">docs/adr/</code>
-          </p>
+          <p>Phần mềm nội bộ cho tổ chức · không phải dịch vụ nhiều tổ chức dùng chung.</p>
         </div>
       </footer>
     </div>

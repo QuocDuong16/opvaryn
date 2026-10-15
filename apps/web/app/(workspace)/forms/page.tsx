@@ -18,7 +18,7 @@ interface PageProps {
 const PLANNED_CAPABILITIES: readonly { title: string; body: string }[] = [
   {
     title: 'Điều kiện hiển thị theo dữ liệu đã nhập',
-    body: 'Field chỉ hiện khi một lựa chọn trước đó thoả điều kiện. Cần rule engine chung với workflow nên để sau khi chốt D05/D08.',
+    body: 'Field chỉ hiện khi một lựa chọn trước đó thoả điều kiện. Sẽ làm cùng lúc với điều kiện rẽ nhánh trong quy trình.',
   },
   {
     title: 'Calculated field',
@@ -55,7 +55,7 @@ export default async function FormsPage({ searchParams }: PageProps) {
       <PageHeader
         eyebrow="03 / Form builder"
         title="Forms"
-        lead="Giao diện nhập liệu được sinh trực tiếp từ schema business object: không viết code cho từng form, không lệch giữa định nghĩa và màn hình nhập. Preview dưới đây là form thật — lưu bản ghi qua API và PostgreSQL."
+        lead="Màn hình nhập liệu được tạo trực tiếp từ định nghĩa dữ liệu: không phải viết code cho từng form, và không lệch giữa định nghĩa với ô nhập. Thử nhập ngay bên dưới — bản ghi được lưu thật."
         aside={error ? undefined : <StatusBadge kind="live" />}
       />
 
@@ -63,11 +63,9 @@ export default async function FormsPage({ searchParams }: PageProps) {
         <Card className="mb-6 border-warning/40">
           <CardTitle className="text-warning">Không đọc được business object</CardTitle>
           <CardDescription>{error}</CardDescription>
-          <pre className="mt-4 overflow-x-auto rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-on-surface-muted">
-            make docker-up{'\n'}cd apps/api &amp;&amp; go run ./cmd/migrate{'\n'}make seed-demo
-            {'\n'}
-            make dev
-          </pre>
+          <p className="mt-4 text-sm text-on-surface-muted">
+            Thử lại sau ít phút. Nếu vẫn không được, báo cho người quản trị hệ thống.
+          </p>
         </Card>
       ) : null}
 
@@ -76,7 +74,7 @@ export default async function FormsPage({ searchParams }: PageProps) {
           <CardTitle>Chưa có schema để dựng form</CardTitle>
           <CardDescription>
             Form Builder cần ít nhất một business object. Tạo định nghĩa ở trang Business Objects
-            hoặc nạp bộ dữ liệu mẫu bằng <code className="font-mono text-xs">make seed-demo</code>.
+            Chưa có định nghĩa nào để dựng form.
           </CardDescription>
           <Link
             href="/objects"

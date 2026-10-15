@@ -10,8 +10,7 @@ export function ObjectList({ objects }: { objects: BusinessObject[] }) {
       <div className="rounded-xl border border-dashed border-border-strong px-5 py-10 text-center">
         <p className="text-sm font-medium">Chưa có business object nào</p>
         <p className="mx-auto mt-1 max-w-md text-sm text-on-surface-muted">
-          Tạo định nghĩa đầu tiên ở biểu mẫu bên cạnh, hoặc nạp bộ dữ liệu mẫu bằng{' '}
-          <code className="font-mono text-xs">make seed-demo</code>. Ví dụ từ playbook:{' '}
+          Tạo định nghĩa đầu tiên ở biểu mẫu bên cạnh, hoặc nạp bộ dữ liệu mẫu bằng Ví dụ:{' '}
           <code className="font-mono text-xs">purchase_request</code> hoặc{' '}
           <code className="font-mono text-xs">it_incident</code>.
         </p>

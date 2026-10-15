@@ -24,7 +24,7 @@ export default async function ObjectsPage() {
       <PageHeader
         eyebrow="02 / Business objects"
         title="Business Objects"
-        lead="Định nghĩa dữ liệu nghiệp vụ: schema, field có kiểu rõ ràng và key ổn định. Định nghĩa và bản ghi đều đi qua API Go và lưu trong PostgreSQL. Mở một object để nhập bản ghi bằng form sinh từ schema."
+        lead="Định nghĩa dữ liệu nghiệp vụ: các field có kiểu rõ ràng và khoá ổn định. Sửa định nghĩa là publish phiên bản mới; bản ghi cũ giữ nguyên định nghĩa lúc được tạo. Mở một định nghĩa để nhập bản ghi."
         aside={error ? undefined : <StatusBadge kind="live" />}
       />
 
@@ -32,11 +32,9 @@ export default async function ObjectsPage() {
         <Card className="mb-6 border-warning/40">
           <CardTitle className="text-warning">Không đọc được dữ liệu</CardTitle>
           <CardDescription>{error}</CardDescription>
-          <pre className="mt-4 overflow-x-auto rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-on-surface-muted">
-            make docker-up{'\n'}cd apps/api &amp;&amp; go run ./cmd/migrate{'\n'}make seed-demo
-            {'\n'}
-            make dev
-          </pre>
+          <p className="mt-4 text-sm text-on-surface-muted">
+            Thử lại sau ít phút. Nếu vẫn không được, báo cho người quản trị hệ thống.
+          </p>
         </Card>
       ) : null}
 

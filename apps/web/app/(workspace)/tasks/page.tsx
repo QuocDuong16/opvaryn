@@ -11,20 +11,20 @@ export const metadata = { title: 'Tasks' };
 
 const RUNTIME_GAPS: readonly { title: string; body: string }[] = [
   {
-    title: 'Đã có trong engine',
-    body: 'Resolver theo role (D08b), transition atomic bằng compare-and-swap (người thứ hai nhận 409), audit append-only kèm actor và lý do, từ chối terminal và trả về reset theo D08a.',
+    title: 'Đã có',
+    body: 'Việc giao theo role; hai người quyết cùng lúc thì người sau được báo là việc đã được xử lý; mọi quyết định đều ghi lại kèm người thực hiện và lý do; từ chối là kết thúc, còn trả về thì mở lại từ đầu.',
   },
   {
     title: 'Chưa có: song song và join',
-    body: 'Nhiều nhánh cùng lúc, gộp nhánh và điều kiện join nằm ngoài phạm vi đã chốt của ADR 0007 (mục 12).',
+    body: 'Chưa hỗ trợ nhiều nhánh chạy song song và gộp nhánh.',
   },
   {
     title: 'Chưa có: SLA và escalation',
-    body: 'Timer, hạn xử lý và tự động chuyển cấp là V1.x; chưa có bảng hay cột nào cho chúng, nên màn hình này không hiển thị hạn giả.',
+    body: 'Hạn xử lý và tự động chuyển cấp chưa có, nên màn hình này không hiển thị hạn giả.',
   },
   {
     title: 'Chưa có: uỷ quyền và huỷ instance',
-    body: 'Delegate, subprocess, service action và huỷ instance giữa đường đều chưa có cột trong schema lẫn giao diện.',
+    body: 'Uỷ quyền cho người khác, quy trình con và huỷ một lần chạy giữa đường đều chưa có.',
   },
 ];
 
@@ -52,7 +52,7 @@ export default async function TasksPage() {
       <PageHeader
         eyebrow="05 / Task inbox"
         title="Tasks"
-        lead="Inbox thật: task đang mở thuộc đúng các role mà người đang đăng nhập giữ, đọc từ engine qua API. Mở một việc để xem bản ghi, timeline sự kiện và quyết định duyệt, trả về hoặc từ chối."
+        lead="Hộp việc của bạn: chỉ những việc đang mở thuộc role bạn giữ. Mở một việc để xem bản ghi, diễn biến và quyết định duyệt, trả về hoặc từ chối."
         aside={error || needsSignIn ? undefined : <StatusBadge kind="live" />}
       />
 
@@ -60,8 +60,7 @@ export default async function TasksPage() {
         <Card className="mb-6 border-warning/40">
           <CardTitle className="text-warning">Cần đăng nhập để đọc inbox</CardTitle>
           <CardDescription>
-            Inbox là theo người: API chỉ trả việc thuộc các role mà session đang giữ. Đăng nhập rồi
-            quay lại trang này.
+            Mỗi người chỉ thấy việc thuộc role mình giữ. Đăng nhập rồi quay lại trang này.
           </CardDescription>
           <Link
             href="/login"
@@ -76,11 +75,9 @@ export default async function TasksPage() {
         <Card className="mb-6 border-warning/40">
           <CardTitle className="text-warning">Không đọc được inbox</CardTitle>
           <CardDescription>{error}</CardDescription>
-          <pre className="mt-4 overflow-x-auto rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-on-surface-muted">
-            make docker-up{'\n'}cd apps/api &amp;&amp; go run ./cmd/migrate{'\n'}make seed-demo
-            {'\n'}
-            make dev
-          </pre>
+          <p className="mt-4 text-sm text-on-surface-muted">
+            Thử lại sau ít phút. Nếu vẫn không được, báo cho người quản trị hệ thống.
+          </p>
         </Card>
       ) : null}
 
@@ -100,9 +97,7 @@ export default async function TasksPage() {
               <dd className="font-mono text-xs">{me.department || '—'}</dd>
             </div>
           </dl>
-          <p className="text-xs text-on-surface-muted">
-            Việc cũ nhất ở trên đầu, đúng thứ tự engine trả về.
-          </p>
+          <p className="text-xs text-on-surface-muted">Việc cũ nhất ở trên đầu.</p>
         </div>
       ) : null}
 
@@ -110,9 +105,8 @@ export default async function TasksPage() {
         <div className="mt-6 rounded-xl border border-dashed border-border-strong px-5 py-10 text-center">
           <p className="text-sm font-medium">Không có việc nào đang chờ bạn</p>
           <p className="mx-auto mt-1 max-w-lg text-sm text-on-surface-muted">
-            Inbox chỉ chứa task mở thuộc role bạn giữ. Khởi động một quy trình từ màn hình bản ghi
-            của business object (hoặc chạy <code className="font-mono text-xs">make seed-demo</code>
-            ), rồi tải lại trang.
+            Inbox chỉ chứa việc đang mở thuộc role bạn giữ. Mở một bản ghi và khởi động quy trình từ
+            đó, rồi tải lại trang.
           </p>
         </div>
       ) : null}
@@ -169,7 +163,7 @@ export default async function TasksPage() {
       {me ? (
         <section className="mt-8">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold tracking-tight">Engine đã có gì, còn thiếu gì</h2>
+            <h2 className="text-lg font-semibold tracking-tight">Đã có gì, còn thiếu gì</h2>
             <StatusBadge kind="concept" />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">

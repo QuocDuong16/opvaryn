@@ -10,7 +10,7 @@ export const metadata = { title: 'Cài đặt' };
 
 const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = [
   { method: 'GET', path: '/healthz', purpose: 'Liveness probe' },
-  { method: 'POST', path: '/api/v1/auth/login', purpose: 'Đăng nhập, mở session cookie' },
+  { method: 'POST', path: '/api/v1/auth/login', purpose: 'Đăng nhập, mở phiên làm việc' },
   { method: 'POST', path: '/api/v1/auth/logout', purpose: 'Kết thúc session hiện tại' },
   { method: 'GET', path: '/api/v1/me', purpose: 'Người dùng hiện tại kèm role và bộ phận' },
   {
@@ -87,7 +87,7 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
   {
     method: 'GET',
     path: '/api/v1/metrics/{key}/result',
-    purpose: 'Chạy metric trên projection có kiểu, theo phạm vi đọc của người gọi',
+    purpose: 'Chạy metric theo phạm vi dữ liệu của người gọi',
   },
   {
     method: 'GET',
@@ -102,7 +102,7 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
   {
     method: 'GET',
     path: '/api/v1/process-instances/{id}',
-    purpose: 'Instance kèm task và event log append-only',
+    purpose: 'Một lần chạy kèm việc và nhật ký sự kiện',
   },
   {
     method: 'POST',
@@ -137,7 +137,7 @@ export default async function SettingsPage() {
       <PageHeader
         eyebrow="09 / Settings"
         title="Cài đặt"
-        lead="Cấu hình theo tổ chức (identity, phân quyền, môi trường) chưa thuộc phạm vi V1. Trang này ghi lại cấu hình kỹ thuật đang có để dev và người vận hành đối chiếu."
+        lead="Trang dành cho người vận hành hệ thống: endpoint, cổng, phiên bản công cụ và nhật ký tích hợp. Cấu hình tổ chức (đăng nhập, phân quyền, môi trường) chưa có trong bản này."
         aside={<StatusBadge kind="live" />}
       />
 
@@ -219,12 +219,12 @@ export default async function SettingsPage() {
         </div>
         <Card>
           <CardDescription>
-            Khi engine làm việc mà hệ thống khác cần biết — instance bắt đầu, một việc được giao,
+            Khi một quy trình chạy mà hệ thống khác cần biết — lần chạy bắt đầu, một việc được giao,
             instance kết thúc hoặc bị từ chối — nó gửi một POST JSON đã ký HMAC tới
-            <code className="mx-1 font-mono text-xs">OPVARYN_WEBHOOK_URL</code> (ADR 0012). Thông
-            báo được ghi vào hàng đợi <em>cùng transaction</em> với sự kiện, gửi lại khi bên nhận
-            lỗi, và bỏ cuộc sau số lần thử cho phép — một thông báo cũ không được chặn việc mới, và
-            quyết định của người dùng không bao giờ phụ thuộc vào việc gửi này.
+            <code className="mx-1 font-mono text-xs">OPVARYN_WEBHOOK_URL</code>. Thông báo được ghi
+            vào hàng đợi <em>cùng transaction</em> với sự kiện, gửi lại khi bên nhận lỗi, và bỏ cuộc
+            sau số lần thử cho phép — một thông báo cũ không được chặn việc mới, và quyết định của
+            người dùng không bao giờ phụ thuộc vào việc gửi này.
           </CardDescription>
 
           {deliveriesError ? (

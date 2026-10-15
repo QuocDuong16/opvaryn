@@ -145,8 +145,7 @@ function ListView({ app, onOpen }: { app: MiniAppData; onOpen: (recordId: string
   if (app.records.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-border-strong px-5 py-10 text-center text-sm text-on-surface-muted">
-        Chưa có bản ghi nào để hiển thị. Nhập dữ liệu ở trang Business Objects hoặc chạy{' '}
-        <code className="font-mono text-xs">make seed-demo</code>.
+        Chưa có bản ghi nào để hiển thị. Nhập dữ liệu ở trang Business Objects.
       </p>
     );
   }

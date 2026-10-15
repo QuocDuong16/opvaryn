@@ -107,6 +107,12 @@ Working agreement for agents and contributors in this repository.
   screen inside the group that anonymous callers are meant to reach.
 - The front page may only state what the product does: no invented customers, logos,
   testimonials or prices, and the "not yet" list stays on it next to the capabilities.
+- Copy on product screens speaks to the person doing the work. No ADR numbers, decision
+  codes, repository paths, `make` commands, or database/HTTP vocabulary ("PostgreSQL",
+  "cookie httpOnly", "event log", "engine") — those belong in code comments, docs and
+  `/settings`, which is the one screen written for whoever operates the system. A screen
+  that cannot load data says so in one sentence and points at the system administrator
+  instead of printing shell commands.
 - All API calls go through the shared client in `lib/api/`. Never fetch the Go API
   directly from components.
 - Follow the design tokens in `apps/web/app/globals.css` (two-layer: raw CSS variables →

@@ -94,7 +94,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
       <PageHeader
         eyebrow="06 / Analytics studio"
         title="Analytics"
-        lead="Dashboard tự cấu hình trên metric thật: metric định nghĩa bằng field của business object (đếm, tổng, trung bình, lọc và nhóm), chạy trên projection có kiểu và trả về đúng phạm vi dữ liệu bạn được đọc. Số liệu và bố cục đều thật."
+        lead="Bảng số liệu tự cấu hình: định nghĩa metric bằng field của bản ghi (đếm, tổng, trung bình, lọc và nhóm), và con số trả về chỉ tính trên dữ liệu bạn được đọc. Cả số liệu lẫn bố cục đều thật."
         aside={error || needsSignIn ? undefined : <StatusBadge kind="live" />}
       />
 
@@ -117,11 +117,9 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
         <Card className="mb-6 border-warning/40">
           <CardTitle className="text-warning">Không đọc được metric</CardTitle>
           <CardDescription>{error}</CardDescription>
-          <pre className="mt-4 overflow-x-auto rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-on-surface-muted">
-            make docker-up{'\n'}cd apps/api &amp;&amp; go run ./cmd/migrate{'\n'}make seed-demo
-            {'\n'}
-            make dev
-          </pre>
+          <p className="mt-4 text-sm text-on-surface-muted">
+            Thử lại sau ít phút. Nếu vẫn không được, báo cho người quản trị hệ thống.
+          </p>
         </Card>
       ) : null}
 
@@ -164,9 +162,8 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               <div className="rounded-xl border border-dashed border-border-strong px-5 py-8 text-center">
                 <p className="text-sm font-medium">Chưa có metric nào</p>
                 <p className="mx-auto mt-1 max-w-lg text-sm text-on-surface-muted">
-                  Tạo metric đầu tiên ở biểu mẫu phía trên, hoặc nạp bộ dữ liệu mẫu bằng{' '}
-                  <code className="font-mono text-xs">make seed-demo</code> để có metric mẫu trên dữ
-                  liệu thật.
+                  Tạo metric đầu tiên ở biểu mẫu phía trên, hoặc nạp bộ dữ liệu mẫu bằng một metric
+                  để có số liệu trên dữ liệu thật.
                 </p>
               </div>
             ) : (
@@ -247,7 +244,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
         {overview ? (
           <>
             <p className="mb-3 max-w-3xl text-sm text-on-surface-muted">
-              {`Engine trong ${overview.windowDays} ngày gần nhất, tính trên process_instances và process_tasks — không phải field của bản ghi, nên đây là bộ metric cố định (ADR 0011). Mọi con số theo phạm vi bạn được đọc: người khác có thể thấy số khác, và đó là thiết kế.`}
+              {`Số liệu vận hành của ${overview.windowDays} ngày gần nhất, tính từ chính các lần chạy quy trình — đây là bộ chỉ số cố định, không phải metric bạn tự định nghĩa. Mọi con số theo phạm vi bạn được đọc: người khác có thể thấy số khác, và đó là chủ ý.`}
             </p>
 
             <form
@@ -352,8 +349,8 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               <CardTitle className="text-warning">SLA chưa có</CardTitle>
               <CardDescription>
                 Tỉ lệ vi phạm SLA cần một chính sách thời gian làm việc (giờ hành chính, ngày nghỉ)
-                mà engine chưa có — timer và escalation thuộc V1.x (ADR 0007 mục 12). Vì vậy bảng
-                này không hiển thị hạn giả: chỉ những gì đo được mới xuất hiện.
+                mà hệ thống chưa có. Vì vậy bảng này không hiển thị hạn giả: chỉ những gì đo được
+                mới xuất hiện.
               </CardDescription>
             </Card>
           </>

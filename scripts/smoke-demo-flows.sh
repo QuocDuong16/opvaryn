@@ -541,9 +541,9 @@ check_surface "/overview" "overview" "Các màn hình của sản phẩm" "Trạ
 check_surface "/forms?object=$object_key" "forms" "Preview form" 'name="priority"'
 check_surface "/workflows" "workflows" "Tạo quy trình mới" "Node catalog theo lộ trình"
 # No process was started yet, so the live inbox is empty for this role — and it says so.
-check_surface "/tasks" "tasks" "Không có việc nào đang chờ bạn" "Engine đã có gì, còn thiếu gì"
+check_surface "/tasks" "tasks" "Không có việc nào đang chờ bạn" "Đã có gì, còn thiếu gì"
 check_surface "/apps" "applications" "Kanban" "Cấu hình" "Tích hợp"
-check_surface "/roadmap" "roadmap" "Điều kiện nghiệm thu MVP V1" "Quyết định đang mở chặn tiến độ" "Concept"
+check_surface "/roadmap" "roadmap" "Điều kiện nghiệm thu MVP V1" "Chủ động để ngoài MVP" "Concept"
 check_surface "/settings" "settings" "make seed-demo" "make smoke-api"
 
 # The gate never lets the workspace render for an anonymous caller, so the pages no
@@ -875,7 +875,7 @@ status="$(web_get "/workflows/$ghost_key" "$tmp_dir/ghost-detail.html")"
 assert_status "$status" "200" "detail page of the definition with an unheld role"
 assert_contains "$tmp_dir/ghost-detail.html" "Role chưa có ai giữ" "the unheld role is flagged"
 assert_contains "$tmp_dir/ghost-detail.html" "$ghost_role" "the warning names the role"
-assert_contains "$tmp_dir/ghost-detail.html" "-add-role" "the warning says how to fix it"
+assert_contains "$tmp_dir/ghost-detail.html" "gán role này cho ít nhất một người" "the warning says how to fix it"
 
 echo "flows: [H] a draft stays in the browser and never reaches the engine"
 curl -sS -b "$cookie_jar" -o "$tmp_dir/definition-before-draft.json" \

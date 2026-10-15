@@ -54,8 +54,7 @@ export default async function LoginPage({ searchParams }: PageProps) {
       <main className="mx-auto flex w-full max-w-md flex-1 flex-col justify-center px-4 py-12 sm:px-6">
         <h1 className="text-2xl font-semibold tracking-tight">Đăng nhập</h1>
         <p className="mt-3 text-sm leading-relaxed text-on-surface-muted">
-          API xác thực bằng session cookie: mọi hành động trên quy trình và mọi lần đọc bản ghi đều
-          gắn với một người thật (ADR 0008).
+          Vào workspace của tổ chức bạn. Mọi thao tác đều ghi nhận người thực hiện.
         </p>
 
         <div className="mt-8">
