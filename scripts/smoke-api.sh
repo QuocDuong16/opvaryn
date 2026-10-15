@@ -464,9 +464,15 @@ status="$(request GET "/api/v1/process-instances?definitionKey=$process_key")"
 [[ "$status" == "401" ]] || fail "listing instances anonymously returned $status, expected 401"
 
 echo "smoke: list pagination (page, total, search, and the bounds)"
+# A second definition so a page has somewhere to move to; the cleanup script knows the prefix.
+status="$(request_as "$designer_jar" POST /api/v1/business-objects \
+  "$(printf '{"key":"smoke_page_%s","name":"Trang thử","fields":[{"key":"title","label":"Tiêu đề","type":"text","required":true}]}' "$stamp")")"
+[[ "$status" == "201" ]] || fail "creating the paging fixture returned $status, expected 201"
+
 status="$(request_as "$designer_jar" GET "/api/v1/business-objects?limit=1")"
 [[ "$status" == "200" ]] || fail "listing with a limit returned $status, expected 200"
-python3 - "$body_file" <<'PAGED'
+cp "$body_file" "$smoke_tmp_dir/page-first.json"
+python3 - "$body_file" <<'PAGED' || fail "the page did not respect the limit"
 import json, sys
 
 payload = json.load(open(sys.argv[1], encoding="utf-8"))
@@ -477,23 +483,37 @@ if payload["total"] < 2:
 print(f"smoke: one page carries {len(payload['data'])} row(s) of {payload['total']}")
 PAGED
 
-# The second page starts where the first ended: offset is a slice, not a restart.
-status="$(request_as "$designer_jar" GET "/api/v1/business-objects?limit=1&offset=1")"
-[[ "$status" == "200" ]] || fail "the second page returned $status, expected 200"
-python3 - "$body_file" <<'PAGED'
+# At this size everything fits in one page, and the total is the number of rows: the count is
+# the real one, not a copy of the page.
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects?limit=100")"
+[[ "$status" == "200" ]] || fail "listing the whole page returned $status, expected 200"
+python3 - "$body_file" <<'PAGED' || fail "the total does not match the rows on a full page"
 import json, sys
 
 payload = json.load(open(sys.argv[1], encoding="utf-8"))
-if len(payload["data"]) != 1:
-    sys.exit(f"the second page returned {len(payload['data'])} rows")
-print("smoke: offset moves the page")
+if len(payload["data"]) != payload["total"]:
+    sys.exit(f"a full page returned {len(payload['data'])} rows for a total of {payload['total']}")
+print(f"smoke: the total ({payload['total']}) is the number of rows, not the page size")
+PAGED
+
+# Offset moves the page: the second row is not the first one.
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects?limit=1&offset=1")"
+[[ "$status" == "200" ]] || fail "the second page returned $status, expected 200"
+python3 - "$smoke_tmp_dir/page-first.json" "$body_file" <<'PAGED' || fail "offset did not move the page"
+import json, sys
+
+first = json.load(open(sys.argv[1], encoding="utf-8"))["data"][0]["key"]
+second = json.load(open(sys.argv[2], encoding="utf-8"))["data"][0]["key"]
+if first == second:
+    sys.exit(f"offset=1 returned the same row as the first page ({first})")
+print(f"smoke: offset moves the page ({first} -> {second})")
 PAGED
 
 # A search narrows the page to what it names.
 status="$(request_as "$designer_jar" GET "/api/v1/business-objects?q=$object_key")"
 [[ "$status" == "200" ]] || fail "a search returned $status, expected 200"
 grep -q "\"key\":\"$object_key\"" "$body_file" || fail "the search did not find the object it named"
-if grep -q '"key":"smoke_flow_' "$body_file"; then
+if grep -q "\"key\":\"smoke_page_$stamp\"" "$body_file"; then
   fail "the search returned an object it does not match"
 fi
 
