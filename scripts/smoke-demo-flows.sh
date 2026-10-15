@@ -992,4 +992,18 @@ if len(open_roles) != 1:
 print("flows: the instance list carries the version, the state and the waiting role")
 PY
 
+# The workspace has its own way out: the account menu in the topbar posts the real sign-out
+# form, and the session is gone afterwards.
+status="$(web_get "/overview" "$tmp_dir/before-signout.html")"
+assert_status "$status" "200" "workspace before signing out"
+assert_contains "$tmp_dir/before-signout.html" "Đăng xuất" "the account menu offers a way out"
+mapfile -t signout_args < <(form_args "$tmp_dir/before-signout.html" logout)
+[[ ${#signout_args[@]} -ge 2 ]] || fail "the account menu has no server-action fields"
+status="$(web_post "/overview" "$tmp_dir/after-signout.html" \
+  "${signout_args[@]}" \
+  --form-string 'logout=1')"
+assert_status "$status" "303" "signing out from the workspace"
+status="$(curl -sS -o /dev/null -w '%{http_code}' "${web_base}/overview" -b "$cookie_jar")"
+assert_status "$status" "307" "workspace after signing out"
+
 echo "flows: PASS"

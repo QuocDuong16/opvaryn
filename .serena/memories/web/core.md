@@ -126,7 +126,10 @@
   `loginAction`, which calls the API and stores the returned token in the web app's own httpOnly
   cookie (`lib/session.ts`, `SESSION_COOKIE = 'opvaryn.session'`). `createServerApiClient` forwards
   that token as a Cookie header, so the browser never holds it and no component fetches the API
-  directly. `components/auth/session-summary.tsx` is the topbar widget and fails soft.
+  directly. `components/auth/session-summary.tsx` is the topbar **account menu**: a native
+  `<details>` showing name/email/department/roles with the **Đăng xuất** form — the only sign-out
+  in the workspace (the /login page has one, but nobody goes looking there). It fails soft when the
+  API is down, and its sign-out button carries `name="logout"` so smoke-demo-flows replays it.
   Useful for scripts: the cookie name matches the API's, and cookies ignore ports, so a session
   obtained from the API on :21501 is also accepted by the web app on :21500.
 - Server actions live in `app/**/actions.ts`. `app/objects/actions.ts` holds
