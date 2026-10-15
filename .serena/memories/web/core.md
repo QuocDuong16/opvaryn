@@ -165,6 +165,16 @@
 - Tokens: two layers in `app/globals.css` — raw CSS variables under `[data-theme='dark'|'light']`,
   then `@theme inline` mapping them to Tailwind color utilities. Dark is the default. Add tokens
   there; never hard-code hex in components.
+- **Audience rule** (ADR 0015): the workspace is built for the person using it. Everyone signed in
+  sees the product screens (nav labels are Vietnamese: Dữ liệu, Nhập liệu, Quy trình, Việc của tôi,
+  Báo cáo, Ứng dụng); `/settings` (Vận hành) and `/roadmap` (Lộ trình) are `audience: 'admin'` and
+  call `notFound()` for anyone else — a 404, not a 403. Even for an admin they appear only with
+  **advanced mode on**: cookie `opvaryn.advanced` behind `app/actions/advanced.ts`, read through
+  `lib/advanced-server.ts`, decided by the pure `lib/advanced.ts` (+ `lib/access.ts` for `isAdmin`).
+  The cookie grants nothing — the API still authorizes every call. `/overview` is a dashboard of the
+  person's own work (greeting, "Việc đang chờ bạn", shortcuts, "Lần chạy gần đây"); the build status,
+  screen list, "chưa có trong V1" and the label legend live in an `AdvancedSection` below it. Only
+  simulated or planned parts carry a badge now — `Live` badges were removed everywhere.
 - **Copy rule** (AGENTS.md, ADR 0014): product screens speak to the person doing the work. No ADR
   numbers, decision codes, repo paths, `make` commands or database/HTTP words ("PostgreSQL", "cookie
   httpOnly", "event log", "engine") — those live in code comments, docs and `/settings`, the one

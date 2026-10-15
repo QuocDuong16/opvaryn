@@ -1,8 +1,12 @@
+import { notFound } from 'next/navigation';
 import { ApiError, type WebhookDeliveryList } from '@opvaryn/contracts';
 
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { isAdmin } from '@/lib/access';
+import { advancedVisible } from '@/lib/advanced';
+import { getAdvancedMode } from '@/lib/advanced-server';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatTimestamp } from '@/lib/format';
 
@@ -118,6 +122,14 @@ const DELIVERY_STATUS_LABELS: Record<string, string> = {
 };
 
 export default async function SettingsPage() {
+  // This screen describes how the system is built and operated, so it belongs to the
+  // administrator and only while advanced mode is on (ADR 0015). Everyone else gets a 404,
+  // the same answer as any other address they have no business at.
+  const [me, advanced] = await Promise.all([loadRoles(), getAdvancedMode()]);
+  if (!advancedVisible(isAdmin(me), advanced)) {
+    notFound();
+  }
+
   // The integration card is live data, and it is allowed to fail on its own: a missing
   // session or a stopped API must not blank the reference tables below.
   const api = createServerApiClient();
@@ -135,10 +147,9 @@ export default async function SettingsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="09 / Settings"
-        title="Cài đặt"
+        eyebrow="09 / Vận hành"
+        title="Vận hành"
         lead="Trang dành cho người vận hành hệ thống: endpoint, cổng, phiên bản công cụ và nhật ký tích hợp. Cấu hình tổ chức (đăng nhập, phân quyền, môi trường) chưa có trong bản này."
-        aside={<StatusBadge kind="live" />}
       />
 
       <div className="grid gap-6 lg:grid-cols-2">
@@ -306,4 +317,14 @@ function PortRow({ label, value }: { label: string; value: string }) {
       <dd className="font-mono text-xs">{value}</dd>
     </div>
   );
+}
+
+/** loadRoles answers who is asking; a broken API hides this screen rather than showing it. */
+async function loadRoles(): Promise<string[]> {
+  try {
+    const me = await createServerApiClient().getMe();
+    return me.roles;
+  } catch {
+    return [];
+  }
 }

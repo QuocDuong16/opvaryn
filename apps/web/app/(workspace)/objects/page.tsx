@@ -4,10 +4,9 @@ import { CreateObjectForm } from '@/components/objects/create-object-form';
 import { ObjectList } from '@/components/objects/object-list';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 
-export const metadata = { title: 'Business Objects' };
+export const metadata = { title: 'Dữ liệu' };
 
 export default async function ObjectsPage() {
   let objects: BusinessObject[] = [];
@@ -22,10 +21,9 @@ export default async function ObjectsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="02 / Business objects"
-        title="Business Objects"
+        eyebrow="02 / Dữ liệu"
+        title="Dữ liệu"
         lead="Định nghĩa dữ liệu nghiệp vụ: các field có kiểu rõ ràng và khoá ổn định. Sửa định nghĩa là publish phiên bản mới; bản ghi cũ giữ nguyên định nghĩa lúc được tạo. Mở một định nghĩa để nhập bản ghi."
-        aside={error ? undefined : <StatusBadge kind="live" />}
       />
 
       {error ? (

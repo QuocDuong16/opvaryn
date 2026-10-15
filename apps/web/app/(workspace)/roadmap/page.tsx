@@ -1,8 +1,14 @@
+import { notFound } from 'next/navigation';
+
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { isAdmin } from '@/lib/access';
+import { advancedVisible } from '@/lib/advanced';
+import { getAdvancedMode } from '@/lib/advanced-server';
+import { createServerApiClient } from '@/lib/api/server';
 
-export const metadata = { title: 'Roadmap' };
+export const metadata = { title: 'Lộ trình' };
 
 const PHASES: readonly {
   tag: string;
@@ -87,12 +93,19 @@ const OUT_OF_MVP: readonly { title: string; body: string }[] = [
   },
 ];
 
-export default function RoadmapPage() {
+export default async function RoadmapPage() {
+  // The roadmap is planning material for whoever runs the product: administrator only, and
+  // only in advanced mode (ADR 0015).
+  const [me, advanced] = await Promise.all([loadRoles(), getAdvancedMode()]);
+  if (!advancedVisible(isAdmin(me), advanced)) {
+    notFound();
+  }
+
   return (
     <>
       <PageHeader
-        eyebrow="08 / Roadmap"
-        title="Roadmap"
+        eyebrow="08 / Lộ trình"
+        title="Lộ trình"
         lead="Lộ trình sản phẩm: những mốc tiếp theo và điều kiện để một bản phát hành được coi là dùng được. Đây là kế hoạch, không phải tính năng đã có."
         aside={<StatusBadge kind="concept" />}
       />
@@ -205,4 +218,14 @@ export default function RoadmapPage() {
       </section>
     </>
   );
+}
+
+/** loadRoles answers who is asking; a broken API hides this screen rather than showing it. */
+async function loadRoles(): Promise<string[]> {
+  try {
+    const me = await createServerApiClient().getMe();
+    return me.roles;
+  } catch {
+    return [];
+  }
 }

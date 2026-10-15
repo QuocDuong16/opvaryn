@@ -3,16 +3,16 @@
 import Link from 'next/link';
 import { usePathname } from 'next/navigation';
 
-import { NAV_ITEMS } from '@/app/nav';
+import type { NavItem } from '@/app/nav';
 import { cn } from '@/lib/utils';
 
 /** Vertical navigation used in the desktop sidebar. */
-export function SidebarNav() {
+export function SidebarNav({ items }: { items: readonly NavItem[] }) {
   const pathname = usePathname();
 
   return (
     <nav aria-label="Điều hướng chính" className="flex flex-col gap-0.5">
-      {NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const active = pathname === item.href;
         return (
           <Link
@@ -43,12 +43,12 @@ export function SidebarNav() {
 }
 
 /** Horizontal navigation strip used below the topbar on small screens. */
-export function CompactNav() {
+export function CompactNav({ items }: { items: readonly NavItem[] }) {
   const pathname = usePathname();
 
   return (
     <nav aria-label="Điều hướng chính" className="flex gap-1 overflow-x-auto py-2">
-      {NAV_ITEMS.map((item) => {
+      {items.map((item) => {
         const active = pathname === item.href;
         return (
           <Link

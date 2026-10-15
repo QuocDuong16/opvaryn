@@ -107,6 +107,12 @@ Working agreement for agents and contributors in this repository.
   screen inside the group that anonymous callers are meant to reach.
 - The front page may only state what the product does: no invented customers, logos,
   testimonials or prices, and the "not yet" list stays on it next to the capabilities.
+- Screens are built for the person using them: everyone signed in sees the product, while the
+  screens that describe how it is built or operated (`/settings`, `/roadmap`) are for an
+  administrator and only appear with advanced mode on — a browser cookie behind a server action
+  that grants nothing (`lib/advanced.ts`, ADR 0015). New nav entries pick an `audience`; the
+  default is `everyone`. The workspace home is a dashboard of the person's own work, never a
+  status board of the build.
 - Copy on product screens speaks to the person doing the work. No ADR numbers, decision
   codes, repository paths, `make` commands, or database/HTTP vocabulary ("PostgreSQL",
   "cookie httpOnly", "event log", "engine") — those belong in code comments, docs and

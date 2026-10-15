@@ -75,7 +75,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
     return (
       <>
         <PageHeader
-          eyebrow="04 / Workflow designer"
+          eyebrow="04 / Quy trình"
           title={key}
           lead="Không đọc được định nghĩa này từ API."
         />
@@ -128,7 +128,6 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
           definition.description ??
           'Graph đã publish của quy trình này. Instance chạy đúng phiên bản này; publish phiên bản mới không đổi các instance đang xử lý.'
         }
-        aside={<StatusBadge kind="live" />}
       />
 
       <p className="mb-6 flex flex-wrap items-center gap-3 text-sm">

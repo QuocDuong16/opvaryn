@@ -8,7 +8,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatTimestamp } from '@/lib/format';
 
-export const metadata = { title: 'Workflows' };
+export const metadata = { title: 'Quy trình' };
 
 const NODE_CATALOG: readonly { node: string; behavior: string; phase: string }[] = [
   {
@@ -85,10 +85,9 @@ export default async function WorkflowsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="04 / Workflow designer"
-        title="Workflows"
+        eyebrow="04 / Quy trình"
+        title="Quy trình"
         lead="Thiết kế quy trình phê duyệt: vẽ các bước, giao việc theo role và đặt điều kiện rẽ nhánh. Sửa một định nghĩa là publish phiên bản mới; quy trình đang chạy vẫn giữ phiên bản cũ."
-        aside={error || needsSignIn ? undefined : <StatusBadge kind="live" />}
       />
 
       {needsSignIn ? (

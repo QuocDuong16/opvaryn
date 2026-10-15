@@ -9,7 +9,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { cn } from '@/lib/utils';
 
-export const metadata = { title: 'Forms' };
+export const metadata = { title: 'Nhập liệu' };
 
 interface PageProps {
   searchParams: Promise<{ object?: string }>;
@@ -53,10 +53,9 @@ export default async function FormsPage({ searchParams }: PageProps) {
   return (
     <>
       <PageHeader
-        eyebrow="03 / Form builder"
-        title="Forms"
+        eyebrow="03 / Nhập liệu"
+        title="Nhập liệu"
         lead="Màn hình nhập liệu được tạo trực tiếp từ định nghĩa dữ liệu: không phải viết code cho từng form, và không lệch giữa định nghĩa với ô nhập. Thử nhập ngay bên dưới — bản ghi được lưu thật."
-        aside={error ? undefined : <StatusBadge kind="live" />}
       />
 
       {error ? (

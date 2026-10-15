@@ -253,7 +253,17 @@ department="flow_dept_$stamp"
   -roles "process_designer,$approver_role") >/dev/null ||
   fail "creating the flow designer failed"
 
+# The build and operations screens belong to an administrator (ADR 0015), so the run needs
+# one person of each kind: a department head who sees the product, and an admin who can turn
+# advanced mode on.
+admin_email="flow_admin_$stamp@example.com"
+admin_jar="$tmp_dir/cookies-admin.txt"
+(cd "$api_dir" && ./bin/useradm -create -email "$admin_email" -name "Flow admin" \
+  -password "$designer_password" -department "$department" -roles "admin") >/dev/null ||
+  fail "creating the flow admin failed"
+
 sign_in_through_form "$cookie_jar" "$designer_email" "$designer_password" "designer"
+sign_in_through_form "$admin_jar" "$admin_email" "$designer_password" "admin"
 
 # The workspace home, not the public front page: the shell (and the person it names)
 # only exists behind the sign-in (ADR 0014).
@@ -537,14 +547,42 @@ check_surface() {
   done
 }
 
-check_surface "/overview" "overview" "Các màn hình của sản phẩm" "Trạng thái nền tảng"
+check_surface "/overview" "overview" "Việc đang chờ bạn" "Lần chạy gần đây"
+# A department head sees the product, never the plumbing: no build status, no endpoint table.
+assert_not_contains "$tmp_dir/surface.html" "Thông tin hệ thống" "overview for a non-admin"
 check_surface "/forms?object=$object_key" "forms" "Preview form" 'name="priority"'
 check_surface "/workflows" "workflows" "Tạo quy trình mới" "Node catalog theo lộ trình"
 # No process was started yet, so the live inbox is empty for this role — and it says so.
 check_surface "/tasks" "tasks" "Không có việc nào đang chờ bạn" "Đã có gì, còn thiếu gì"
 check_surface "/apps" "applications" "Kanban" "Cấu hình" "Tích hợp"
-check_surface "/roadmap" "roadmap" "Điều kiện nghiệm thu MVP V1" "Chủ động để ngoài MVP" "Concept"
-check_surface "/settings" "settings" "make seed-demo" "make smoke-api"
+
+status="$(web_get_as "$cookie_jar" "/roadmap" "$tmp_dir/roadmap-denied.html")"
+assert_status "$status" "404" "roadmap for a non-admin"
+status="$(web_get_as "$cookie_jar" "/settings" "$tmp_dir/settings-denied.html")"
+assert_status "$status" "404" "operations screen for a non-admin"
+
+# The administrator gets them, but only after turning the switch on — the switch is the real
+# form in the topbar, replayed the way a browser without JavaScript would submit it.
+status="$(web_get_as "$admin_jar" "/overview" "$tmp_dir/admin-overview.html")"
+assert_status "$status" "200" "admin overview"
+assert_not_contains "$tmp_dir/admin-overview.html" "Thông tin hệ thống" "advanced mode is off by default"
+mapfile -t advanced_args < <(form_args "$tmp_dir/admin-overview.html" advanced)
+[[ ${#advanced_args[@]} -ge 2 ]] || fail "the advanced switch has no server-action fields"
+status="$(web_post_as "$admin_jar" "/overview" "$tmp_dir/admin-advanced.html" \
+  "${advanced_args[@]}" \
+  --form-string 'advanced=toggle')"
+assert_status "$status" "200" "turning advanced mode on"
+assert_contains "$tmp_dir/admin-advanced.html" "Thông tin hệ thống" "advanced mode reveals the build info"
+assert_contains "$tmp_dir/admin-advanced.html" "Trạng thái nền tảng" "advanced mode shows the platform status"
+
+status="$(web_get_as "$admin_jar" "/roadmap" "$tmp_dir/roadmap.html")"
+assert_status "$status" "200" "roadmap for an admin in advanced mode"
+assert_contains "$tmp_dir/roadmap.html" "Điều kiện nghiệm thu MVP V1" "roadmap content"
+assert_contains "$tmp_dir/roadmap.html" "Chủ động để ngoài MVP" "roadmap content"
+status="$(web_get_as "$admin_jar" "/settings" "$tmp_dir/settings.html")"
+assert_status "$status" "200" "operations screen for an admin in advanced mode"
+assert_contains "$tmp_dir/settings.html" "make seed-demo" "operations content"
+assert_contains "$tmp_dir/settings.html" "make smoke-api" "operations content"
 
 # The gate never lets the workspace render for an anonymous caller, so the pages no
 # longer carry a sign-in card of their own.

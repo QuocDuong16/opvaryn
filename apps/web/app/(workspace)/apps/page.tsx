@@ -4,10 +4,9 @@ import type { BusinessObject, ObjectRecord } from '@opvaryn/contracts';
 import { MiniApp, type MiniAppData } from '@/components/apps/mini-app';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 
-export const metadata = { title: 'Applications' };
+export const metadata = { title: 'Ứng dụng' };
 
 /** Cap the records read per object so the showcase stays a summary, not a dump. */
 const RECORDS_PER_APP = 25;
@@ -34,10 +33,9 @@ export default async function ApplicationsPage() {
   return (
     <>
       <PageHeader
-        eyebrow="07 / Application builder"
-        title="Applications"
+        eyebrow="07 / Ứng dụng"
+        title="Ứng dụng"
         lead="Cùng một dữ liệu, nhiều dạng xem: danh sách, chi tiết, kanban, cấu hình và panel tích hợp — phần mà V2 sẽ cho phép tự cấu hình. Danh sách và chi tiết đọc dữ liệu thật; kanban, cấu hình và tích hợp chỉ là minh hoạ, mỗi dạng xem gắn nhãn riêng."
-        aside={error ? undefined : <StatusBadge kind="live" />}
       />
 
       {error ? (

@@ -1,6 +1,7 @@
+import type { NavItem } from '@/app/nav';
 import { SidebarNav } from '@/components/app-shell/nav';
 
-export function Sidebar() {
+export function Sidebar({ items }: { items: readonly NavItem[] }) {
   return (
     <aside className="hidden border-r border-border bg-surface-raised lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col">
       <div className="flex items-center gap-3 border-b border-border px-5 py-4">
@@ -17,14 +18,7 @@ export function Sidebar() {
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-4">
-        <p className="px-3 pb-2 font-mono text-[11px] tracking-widest text-on-surface-muted uppercase">
-          Workspace
-        </p>
-        <SidebarNav />
-      </div>
-
-      <div className="border-t border-border px-5 py-4 text-[11px] leading-relaxed text-on-surface-muted">
-        Bản MVP V1 · đang hoàn thiện theo phản hồi từ pilot.
+        <SidebarNav items={items} />
       </div>
     </aside>
   );

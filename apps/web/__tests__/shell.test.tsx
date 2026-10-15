@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 
-import { navItemFor, NAV_ITEMS } from '@/app/nav';
+import { navItemFor, navItemsFor, NAV_ITEMS } from '@/app/nav';
 import { StatusBadge } from '@/components/ui/status-badge';
 
 describe('StatusBadge', () => {
@@ -44,12 +44,23 @@ describe('navigation', () => {
   });
 
   it('resolves a nav item for a known path', () => {
-    expect(navItemFor('/analytics')?.label).toBe('Analytics');
+    expect(navItemFor('/analytics')?.label).toBe('Báo cáo');
     expect(navItemFor('/unknown')).toBeUndefined();
   });
 
+  it('shows the product screens to everyone and the build screens only in advanced mode', () => {
+    const everyday = navItemsFor(false).map((item) => item.href);
+    expect(everyday).toContain('/tasks');
+    expect(everyday).not.toContain('/settings');
+    expect(everyday).not.toContain('/roadmap');
+
+    const advanced = navItemsFor(true).map((item) => item.href);
+    expect(advanced).toContain('/settings');
+    expect(advanced).toContain('/roadmap');
+  });
+
   it('resolves nested routes to their area', () => {
-    expect(navItemFor('/objects/asset')?.label).toBe('Business Objects');
+    expect(navItemFor('/objects/asset')?.label).toBe('Dữ liệu');
     expect(navItemFor('/objects/asset')?.href).toBe('/objects');
   });
 });

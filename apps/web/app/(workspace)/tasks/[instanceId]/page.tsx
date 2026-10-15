@@ -18,7 +18,6 @@ import {
 } from '@/components/process/process-timeline';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
-import { StatusBadge } from '@/components/ui/status-badge';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatFieldValue, formatTimestamp } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -64,7 +63,7 @@ export default async function ProcessInstancePage({ params }: PageProps) {
       return (
         <>
           <PageHeader
-            eyebrow="05 / Task inbox"
+            eyebrow="05 / Việc của tôi"
             title="Cần đăng nhập"
             lead="Phiên làm việc đã hết hạn hoặc chưa đăng nhập. Đăng nhập lại để xem quy trình này."
           />
@@ -112,10 +111,9 @@ export default async function ProcessInstancePage({ params }: PageProps) {
   return (
     <>
       <PageHeader
-        eyebrow={`05 / Task inbox · ${instance.definitionKey} v${instance.definitionVersion}`}
+        eyebrow={`05 / Việc của tôi · ${instance.definitionKey} v${instance.definitionVersion}`}
         title={`Phiên chạy ${instance.id.slice(0, 8)}…`}
         lead={`Chạy trên bản ghi của ${instance.objectKey} theo định nghĩa phiên bản ${instance.definitionVersion}. Mọi quyết định bên dưới đều được ghi lại.`}
-        aside={<StatusBadge kind="live" />}
       />
 
       <p className="mb-6 flex flex-wrap items-center gap-3 text-sm">

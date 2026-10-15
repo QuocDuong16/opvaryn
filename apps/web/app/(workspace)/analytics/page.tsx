@@ -22,7 +22,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { getDashboardWidgets } from '@/lib/dashboard';
 
-export const metadata = { title: 'Analytics' };
+export const metadata = { title: 'Báo cáo' };
 
 const WINDOW_CHOICES = [7, 30, 90, 365] as const;
 
@@ -92,10 +92,9 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
   return (
     <>
       <PageHeader
-        eyebrow="06 / Analytics studio"
-        title="Analytics"
+        eyebrow="06 / Báo cáo"
+        title="Báo cáo"
         lead="Bảng số liệu tự cấu hình: định nghĩa metric bằng field của bản ghi (đếm, tổng, trung bình, lọc và nhóm), và con số trả về chỉ tính trên dữ liệu bạn được đọc. Cả số liệu lẫn bố cục đều thật."
-        aside={error || needsSignIn ? undefined : <StatusBadge kind="live" />}
       />
 
       {needsSignIn ? (

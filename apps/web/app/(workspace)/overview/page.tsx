@@ -1,41 +1,52 @@
 import Link from 'next/link';
-import type { Meta } from '@opvaryn/contracts';
+import {
+  ApiError,
+  type InboxItem,
+  type Meta,
+  type Me,
+  type ProcessInstanceSummary,
+} from '@opvaryn/contracts';
 
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge, type StatusKind } from '@/components/ui/status-badge';
+import { isAdmin } from '@/lib/access';
+import { advancedVisible } from '@/lib/advanced';
+import { getAdvancedMode } from '@/lib/advanced-server';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
+import { formatTimestamp } from '@/lib/format';
 import { stageLabel } from '@/lib/stage';
 
 export const metadata = { title: 'Tổng quan' };
 
-interface PlatformStatus {
-  api: boolean;
-  database: boolean;
-  meta: Meta | null;
-  message: string | null;
-}
+const RECENT_LIMIT = 5;
 
-async function loadPlatformStatus(): Promise<PlatformStatus> {
-  const api = createServerApiClient();
-  try {
-    const [meta, readiness] = await Promise.all([api.getMeta(), api.getReadiness()]);
-    return {
-      api: true,
-      database: readiness.status === 'ok',
-      meta,
-      message: null,
-    };
-  } catch (cause) {
-    return { api: false, database: false, meta: null, message: describeApiError(cause) };
-  }
-}
+const STATE_LABELS: Record<string, string> = {
+  running: 'Đang chạy',
+  completed: 'Hoàn tất',
+  rejected: 'Bị từ chối',
+};
 
-/**
- * The screens of the product, each with the label its own content earns: a screen that
- * reads real rows is `live`, a screen that draws simulated data is `mock`, a screen that
- * only describes the plan is `concept` (AGENTS.md).
- */
+/** Shortcuts to the work a person does here; each one is a real screen, not a teaser. */
+const SHORTCUTS: readonly { href: string; title: string; body: string }[] = [
+  {
+    href: '/objects',
+    title: 'Nhập dữ liệu',
+    body: 'Mở một loại dữ liệu để thêm bản ghi mới.',
+  },
+  {
+    href: '/tasks',
+    title: 'Xử lý việc đang chờ',
+    body: 'Duyệt, trả về hoặc từ chối những việc thuộc role của bạn.',
+  },
+  {
+    href: '/analytics',
+    title: 'Xem báo cáo',
+    body: 'Chỉ số trên dữ liệu bạn được đọc, và bảng số liệu tự sắp.',
+  },
+];
+
+/** Shown only with advanced mode on: how the build stands, for whoever runs the system. */
 const SURFACES: readonly {
   href: string;
   stage: StatusKind;
@@ -45,80 +56,76 @@ const SURFACES: readonly {
   {
     href: '/objects',
     stage: 'live',
-    title: 'Business Objects & bản ghi',
-    body: 'Tự định nghĩa dữ liệu với field có kiểu; sửa định nghĩa bằng cách publish phiên bản mới, và nhập bản ghi ngay trên đó.',
+    title: 'Dữ liệu',
+    body: 'Định nghĩa có phiên bản và bản ghi; sửa định nghĩa là publish phiên bản mới.',
   },
   {
     href: '/forms',
     stage: 'live',
-    title: 'Form builder',
-    body: 'Mỗi định nghĩa có sẵn màn hình nhập liệu, dữ liệu được kiểm tra theo đúng phiên bản định nghĩa của bản ghi.',
+    title: 'Nhập liệu',
+    body: 'Màn hình nhập sinh từ định nghĩa; dữ liệu kiểm tra theo phiên bản của bản ghi.',
   },
   {
     href: '/workflows',
     stage: 'live',
-    title: 'Workflow designer',
-    body: 'Kéo thả để vẽ quy trình, lưu nháp trong trình duyệt rồi publish thành phiên bản mới; quy trình đang chạy giữ nguyên phiên bản của nó.',
+    title: 'Quy trình',
+    body: 'Canvas kéo thả trên bản nháp, publish thành phiên bản mới; lần chạy giữ phiên bản của nó.',
   },
   {
     href: '/tasks',
     stage: 'live',
-    title: 'Task inbox',
-    body: 'Chỉ hiện việc thuộc role của bạn; mở một việc để xem bản ghi, diễn biến và quyết định duyệt / trả về / từ chối.',
+    title: 'Việc của tôi',
+    body: 'Việc đang mở theo role; quyết định ghi lại kèm người thực hiện và lý do.',
   },
   {
     href: '/analytics',
     stage: 'live',
-    title: 'Analytics',
-    body: 'Tự định nghĩa metric trên field của bản ghi (đếm, tổng, trung bình, lọc, nhóm) cùng số liệu vận hành của quy trình — con số chỉ tính trên dữ liệu bạn được đọc.',
+    title: 'Báo cáo',
+    body: 'Metric tự định nghĩa trên field của bản ghi, cộng chỉ số vận hành quy trình.',
   },
   {
     href: '/apps',
     stage: 'live',
-    title: 'Application showcase',
-    body: 'Cùng một dữ liệu dưới nhiều dạng xem: danh sách và chi tiết đọc dữ liệu thật; kanban và panel tích hợp chỉ là minh hoạ, tab cấu hình chưa hoạt động — mỗi dạng xem gắn nhãn riêng.',
+    title: 'Ứng dụng',
+    body: 'Nhiều dạng xem trên cùng dữ liệu; kanban và panel tích hợp là minh hoạ.',
   },
   {
     href: '/settings',
     stage: 'live',
-    title: 'Cài đặt',
-    body: 'Thông tin cho người vận hành: endpoint, cổng, và nhật ký gửi sự kiện ra hệ thống ngoài (kể cả các lần thử lại).',
+    title: 'Vận hành',
+    body: 'Endpoint, cổng, phiên bản công cụ và nhật ký gửi sự kiện ra ngoài.',
   },
   {
     href: '/roadmap',
     stage: 'concept',
-    title: 'Roadmap',
-    body: 'Bốn phase, điều kiện nghiệm thu MVP V1 và những gì còn thiếu — kế hoạch, không phải tính năng đã có.',
+    title: 'Lộ trình',
+    body: 'Các mốc tiếp theo và những gì chưa có — kế hoạch, không phải tính năng đã có.',
   },
 ];
 
-/**
- * What the product does not do yet. Kept next to the surfaces so the page never reads as
- * if the platform were finished; the roadmap page carries the detail and the phases.
- */
 const NOT_YET: readonly { title: string; body: string }[] = [
   {
-    title: 'OIDC / SSO',
-    body: 'Đăng nhập hiện dùng tài khoản nội bộ. Kết nối với hệ thống đăng nhập của tổ chức (SSO) đang chờ chính hệ thống đó.',
+    title: 'SSO',
+    body: 'Đăng nhập hiện dùng tài khoản nội bộ; kết nối hệ thống đăng nhập của tổ chức đang chờ chính hệ thống đó.',
   },
   {
-    title: 'SLA và escalation',
-    body: 'Hạn xử lý và tự động chuyển cấp cần một chính sách thời gian làm việc; chưa có, nên hệ thống không hiển thị hạn giả.',
+    title: 'Hạn xử lý và chuyển cấp',
+    body: 'Cần một chính sách thời gian làm việc; chưa có, nên hệ thống không hiển thị hạn giả.',
   },
   {
-    title: 'Integration Hub đầy đủ',
-    body: 'Hiện gửi được sự kiện ra hệ thống khác kèm thử lại và nhật ký; chiều ngược lại (đọc dữ liệu từ hệ thống ngoài) thì chưa.',
+    title: 'Kết nối hai chiều',
+    body: 'Hiện gửi được sự kiện ra hệ thống khác kèm thử lại và nhật ký; đọc dữ liệu từ hệ thống ngoài thì chưa.',
   },
   {
-    title: 'Kanban và connector thật',
-    body: 'Kanban và panel tích hợp trong màn Ứng dụng chỉ là minh hoạ cho phần sẽ làm ở V2.',
+    title: 'Kanban và panel tích hợp thật',
+    body: 'Trong màn Ứng dụng, hai phần này chỉ là minh hoạ cho phần sẽ làm ở V2.',
   },
   {
-    title: 'Tiện ích của trình soạn quy trình',
-    body: 'Hoàn tác (undo/redo) và nhiều người cùng sửa một định nghĩa chưa có.',
+    title: 'Tiện ích trình soạn quy trình',
+    body: 'Hoàn tác và nhiều người cùng sửa một định nghĩa chưa có.',
   },
   {
-    title: 'Song song và join',
+    title: 'Nhiều nhánh song song',
     body: 'Chưa hỗ trợ nhiều nhánh chạy song song và gộp nhánh.',
   },
 ];
@@ -138,146 +145,288 @@ const STATUS_LEGEND: readonly { kind: StatusKind; body: string }[] = [
   },
 ];
 
+interface Overview {
+  me: Me | null;
+  inbox: InboxItem[];
+  instances: ProcessInstanceSummary[];
+  error: string | null;
+}
+
+async function loadOverview(): Promise<Overview> {
+  const api = createServerApiClient();
+
+  let me: Me;
+  try {
+    me = await api.getMe();
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.code === 'unauthorized') {
+      // The proxy already sends anonymous callers to the sign-in screen; a session that
+      // expired between the two calls lands here.
+      return { me: null, inbox: [], instances: [], error: 'Phiên làm việc đã hết hạn.' };
+    }
+    return { me: null, inbox: [], instances: [], error: describeApiError(cause) };
+  }
+
+  // Each part fails on its own: a slow list must not blank the whole page.
+  const [inbox, instances] = await Promise.all([
+    api.listInboxTasks().catch(() => []),
+    api.listProcessInstances().catch(() => []),
+  ]);
+
+  return { me, inbox, instances, error: null };
+}
+
 export default async function OverviewPage() {
-  const status = await loadPlatformStatus();
+  const [overview, advanced] = await Promise.all([loadOverview(), getAdvancedMode()]);
+  const { me, inbox, instances, error } = overview;
+  const showAdvanced = advancedVisible(isAdmin(me?.roles), advanced);
+
+  if (!me) {
+    return (
+      <>
+        <PageHeader
+          eyebrow="01 / Tổng quan"
+          title="Tổng quan"
+          lead="Việc đang chờ bạn và lối vào các phần chính."
+        />
+        <Card className="border-warning/40">
+          <CardTitle className="text-warning">Không mở được trang này</CardTitle>
+          <CardDescription>{error ?? 'Không đọc được phiên làm việc.'}</CardDescription>
+          <Link
+            href="/login"
+            className="mt-4 inline-block rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:opacity-90"
+          >
+            Đăng nhập lại
+          </Link>
+        </Card>
+      </>
+    );
+  }
+
+  const recent = instances.slice(0, RECENT_LIMIT);
 
   return (
     <>
       <PageHeader
         eyebrow="01 / Tổng quan"
-        title="OPVARYN — Business Operations Platform"
-        lead="Một nền tảng xây dựng và điều phối hoạt động nội bộ, nơi tổ chức tự định nghĩa dữ liệu, quy trình, ứng dụng nghiệp vụ và báo cáo của mình. Bản MVP V1 đang chạy: ba quy trình pilot, phê duyệt thật, phân quyền theo role và bộ phận, báo cáo trên dữ liệu thật, và triển khai trong hạ tầng của tổ chức."
+        title={`Xin chào, ${me.name}`}
+        lead={`Bộ phận ${me.department || '—'} · role ${me.roles.join(', ') || '—'}. Dưới đây là việc đang chờ bạn và những chỗ bạn hay dùng.`}
       />
 
       <Card className="mb-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle>Trạng thái nền tảng</CardTitle>
+            <CardTitle>Việc đang chờ bạn</CardTitle>
             <CardDescription>
-              Đọc trực tiếp từ API đang chạy, không có dữ liệu giả ở khối này.
+              Chỉ những việc thuộc role bạn giữ, mới nhất ở trên đầu.
             </CardDescription>
           </div>
-          <StatusBadge kind={status.api ? 'live' : 'mock'} />
+          <span className="rounded-full border border-warning/40 px-2.5 py-0.5 text-xs font-medium text-warning">
+            {inbox.length} việc
+          </span>
         </div>
 
-        <dl className="mt-5 grid gap-4 sm:grid-cols-3">
-          <div>
-            <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Sản phẩm</dt>
-            <dd className="mt-1 font-medium">{status.meta?.name ?? 'OPVARYN'}</dd>
-          </div>
-          <div>
-            <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Phiên bản</dt>
-            <dd className="mt-1 font-mono text-sm">{status.meta?.version ?? '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Giai đoạn</dt>
-            <dd className="mt-1 font-mono text-sm">
-              {status.meta ? stageLabel(status.meta.stage) : '—'}
-            </dd>
-          </div>
-        </dl>
+        {inbox.length === 0 ? (
+          <p className="mt-4 rounded-lg border border-dashed border-border-strong px-4 py-6 text-center text-sm text-on-surface-muted">
+            Không có việc nào đang chờ bạn.
+          </p>
+        ) : (
+          <ul className="mt-4 divide-y divide-border">
+            {inbox.slice(0, RECENT_LIMIT).map((item) => (
+              <li key={item.task.id}>
+                <Link
+                  href={`/tasks/${item.instance.id}`}
+                  className="flex flex-wrap items-center justify-between gap-3 py-3 hover:text-accent-strong"
+                >
+                  <span className="min-w-0">
+                    <span className="block text-sm font-medium">{item.task.title}</span>
+                    <span className="block text-xs text-on-surface-muted">
+                      {`${item.instance.objectKey} · từ ${formatTimestamp(item.task.createdAt)}`}
+                    </span>
+                  </span>
+                  <span className="text-xs font-medium">Xử lý →</span>
+                </Link>
+              </li>
+            ))}
+          </ul>
+        )}
 
-        <div className="mt-5 flex flex-wrap gap-2 text-sm">
-          <DependencyChip label="Máy chủ API" up={status.api} />
-          <DependencyChip label="Cơ sở dữ liệu" up={status.database} />
-        </div>
-
-        {status.message ? (
-          <div className="mt-5 rounded-lg border border-warning/40 bg-warning/5 px-4 py-3 text-sm">
-            <p className="font-medium text-warning">API chưa sẵn sàng</p>
-            <p className="mt-1 text-on-surface-muted">{status.message}</p>
-            <p className="mt-2 text-sm text-on-surface-muted">
-              Nếu tình trạng này kéo dài, báo cho người quản trị hệ thống.
-            </p>
-          </div>
+        {inbox.length > RECENT_LIMIT ? (
+          <Link
+            href="/tasks"
+            className="mt-4 inline-block text-sm font-medium text-accent-strong hover:underline"
+          >
+            Xem tất cả {inbox.length} việc →
+          </Link>
         ) : null}
       </Card>
 
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <KpiCard
-          label="Quy trình pilot"
-          value="3"
-          note="Duyệt mua hàng, xử lý sự cố IT và onboarding nhân sự."
-        />
-        <KpiCard
-          label="Điều kiện nghiệm thu MVP V1"
-          value="1–7"
-          note="Chi tiết ở trang Lộ trình."
-        />
-        <KpiCard
-          label="Triển khai"
-          value="1 host"
-          note="Một host nội bộ, có TLS, sao lưu định kỳ và đã diễn tập phục hồi."
-        />
-      </div>
-
-      <section className="mb-6">
-        <h2 className="mb-3 text-lg font-semibold tracking-tight">Các màn hình của sản phẩm</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {SURFACES.map((stop, index) => (
-            <Link key={stop.href} href={stop.href} className="group">
-              <Card className="h-full transition-colors group-hover:border-border-strong">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm font-semibold">
-                    <span className="mr-2 font-mono text-xs text-accent-strong">
-                      {String(index + 1).padStart(2, '0')}
-                    </span>
-                    {stop.title}
-                  </p>
-                  <StatusBadge kind={stop.stage} />
-                </div>
-                <p className="mt-2 text-sm leading-relaxed text-on-surface-muted">{stop.body}</p>
-              </Card>
-            </Link>
-          ))}
-        </div>
+      <section className="mb-6 grid gap-4 sm:grid-cols-3">
+        {SHORTCUTS.map((shortcut) => (
+          <Link key={shortcut.href} href={shortcut.href} className="group">
+            <Card className="h-full transition-colors group-hover:border-border-strong">
+              <CardTitle>{shortcut.title}</CardTitle>
+              <CardDescription>{shortcut.body}</CardDescription>
+            </Card>
+          </Link>
+        ))}
       </section>
 
       <section className="mb-6">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold tracking-tight">Chưa có trong V1</h2>
-          <StatusBadge kind="concept" />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {NOT_YET.map((item) => (
-            <Card key={item.title}>
-              <h3 className="text-sm font-semibold">{item.title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-on-surface-muted">{item.body}</p>
-            </Card>
-          ))}
-        </div>
+        <h2 className="mb-3 text-lg font-semibold tracking-tight">Lần chạy gần đây</h2>
+        {recent.length === 0 ? (
+          <p className="rounded-xl border border-dashed border-border-strong px-4 py-6 text-center text-sm text-on-surface-muted">
+            Chưa có quy trình nào được khởi động trong phạm vi bạn đọc được.
+          </p>
+        ) : (
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-raised text-left text-xs tracking-wide text-on-surface-muted uppercase">
+                <tr>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Quy trình
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Trạng thái
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Bản ghi
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Khởi động
+                  </th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-border bg-surface-raised/40">
+                {recent.map((summary) => (
+                  <tr key={summary.instance.id}>
+                    <td className="px-4 py-3">
+                      <Link
+                        href={`/tasks/${summary.instance.id}`}
+                        className="font-medium hover:text-accent-strong"
+                      >
+                        {summary.instance.definitionKey}
+                      </Link>
+                    </td>
+                    <td className="px-4 py-3 text-xs">
+                      {STATE_LABELS[summary.instance.state] ?? summary.instance.state}
+                    </td>
+                    <td className="px-4 py-3 font-mono text-xs text-on-surface-muted">
+                      {`${summary.instance.objectKey} · ${summary.instance.recordId.slice(0, 8)}…`}
+                    </td>
+                    <td className="px-4 py-3 text-xs text-on-surface-muted">
+                      {formatTimestamp(summary.instance.startedAt)}
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </section>
 
-      <section>
-        <h2 className="mb-3 text-lg font-semibold tracking-tight">Quy ước nhãn trạng thái</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
-          {STATUS_LEGEND.map((entry) => (
-            <Card key={entry.kind}>
-              <StatusBadge kind={entry.kind} />
-              <p className="mt-3 text-sm leading-relaxed text-on-surface-muted">{entry.body}</p>
-            </Card>
-          ))}
-        </div>
-      </section>
+      {showAdvanced ? <AdvancedSection /> : null}
     </>
   );
 }
 
-function DependencyChip({ label, up }: { label: string; up: boolean }) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs">
-      <span aria-hidden className={`size-1.5 rounded-full ${up ? 'bg-success' : 'bg-danger'}`} />
-      {label}: {up ? 'sẵn sàng' : 'chưa kết nối'}
-    </span>
-  );
-}
+/**
+ * The administrator's view of the build itself: platform status, every screen with its label,
+ * what is not built yet, and the label legend. It sits below the work and appears only with
+ * advanced mode on (ADR 0015).
+ */
+async function AdvancedSection() {
+  let meta: Meta | null = null;
+  let reachable = false;
+  try {
+    const api = createServerApiClient();
+    meta = await api.getMeta();
+    const readiness = await api.getReadiness();
+    reachable = readiness.status === 'ok';
+  } catch {
+    meta = null;
+  }
 
-function KpiCard({ label, value, note }: { label: string; value: string; note: string }) {
   return (
-    <Card>
-      <p className="text-xs tracking-wide text-on-surface-muted uppercase">{label}</p>
-      <p className="mt-2 text-xl font-semibold tracking-tight">{value}</p>
-      <p className="mt-1 text-sm text-on-surface-muted">{note}</p>
-    </Card>
+    <section className="mt-10 border-t border-border pt-8">
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h2 className="text-lg font-semibold tracking-tight">Thông tin hệ thống</h2>
+        <span className="font-mono text-[11px] tracking-wide text-on-surface-muted uppercase">
+          Chế độ nâng cao
+        </span>
+      </div>
+
+      <Card className="mb-6">
+        <div className="flex flex-wrap items-start justify-between gap-3">
+          <div>
+            <CardTitle>Trạng thái nền tảng</CardTitle>
+            <CardDescription>Đọc trực tiếp từ hệ thống đang chạy.</CardDescription>
+          </div>
+          <StatusBadge kind={reachable ? 'live' : 'mock'} />
+        </div>
+        <dl className="mt-5 grid gap-4 sm:grid-cols-4">
+          <div>
+            <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Phiên bản</dt>
+            <dd className="mt-1 font-mono text-sm">{meta?.version ?? '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Giai đoạn</dt>
+            <dd className="mt-1 font-mono text-sm">{meta ? stageLabel(meta.stage) : '—'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Máy chủ API</dt>
+            <dd className="mt-1 text-sm">{reachable ? 'sẵn sàng' : 'chưa kết nối'}</dd>
+          </div>
+          <div>
+            <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Cơ sở dữ liệu</dt>
+            <dd className="mt-1 text-sm">{reachable ? 'sẵn sàng' : 'chưa kết nối'}</dd>
+          </div>
+        </dl>
+      </Card>
+
+      <h3 className="mb-3 text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
+        Các màn hình
+      </h3>
+      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+        {SURFACES.map((surface) => (
+          <Link key={surface.href} href={surface.href} className="group">
+            <Card className="h-full transition-colors group-hover:border-border-strong">
+              <div className="flex items-start justify-between gap-3">
+                <CardTitle>{surface.title}</CardTitle>
+                <StatusBadge kind={surface.stage} />
+              </div>
+              <CardDescription>{surface.body}</CardDescription>
+            </Card>
+          </Link>
+        ))}
+      </div>
+
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+        <h3 className="text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
+          Chưa có trong V1
+        </h3>
+        <StatusBadge kind="concept" />
+      </div>
+      <div className="mb-6 grid gap-4 sm:grid-cols-2">
+        {NOT_YET.map((item) => (
+          <Card key={item.title}>
+            <CardTitle>{item.title}</CardTitle>
+            <CardDescription>{item.body}</CardDescription>
+          </Card>
+        ))}
+      </div>
+
+      <h3 className="mb-3 text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
+        Quy ước nhãn trạng thái
+      </h3>
+      <div className="grid gap-4 sm:grid-cols-3">
+        {STATUS_LEGEND.map((entry) => (
+          <Card key={entry.kind}>
+            <StatusBadge kind={entry.kind} />
+            <CardDescription>{entry.body}</CardDescription>
+          </Card>
+        ))}
+      </div>
+    </section>
   );
 }

@@ -7,7 +7,7 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatTimestamp } from '@/lib/format';
 
-export const metadata = { title: 'Tasks' };
+export const metadata = { title: 'Việc của tôi' };
 
 const RUNTIME_GAPS: readonly { title: string; body: string }[] = [
   {
@@ -50,10 +50,9 @@ export default async function TasksPage() {
   return (
     <>
       <PageHeader
-        eyebrow="05 / Task inbox"
-        title="Tasks"
+        eyebrow="05 / Việc của tôi"
+        title="Việc của tôi"
         lead="Hộp việc của bạn: chỉ những việc đang mở thuộc role bạn giữ. Mở một việc để xem bản ghi, diễn biến và quyết định duyệt, trả về hoặc từ chối."
-        aside={error || needsSignIn ? undefined : <StatusBadge kind="live" />}
       />
 
       {needsSignIn ? (

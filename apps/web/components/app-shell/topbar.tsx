@@ -1,3 +1,5 @@
+import type { NavItem } from '@/app/nav';
+import { AdvancedToggle } from '@/components/app-shell/advanced-toggle';
 import { SessionSummary } from '@/components/auth/session-summary';
 import { Breadcrumb } from '@/components/app-shell/breadcrumb';
 import { CompactNav } from '@/components/app-shell/nav';
@@ -5,7 +7,7 @@ import { ThemeToggle } from '@/components/app-shell/theme-toggle';
 import { createServerApiClient } from '@/lib/api/server';
 import { stageLabel } from '@/lib/stage';
 
-/** The stage chip names the build the workspace is running, straight from the API. */
+/** The stage chip names the build the workspace is running; only advanced mode asks for it. */
 async function loadStage(): Promise<string | null> {
   try {
     const meta = await createServerApiClient().getMeta();
@@ -15,8 +17,16 @@ async function loadStage(): Promise<string | null> {
   }
 }
 
-export async function Topbar() {
-  const stage = await loadStage();
+export async function Topbar({
+  items,
+  isAdminUser,
+  showStage,
+}: {
+  items: readonly NavItem[];
+  isAdminUser: boolean;
+  showStage: boolean;
+}) {
+  const stage = showStage ? await loadStage() : null;
 
   return (
     <header className="sticky top-0 z-10 border-b border-border bg-surface/85 backdrop-blur">
@@ -28,12 +38,13 @@ export async function Topbar() {
               {stage}
             </span>
           ) : null}
+          {isAdminUser ? <AdvancedToggle /> : null}
           <SessionSummary />
           <ThemeToggle />
         </div>
       </div>
       <div className="px-3 lg:hidden">
-        <CompactNav />
+        <CompactNav items={items} />
       </div>
     </header>
   );

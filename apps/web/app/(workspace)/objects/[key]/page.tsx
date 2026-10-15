@@ -65,7 +65,7 @@ export default async function ObjectDetailPage({ params }: PageProps) {
     return (
       <>
         <PageHeader
-          eyebrow="02 / Business objects"
+          eyebrow="02 / Dữ liệu"
           title={key}
           lead="Không đọc được định nghĩa này từ API."
         />
@@ -76,7 +76,7 @@ export default async function ObjectDetailPage({ params }: PageProps) {
             href="/objects"
             className="mt-4 inline-block text-sm font-medium text-accent-strong hover:underline"
           >
-            ← Về danh sách business object
+            ← Về danh sách dữ liệu
           </Link>
         </Card>
       </>
@@ -86,13 +86,12 @@ export default async function ObjectDetailPage({ params }: PageProps) {
   return (
     <>
       <PageHeader
-        eyebrow={`02 / Business objects · ${object.key}`}
+        eyebrow={`02 / Dữ liệu · ${object.key}`}
         title={object.name}
         lead={
           object.description ??
           'Định nghĩa dữ liệu nghiệp vụ với field có kiểu rõ ràng. Form nhập liệu bên dưới được sinh trực tiếp từ phiên bản đang dùng.'
         }
-        aside={<StatusBadge kind="live" />}
       />
 
       <p className="mb-6 flex flex-wrap items-center gap-3 text-sm">
