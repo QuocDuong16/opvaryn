@@ -13,27 +13,30 @@ const STATE_STYLES: Record<string, string> = {
 };
 
 /**
- * InstanceList renders instances as rows: which record each one runs on, its state,
- * the definition version it is bound to, the node it waits at, and who holds it up.
- * It is the answer to "what is running on these records?" — the list the inbox alone
- * could not give, because an instance whose task was already decided never appears in
- * anyone's inbox.
+ * InstanceList renders instances as rows: which record each one runs on, its state, the step it
+ * waits at, and who holds it up. It answers "what is running on these records?" — the list the
+ * inbox alone could not give, because an instance whose task was already decided never appears
+ * in anyone's inbox.
  *
- * `recordLabels` maps a record id to the label that identifies it (the record screen
- * builds it from each record's own definition version). A record the caller may not
- * read has no label; the row still shows its instance id rather than pretending.
+ * A step is named by the task waiting on it, never by its node key: the key is what the graph
+ * compares, and a person reads the step's title (ADR 0016). `recordLabels` maps a record id to
+ * the label that identifies it (built from each record's own definition version); a record the
+ * caller may not read has no label, and the row says so instead of pretending.
  */
 export function InstanceList({
   instances,
   emptyHint,
   recordLabels = {},
   roleLabels = {},
+  definitionNames = {},
 }: {
   instances: readonly ProcessInstanceSummary[];
   emptyHint: string;
   recordLabels?: Record<string, string>;
   /** Role key to display name; a role nobody has named keeps its key. */
   roleLabels?: Record<string, string>;
+  /** Definition key to its name. */
+  definitionNames?: Record<string, string>;
 }) {
   if (instances.length === 0) {
     return (
@@ -53,13 +56,13 @@ export function InstanceList({
               Bản ghi
             </th>
             <th scope="col" className="px-4 py-3 font-medium">
+              Quy trình
+            </th>
+            <th scope="col" className="px-4 py-3 font-medium">
               Trạng thái
             </th>
             <th scope="col" className="px-4 py-3 font-medium">
-              Node hiện tại
-            </th>
-            <th scope="col" className="px-4 py-3 font-medium">
-              Đang chờ ai
+              Bước đang chờ
             </th>
             <th scope="col" className="px-4 py-3 font-medium">
               Bắt đầu
@@ -74,11 +77,13 @@ export function InstanceList({
                   href={`/tasks/${instance.id}`}
                   className="font-medium text-accent-strong hover:underline"
                 >
-                  {recordLabels[instance.recordId] ??
-                    `${instance.objectKey} · ${instance.recordId.slice(0, 8)}…`}
+                  {recordLabels[instance.recordId] ?? 'Bản ghi bạn không đọc được'}
                 </Link>
-                <span className="mt-1 block font-mono text-[11px] text-on-surface-muted">
-                  {`${instance.definitionKey} v${instance.definitionVersion} · attempt ${instance.attempt}`}
+              </td>
+              <td className="px-4 py-3 align-top text-xs">
+                {labelOrKey(definitionNames[instance.definitionKey], instance.definitionKey)}
+                <span className="mt-1 block text-[11px] text-on-surface-muted">
+                  {`phiên bản ${instance.definitionVersion}${instance.attempt > 1 ? ` · lần ${instance.attempt}` : ''}`}
                 </span>
               </td>
               <td className="px-4 py-3 align-top">
@@ -91,7 +96,6 @@ export function InstanceList({
                   {INSTANCE_STATE_LABELS[instance.state] ?? instance.state}
                 </span>
               </td>
-              <td className="px-4 py-3 align-top font-mono text-xs">{instance.currentNode}</td>
               <td className="px-4 py-3 align-top">
                 {openTasks.length === 0 ? (
                   <span className="text-xs text-on-surface-muted">— đã kết thúc</span>

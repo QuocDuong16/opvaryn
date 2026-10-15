@@ -185,9 +185,7 @@ export default async function ProcessInstancePage({ params }: PageProps) {
                           {task.title}
                         </h3>
                         <p className="mt-1 text-xs text-on-surface-muted">
-                          {'node '}
-                          <code className="font-mono">{task.nodeKey}</code>
-                          {` · giao ${formatTimestamp(task.createdAt)}`}
+                          {`Giao ${formatTimestamp(task.createdAt)}`}
                           {task.decidedBy ? ` · quyết định bởi ${task.decidedBy}` : ''}
                           {task.decidedAt ? ` lúc ${formatTimestamp(task.decidedAt)}` : ''}
                         </p>
@@ -311,8 +309,12 @@ export default async function ProcessInstancePage({ params }: PageProps) {
                 </dd>
               </div>
               <div className="flex justify-between gap-2">
-                <dt className="text-on-surface-muted">Node hiện tại</dt>
-                <dd className="font-mono text-xs">{instance.currentNode}</dd>
+                <dt className="text-on-surface-muted">Bước hiện tại</dt>
+                <dd className="text-right text-xs">
+                  {waiting.length > 0
+                    ? waiting.map((task) => task.title).join(', ')
+                    : '— đã kết thúc'}
+                </dd>
               </div>
               <div className="flex justify-between gap-2">
                 <dt className="text-on-surface-muted">Bắt đầu</dt>

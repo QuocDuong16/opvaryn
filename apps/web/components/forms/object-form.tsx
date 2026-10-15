@@ -6,7 +6,6 @@ import type { BusinessObject, FieldDefinition } from '@opvaryn/contracts';
 
 import { createObjectRecordAction } from '@/app/(workspace)/objects/actions';
 import { INITIAL_CREATE_RECORD_STATE } from '@/components/forms/object-form-state';
-import { FIELD_TYPE_LABELS } from '@/lib/format';
 
 const INPUT_CLASS =
   'mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm ' +
@@ -78,12 +77,36 @@ function FieldControl({ field }: { field: FieldDefinition }) {
 
       {renderControl(field, controlId, describedBy)}
 
-      <p id={describedBy} className="mt-1 text-xs text-on-surface-muted">
-        <code className="font-mono">{field.key}</code> · {FIELD_TYPE_LABELS[field.type]}
-        {field.required ? ' · bắt buộc' : ''}
-      </p>
+      {/* The key stays in the API payload; a person filling the form needs the rule, not
+          the column name (ADR 0016). Only hints that change what they type are shown. */}
+      {fieldHint(field) ? (
+        <p id={describedBy} className="mt-1 text-xs text-on-surface-muted">
+          {fieldHint(field)}
+        </p>
+      ) : null}
     </div>
   );
+}
+
+/**
+ * fieldHint is the plain-language rule of a field, and nothing else: what to type, or how a
+ * choice behaves. An empty string means the label and the control already say it all.
+ */
+function fieldHint(field: FieldDefinition): string {
+  switch (field.type) {
+    case 'select':
+      return field.options && field.options.length > 0 ? 'Chọn một mục trong danh sách.' : '';
+    case 'rows':
+      return 'Mỗi dòng một mục.';
+    case 'number':
+      return 'Chỉ nhập số.';
+    case 'date':
+      return 'Chọn ngày.';
+    case 'file':
+      return 'Chưa hỗ trợ tệp đính kèm trong bản này.';
+    default:
+      return '';
+  }
 }
 
 function renderControl(field: FieldDefinition, controlId: string, describedBy: string) {

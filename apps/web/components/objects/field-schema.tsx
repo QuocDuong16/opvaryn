@@ -19,9 +19,6 @@ export function FieldSchema({ object }: { object: BusinessObject }) {
         <thead className="bg-surface-raised text-left text-xs tracking-wide text-on-surface-muted uppercase">
           <tr>
             <th scope="col" className="px-4 py-3 font-medium">
-              Key
-            </th>
-            <th scope="col" className="px-4 py-3 font-medium">
               Nhãn
             </th>
             <th scope="col" className="px-4 py-3 font-medium">
@@ -38,7 +35,6 @@ export function FieldSchema({ object }: { object: BusinessObject }) {
         <tbody className="divide-y divide-border bg-surface-raised/40">
           {object.fields.map((field) => (
             <tr key={field.key}>
-              <td className="px-4 py-3 font-mono text-xs">{field.key}</td>
               <td className="px-4 py-3">{field.label}</td>
               <td className="px-4 py-3 text-on-surface-muted">{FIELD_TYPE_LABELS[field.type]}</td>
               <td className="px-4 py-3">

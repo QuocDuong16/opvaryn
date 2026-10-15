@@ -259,6 +259,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
             <InstanceList
               instances={instances}
               recordLabels={labels}
+              definitionNames={{ [definition.key]: definition.name }}
               emptyHint="Chạy quy trình này từ màn hình bản ghi của business object để thấy một lần chạy ở đây."
             />
             <Pagination

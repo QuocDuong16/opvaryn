@@ -566,7 +566,10 @@ check_surface "/overview" "overview" "Việc đang chờ bạn" "Lần chạy g�
 assert_not_contains "$tmp_dir/surface.html" "Thông tin hệ thống" "overview for a non-admin"
 # The Data screen leads with the definitions in use and offers the search that goes with it.
 check_surface "/objects" "objects" "Đang dùng" "Tìm theo tên hoặc key"
-check_surface "/forms?object=$object_key" "forms" "Preview form" 'name="priority"'
+check_surface "/forms?object=$object_key" "forms" "Nhập" 'name="priority"'
+# A person entering data sees the field's name and its rule, never the column key (ADR 0016).
+assert_contains "$tmp_dir/surface.html" "Nội dung" "the form names its fields"
+assert_not_contains "$tmp_dir/surface.html" ">title<" "the form does not print the field key"
 check_surface "/workflows" "workflows" "Tạo quy trình mới" "Node catalog theo lộ trình"
 # No process was started yet, so the live inbox is empty for this role — and it says so.
 check_surface "/tasks" "tasks" "Không có việc nào đang chờ bạn" "Đã có gì, còn thiếu gì"
@@ -910,7 +913,7 @@ status="$(web_get "/objects/$object_key" "$tmp_dir/object-instances.html")"
 assert_status "$status" "200" "object page after the run"
 assert_contains "$tmp_dir/object-instances.html" "Quy trình trên các bản ghi này" "the instance section"
 assert_contains "$tmp_dir/object-instances.html" "Kiểm thử luồng demo" "the instance row names its record"
-assert_contains "$tmp_dir/object-instances.html" "v1 · attempt 1" "the instance is listed with its version"
+assert_contains "$tmp_dir/object-instances.html" "phiên bản 1" "the instance is listed with its version"
 assert_contains "$tmp_dir/object-instances.html" "Kiểm tra yêu cầu" "the list names the waiting task"
 
 status="$(web_get "/workflows/$web_flow_key" "$tmp_dir/workflow-instances.html")"
@@ -997,7 +1000,7 @@ assert_status "$status" "200" "workflow detail after the publish"
 assert_contains "$tmp_dir/workflow-v2.html" "phiên bản đang dùng v2" "the newest version is in use"
 assert_contains "$tmp_dir/workflow-v2.html" "Kiểm tra yêu cầu (v2)" "the canvas shows the new graph"
 # The instance keeps the version it started with: this is ADR 0006 in the UI.
-assert_contains "$tmp_dir/workflow-v2.html" "v1 · attempt 1" "the running instance stays on v1"
+assert_contains "$tmp_dir/workflow-v2.html" "phiên bản 1" "the running instance stays on v1"
 curl -sS -b "$cookie_jar" -o "$tmp_dir/instances.json" "$api_base/api/v1/process-instances?definitionKey=$web_flow_key"
 python3 - "$tmp_dir/instances.json" "$web_flow_key" <<'PY' || fail "[H] the instance list does not match the UI"
 import json, sys

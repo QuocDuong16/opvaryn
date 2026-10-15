@@ -223,6 +223,9 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
             <InstanceList
               instances={instances}
               recordLabels={recordLabels(records, versions)}
+              definitionNames={Object.fromEntries(
+                definitions.map((definition) => [definition.key, definition.name]),
+              )}
               emptyHint="Chạy một quy trình ở biểu mẫu bên phải để thấy một lần chạy, bước đang chờ và người giữ việc."
             />
             <Pagination
