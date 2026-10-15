@@ -97,7 +97,7 @@ export function DashboardStudio({
   if (metrics.length === 0) {
     return (
       <Card>
-        <CardTitle>Chưa có metric nào để hiển thị</CardTitle>
+        <CardTitle>Chưa có chỉ số nào để hiển thị</CardTitle>
         <CardDescription>
           Dashboard đọc metric thật từ API. Tạo metric đầu tiên ở biểu mẫu bên dưới (cần role
           <code className="mx-1 font-mono text-xs">process_designer</code> hoặc{' '}
@@ -114,7 +114,7 @@ export function DashboardStudio({
           htmlFor="add-widget"
           className="text-xs tracking-wide text-on-surface-muted uppercase"
         >
-          Thêm widget
+          Thêm ô số liệu
         </label>
         <select
           id="add-widget"

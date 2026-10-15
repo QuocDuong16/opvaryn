@@ -131,7 +131,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
       <PageHeader
         eyebrow="06 / Báo cáo"
         title="Báo cáo"
-        lead="Bảng số liệu tự cấu hình: định nghĩa metric bằng field của bản ghi (đếm, tổng, trung bình, lọc và nhóm), và con số trả về chỉ tính trên dữ liệu bạn được đọc. Cả số liệu lẫn bố cục đều thật."
+        lead="Bảng số liệu tự cấu hình: định nghĩa chỉ số trên các trường của bản ghi (đếm, tổng, trung bình, lọc và nhóm), và con số trả về chỉ tính trên dữ liệu bạn được đọc. Cả số liệu lẫn bố cục đều thật."
       />
 
       {needsSignIn ? (
@@ -151,7 +151,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
 
       {error ? (
         <Card className="mb-6 border-warning/40">
-          <CardTitle className="text-warning">Không đọc được metric</CardTitle>
+          <CardTitle className="text-warning">Không đọc được chỉ số</CardTitle>
           <CardDescription>{error}</CardDescription>
           <p className="mt-4 text-sm text-on-surface-muted">
             Thử lại sau ít phút. Nếu vẫn không được, báo cho người quản trị hệ thống.
@@ -164,7 +164,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
           <section className="mb-8">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
-                {`Dashboard (${metrics.length} metric)`}
+                {`Bảng số liệu (${metrics.length} chỉ số)`}
               </h2>
               <StatusBadge kind="live" />
             </div>
@@ -200,7 +200,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
             </div>
             {metrics.length === 0 ? (
               <div className="rounded-xl border border-dashed border-border-strong px-5 py-8 text-center">
-                <p className="text-sm font-medium">Chưa có metric nào</p>
+                <p className="text-sm font-medium">Chưa có chỉ số nào</p>
                 <p className="mx-auto mt-1 max-w-lg text-sm text-on-surface-muted">
                   Tạo metric đầu tiên ở biểu mẫu phía trên, hoặc nạp bộ dữ liệu mẫu bằng một metric
                   để có số liệu trên dữ liệu thật.
@@ -286,7 +286,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
         {overview ? (
           <>
             <p className="mb-3 max-w-3xl text-sm text-on-surface-muted">
-              {`Số liệu vận hành của ${overview.windowDays} ngày gần nhất, tính từ chính các lần chạy quy trình — đây là bộ chỉ số cố định, không phải metric bạn tự định nghĩa. Mọi con số theo phạm vi bạn được đọc: người khác có thể thấy số khác, và đó là chủ ý.`}
+              {`Số liệu vận hành của ${overview.windowDays} ngày gần nhất, tính từ chính các lần chạy quy trình — đây là bộ chỉ số cố định, không phải chỉ số bạn tự định nghĩa. Mọi con số theo phạm vi bạn được đọc: người khác có thể thấy số khác, và đó là chủ ý.`}
             </p>
 
             <form

@@ -65,7 +65,7 @@ export function CreateMetricForm({ objects }: { objects: readonly BusinessObject
     >
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-xs">
-          <span className="font-medium tracking-wide uppercase">Mã metric</span>
+          <span className="font-medium tracking-wide uppercase">Mã chỉ số</span>
           <input
             name="key"
             required
@@ -74,7 +74,7 @@ export function CreateMetricForm({ objects }: { objects: readonly BusinessObject
           />
         </label>
         <label className="text-xs">
-          <span className="font-medium tracking-wide uppercase">Tên metric</span>
+          <span className="font-medium tracking-wide uppercase">Tên chỉ số</span>
           <input
             name="name"
             required
@@ -119,7 +119,7 @@ export function CreateMetricForm({ objects }: { objects: readonly BusinessObject
             <span className="font-medium tracking-wide uppercase">Đo trường nào (trường số)</span>
             <select name="field" className={cn(INPUT_CLASS, 'mt-1.5 font-mono')}>
               {numberFields.length === 0 ? (
-                <option value="">— object không có field số —</option>
+                <option value="">— loại dữ liệu này không có trường số —</option>
               ) : null}
               {numberFields.map((field) => (
                 <option key={field.key} value={field.key}>
