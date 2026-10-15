@@ -206,6 +206,12 @@ if curl -sf -o /dev/null "$web_base/" 2>/dev/null; then
   fail "another web server already answers on $web_base — stop it before running this script"
 fi
 
+# Leftovers from earlier runs made the Data screen unreadable (118 objects after a day), so
+# every run tidies up first. Only smoke-tagged rows are removed: make clean-smoke-data does the
+# same thing by hand, and the pilot data never matches.
+sh "$root_dir/scripts/clean-smoke-data.sh" >/dev/null 2>&1 ||
+  echo "smoke: could not clean leftovers from earlier runs (is Postgres up?)"
+
 echo "flows: building the API"
 (cd "$api_dir" && go build -o bin/server ./cmd/server)
 

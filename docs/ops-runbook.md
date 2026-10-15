@@ -176,6 +176,12 @@ docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/u
 Session hết hạn vốn đã không dùng được (truy vấn lọc theo `expires_at`), nên đây thuần là dọn dẹp —
 nhưng không dọn thì bảng chỉ lớn thêm. Một dòng cron mỗi ngày là đủ.
 
+Trên môi trường dev, các lần chạy `make smoke-*` để lại object, định nghĩa, instance và tài khoản
+thử nghiệm; sau một ngày chúng đủ để màn Dữ liệu chỉ còn là rác. `make clean-smoke-data` xoá đúng
+những dòng do smoke tạo (tiền tố `smoke_`/`flow_`/`restart_` và địa chỉ `*@example.com`) và không
+đụng dữ liệu pilot. Ba script smoke tự gọi bước này trước khi chạy, nên chạy tay chỉ cần khi bạn
+muốn dọn ngay. Chạy `make backup` trước nếu muốn có đường lùi.
+
 ## 7. Checklist trước khi cho người thật dùng
 
 - [ ] `.env` trên host: `POSTGRES_PASSWORD` đã đổi, `API_ENV=production`, `CORS_ALLOWED_ORIGINS` là

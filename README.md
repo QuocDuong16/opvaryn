@@ -85,6 +85,7 @@ make dev                     # terminal 1: API :21501 + web :21500
 
 ```bash
 make seed-demo               # 3 business object, 3 quy trình pilot + việc đang chờ, qua chính API
+make clean-smoke-data        # dọn object/tài khoản thử nghiệm mà các lần chạy smoke để lại
 ```
 
 Mở http://localhost:21500 — trang giới thiệu công khai; bấm **Đăng nhập** rồi vào workspace (màn

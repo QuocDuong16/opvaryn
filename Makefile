@@ -8,7 +8,7 @@
         contract-generate contract-check \
         api-tools-check api-fix api-build api-test api-lint api-vuln api-check \
         useradm \
-        smoke-api smoke-demo-flows smoke-restart seed-demo \
+        smoke-api smoke-demo-flows smoke-restart seed-demo clean-smoke-data \
         web-install web-lint web-format web-typecheck web-test web-build web-check \
         actions-lint docs-check quality-check clean
 
@@ -177,6 +177,9 @@ web-check: ## Run web lint, format, type, test, and build checks
 	cd apps/web && pnpm build
 
 ##@ Repository checks
+
+clean-smoke-data: ## Remove the objects, users and instances the smoke tests created
+	bash scripts/clean-smoke-data.sh
 
 smoke-api: ## Build the API, start it and smoke test it against local Postgres
 	bash scripts/smoke-api.sh
