@@ -30,7 +30,7 @@ const PLANNED_CAPABILITIES: readonly { title: string; body: string }[] = [
   },
   {
     title: 'Upload tệp và repeating rows dạng bảng',
-    body: 'Trường tệp cần object storage; rows trong demo nhập mỗi dòng một mục. Bản đầy đủ thuộc MVP.',
+    body: 'Trường tệp cần object storage; rows trong V1 nhập mỗi dòng một mục.',
   },
 ];
 
@@ -56,7 +56,7 @@ export default async function FormsPage({ searchParams }: PageProps) {
         eyebrow="03 / Form builder"
         title="Forms"
         lead="Giao diện nhập liệu được sinh trực tiếp từ schema business object: không viết code cho từng form, không lệch giữa định nghĩa và màn hình nhập. Preview dưới đây là form thật — lưu bản ghi qua API và PostgreSQL."
-        aside={<StatusBadge kind={error ? 'mock' : 'live'} />}
+        aside={error ? undefined : <StatusBadge kind="live" />}
       />
 
       {error ? (
@@ -141,7 +141,7 @@ export default async function FormsPage({ searchParams }: PageProps) {
               <section>
                 <div className="mb-3 flex items-center justify-between gap-3">
                   <h2 className="text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
-                    Chưa có trong demo
+                    Chưa có trong V1
                   </h2>
                   <StatusBadge kind="concept" />
                 </div>

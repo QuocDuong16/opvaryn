@@ -39,7 +39,7 @@ export default async function RootLayout({ children }: { children: ReactNode }) 
               {children}
             </main>
             <footer className="border-t border-border px-4 py-5 text-xs text-on-surface-muted sm:px-6 lg:px-8">
-              OPVARYN · Interactive demo · Tài liệu gốc: operations-playbook/
+              OPVARYN · MVP V1 · Yêu cầu: operations-playbook/ · Quyết định: docs/adr/
             </footer>
           </div>
         </div>

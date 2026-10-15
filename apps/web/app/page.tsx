@@ -30,7 +30,12 @@ async function loadPlatformStatus(): Promise<PlatformStatus> {
   }
 }
 
-const DEMO_TOUR: readonly {
+/**
+ * The screens of the product, each with the label its own content earns: a screen that
+ * reads real rows is `live`, a screen that draws simulated data is `mock`, a screen that
+ * only describes the plan is `concept` (AGENTS.md).
+ */
+const SURFACES: readonly {
   href: string;
   stage: StatusKind;
   title: string;
@@ -40,49 +45,49 @@ const DEMO_TOUR: readonly {
     href: '/objects',
     stage: 'live',
     title: 'Business Objects & bản ghi',
-    body: 'Khai schema với field có kiểu, tạo định nghĩa và nhập bản ghi thật vào PostgreSQL.',
+    body: 'Khai schema với field có kiểu, publish định nghĩa theo phiên bản bất biến và nhập bản ghi thật vào PostgreSQL.',
   },
   {
     href: '/forms',
     stage: 'live',
-    title: 'Form Builder preview',
-    body: 'Form nhập liệu sinh trực tiếp từ schema; thử submit để thấy validate ở server.',
+    title: 'Form builder',
+    body: 'Form nhập liệu sinh trực tiếp từ schema; validate ở server theo đúng phiên bản định nghĩa mà bản ghi được tạo dưới.',
   },
   {
     href: '/workflows',
-    stage: 'mock',
-    title: 'Workflow Designer',
-    body: 'Sơ đồ hai quy trình mẫu với nhánh điều kiện — preview thiết kế; runtime thật nằm ở API.',
+    stage: 'live',
+    title: 'Workflow designer',
+    body: 'Canvas kéo thả trên bản nháp của trình duyệt rồi publish thành phiên bản mới; bản đã publish là bất biến và instance giữ phiên bản lúc start.',
   },
   {
     href: '/tasks',
-    stage: 'mock',
-    title: 'Task Inbox',
-    body: 'Timeline và người giữ việc trên dữ liệu mô phỏng; engine duyệt thật đã có ở API.',
+    stage: 'live',
+    title: 'Task inbox',
+    body: 'Việc đang mở thuộc đúng các role người đăng nhập giữ; mở một việc để xem bản ghi, timeline sự kiện và quyết định duyệt / trả về / từ chối.',
   },
   {
     href: '/analytics',
-    stage: 'mock',
-    title: 'Analytics Studio',
-    body: 'Chọn metric, dimension và chart trên số liệu fixture; bố cục widget kéo thả và lưu được thật.',
+    stage: 'live',
+    title: 'Analytics',
+    body: 'Metric tự định nghĩa trên field của object (đếm / tổng / trung bình, lọc, nhóm) chạy trên projection có kiểu, cộng số liệu vận hành của engine — tất cả theo phạm vi đọc.',
   },
   {
     href: '/apps',
     stage: 'live',
     title: 'Application showcase',
-    body: 'Cùng một object dưới dạng list, detail, kanban, cấu hình quản trị và panel tích hợp — hai dạng xem đọc dữ liệu thật.',
-  },
-  {
-    href: '/roadmap',
-    stage: 'concept',
-    title: 'Roadmap tới MVP',
-    body: 'Bốn phase, điều kiện nghiệm thu MVP và các quyết định đang chặn tiến độ.',
+    body: 'Cùng một object dưới nhiều dạng xem: danh sách và chi tiết đọc dữ liệu thật; kanban và panel connector là mô phỏng, tab cấu hình là concept — mỗi view gắn nhãn riêng.',
   },
   {
     href: '/settings',
     stage: 'live',
-    title: 'Cài đặt & môi trường demo',
-    body: 'Endpoint đang chạy, cổng local và toolchain được pin cho buổi trình diễn.',
+    title: 'Cài đặt',
+    body: 'Endpoint đang chạy, cổng và toolchain được pin, cùng nhật ký giao webhook ra ngoài (kể cả lần thử lại).',
+  },
+  {
+    href: '/roadmap',
+    stage: 'concept',
+    title: 'Roadmap',
+    body: 'Bốn phase, điều kiện nghiệm thu MVP V1 và những gì còn thiếu — kế hoạch, không phải tính năng đã có.',
   },
 ];
 
@@ -97,7 +102,7 @@ const PRINCIPLES: readonly { title: string; body: string }[] = [
   },
   {
     title: 'Platform-first, không over-engineer',
-    body: 'Domain và interface đủ mở rộng, nhưng demo chỉ hiện thực hóa một tập use case an toàn và dùng được.',
+    body: 'Domain và interface đủ mở rộng, nhưng V1 chỉ hiện thực hóa một tập use case an toàn và dùng được.',
   },
   {
     title: 'Data & security by design',
@@ -108,41 +113,39 @@ const PRINCIPLES: readonly { title: string; body: string }[] = [
     body: 'V1 không phải một bộ UI: workflow phải chạy đúng, quyền hợp lệ, dữ liệu bền vững và theo dõi được.',
   },
   {
-    title: 'Demo minh họa tầm nhìn',
-    body: 'Tính năng mô phỏng phải được gắn nhãn rõ ràng, không được trình bày như chức năng thật.',
+    title: 'Nhãn trạng thái phải trung thực',
+    body: 'Phần mô phỏng được gắn nhãn rõ ràng và không bao giờ được trình bày như chức năng thật — theo cả hai chiều.',
   },
 ];
 
-const DEMO_PLAN: readonly { time: string; title: string; body: string }[] = [
+/**
+ * What the product does not do yet. Kept next to the surfaces so the page never reads as
+ * if the platform were finished; the roadmap page carries the detail and the phases.
+ */
+const NOT_YET: readonly { title: string; body: string }[] = [
   {
-    time: 'Tuần 1',
-    title: 'Foundation & Design System',
-    body: 'App shell, navigation, design tokens, domain và API contracts.',
+    title: 'OIDC / SSO',
+    body: 'Đăng nhập hiện dùng tài khoản nội bộ có role và bộ phận. Cắm IdP của tổ chức đang chờ chính IdP đó.',
   },
   {
-    time: 'Tuần 2–3',
-    title: 'Business Object & Form Builder',
-    body: 'Schema editor, field types, validation, preview.',
+    title: 'SLA và escalation',
+    body: 'Hạn xử lý, timer và tự động chuyển cấp cần một chính sách thời gian làm việc — thuộc V1.x, nên không có hạn giả nào được hiển thị.',
   },
   {
-    time: 'Tuần 4–5',
-    title: 'Workflow & Task Experience',
-    body: 'Visual graph, nhánh điều kiện, duyệt/từ chối/trả về, timeline và inbox.',
+    title: 'Integration Hub đầy đủ',
+    body: 'Hiện có webhook ra ngoài kèm retry và nhật ký giao; adapter hai chiều với mapping thì chưa.',
   },
   {
-    time: 'Tuần 6',
-    title: 'Analytics Studio',
-    body: 'Metric, chart selector, dashboard được lưu theo bố cục.',
+    title: 'Kanban và connector thật',
+    body: 'Hai dạng xem này trong Application showcase là mô phỏng để minh hoạ Application Builder (V2).',
   },
   {
-    time: 'Tuần 7',
-    title: 'Application Builder Showcase',
-    body: 'Một mini-app giả định, mock connector và màn hình administration.',
+    title: 'Tiện ích của trình soạn quy trình',
+    body: 'Undo/redo và nhiều người cùng sửa một định nghĩa cần khoá lạc quan — chưa nằm trong V1.',
   },
   {
-    time: 'Tuần 8',
-    title: 'Polish & Vision Roadmap',
-    body: 'Walkthrough, nhãn live/mock/concept, nội dung roadmap và test demo flows.',
+    title: 'Song song và join',
+    body: 'Nhiều nhánh cùng lúc, gộp nhánh và điều kiện join nằm ngoài phạm vi đã chốt của ADR 0007.',
   },
 ];
 
@@ -153,11 +156,11 @@ const STATUS_LEGEND: readonly { kind: StatusKind; body: string }[] = [
   },
   {
     kind: 'mock',
-    body: 'Mô phỏng: giao diện thật nhưng dữ liệu và hành vi được giả lập cho buổi trình diễn.',
+    body: 'Mô phỏng: giao diện thật nhưng dữ liệu và hành vi được giả lập để minh hoạ.',
   },
   {
     kind: 'concept',
-    body: 'Concept: minh họa tầm nhìn dài hạn, chưa có hành vi và chưa thuộc phạm vi demo.',
+    body: 'Concept: minh họa tầm nhìn dài hạn, chưa có hành vi và chưa thuộc phạm vi V1.',
   },
 ];
 
@@ -167,9 +170,9 @@ export default async function OverviewPage() {
   return (
     <>
       <PageHeader
-        eyebrow="01 / Product vision"
+        eyebrow="01 / Tổng quan"
         title="OPVARYN — Business Operations Platform"
-        lead="Một nền tảng xây dựng và điều phối hoạt động nội bộ, nơi tổ chức tự định nghĩa dữ liệu, quy trình, ứng dụng nghiệp vụ và báo cáo của mình. Trang này là điểm vào của bản demo tương tác."
+        lead="Một nền tảng xây dựng và điều phối hoạt động nội bộ, nơi tổ chức tự định nghĩa dữ liệu, quy trình, ứng dụng nghiệp vụ và báo cáo của mình. MVP V1 đang chạy trong repo này: ba quy trình pilot, engine duyệt thật, phân quyền theo role và bộ phận, analytics trên projection có kiểu, và triển khai một host có backup."
       />
 
       <Card className="mb-6">
@@ -216,22 +219,26 @@ export default async function OverviewPage() {
 
       <div className="mb-6 grid gap-4 sm:grid-cols-3">
         <KpiCard
-          label="Luận điểm chính"
-          value="Platform-first"
-          note="Không đóng khung trong phiếu hoặc luồng duyệt."
+          label="Quy trình pilot"
+          value="3"
+          note="Duyệt mua hàng, xử lý sự cố IT và onboarding nhân sự (D07)."
         />
-        <KpiCard label="Mốc demo" value="8 tuần" note="Bản trình diễn tương tác của tầm nhìn." />
         <KpiCard
-          label="Mốc MVP V1"
-          value="24 tuần"
-          note="Ước lượng từ playbook, chưa phải cam kết."
+          label="Điều kiện nghiệm thu MVP V1"
+          value="1–7"
+          note="Có bằng chứng chạy được trong repo; chi tiết ở trang Roadmap."
+        />
+        <KpiCard
+          label="Triển khai"
+          value="1 host"
+          note="Docker Compose, TLS qua Caddy, backup có diễn tập phục hồi (ADR 0009)."
         />
       </div>
 
       <section className="mb-6">
-        <h2 className="mb-3 text-lg font-semibold tracking-tight">Walkthrough bản demo</h2>
+        <h2 className="mb-3 text-lg font-semibold tracking-tight">Các màn hình của sản phẩm</h2>
         <div className="grid gap-4 sm:grid-cols-2">
-          {DEMO_TOUR.map((stop, index) => (
+          {SURFACES.map((stop, index) => (
             <Link key={stop.href} href={stop.href} className="group">
               <Card className="h-full transition-colors group-hover:border-border-strong">
                 <div className="flex items-start justify-between gap-3">
@@ -251,6 +258,21 @@ export default async function OverviewPage() {
       </section>
 
       <section className="mb-6">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <h2 className="text-lg font-semibold tracking-tight">Chưa có trong V1</h2>
+          <StatusBadge kind="concept" />
+        </div>
+        <div className="grid gap-4 sm:grid-cols-2">
+          {NOT_YET.map((item) => (
+            <Card key={item.title}>
+              <h3 className="text-sm font-semibold">{item.title}</h3>
+              <p className="mt-1.5 text-sm leading-relaxed text-on-surface-muted">{item.body}</p>
+            </Card>
+          ))}
+        </div>
+      </section>
+
+      <section className="mb-6">
         <h2 className="mb-3 text-lg font-semibold tracking-tight">Nguyên tắc đã thống nhất</h2>
         <div className="grid gap-4 sm:grid-cols-2">
           {PRINCIPLES.map((principle) => (
@@ -262,23 +284,6 @@ export default async function OverviewPage() {
             </Card>
           ))}
         </div>
-      </section>
-
-      <section className="mb-6">
-        <h2 className="mb-3 text-lg font-semibold tracking-tight">Kế hoạch 8 tuần của bản demo</h2>
-        <ol className="space-y-3">
-          {DEMO_PLAN.map((step) => (
-            <li key={step.time} className="flex gap-4">
-              <span className="w-20 shrink-0 pt-0.5 font-mono text-xs text-accent-strong">
-                {step.time}
-              </span>
-              <div className="min-w-0">
-                <p className="text-sm font-medium">{step.title}</p>
-                <p className="mt-0.5 text-sm text-on-surface-muted">{step.body}</p>
-              </div>
-            </li>
-          ))}
-        </ol>
       </section>
 
       <section>

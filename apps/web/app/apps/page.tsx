@@ -37,7 +37,7 @@ export default async function ApplicationsPage() {
         eyebrow="07 / Application builder"
         title="Applications"
         lead="Cùng một business object, nhiều dạng xem: danh sách, chi tiết, kanban, cấu hình quản trị và panel tích hợp — thứ mà Application Builder (V2) sẽ cho admin tự cấu hình. Danh sách và chi tiết đọc dữ liệu thật; kanban, cấu hình và connector là mô phỏng hoặc concept, mỗi view gắn nhãn riêng."
-        aside={<StatusBadge kind={error ? 'mock' : 'live'} />}
+        aside={error ? undefined : <StatusBadge kind="live" />}
       />
 
       {error ? (
@@ -72,7 +72,7 @@ export default async function ApplicationsPage() {
 
       <section className="mt-8 grid gap-4 sm:grid-cols-2">
         <Card>
-          <CardTitle>Trong demo đã là thật</CardTitle>
+          <CardTitle>Chạy thật trong V1</CardTitle>
           <CardDescription>
             Danh sách và chi tiết đọc bản ghi từ PostgreSQL qua API Go; thêm bản ghi ở Business
             Objects sẽ xuất hiện ngay ở đây.

@@ -520,11 +520,11 @@ check_surface() {
   done
 }
 
-check_surface "/" "overview" "Walkthrough bản demo" "Trạng thái nền tảng"
+check_surface "/" "overview" "Các màn hình của sản phẩm" "Trạng thái nền tảng"
 check_surface "/forms?object=$object_key" "forms" "Preview form" 'name="priority"'
 check_surface "/workflows" "workflows" "Tạo quy trình mới" "Node catalog theo lộ trình"
 # No process was started yet, so the live inbox is empty for this role — and it says so.
-check_surface "/tasks" "tasks" "Không có việc nào đang chờ bạn" "Engine đã có gì, inbox còn thiếu gì"
+check_surface "/tasks" "tasks" "Không có việc nào đang chờ bạn" "Engine đã có gì, còn thiếu gì"
 check_surface "/apps" "applications" "Kanban" "Cấu hình" "Tích hợp"
 check_surface "/roadmap" "roadmap" "Điều kiện nghiệm thu MVP V1" "Quyết định đang mở chặn tiến độ" "Concept"
 check_surface "/settings" "settings" "make seed-demo" "make smoke-api"

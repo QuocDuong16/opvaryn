@@ -63,7 +63,7 @@ const MVP_ACCEPTANCE: readonly string[] = [
 const OUT_OF_MVP: readonly { title: string; body: string }[] = [
   {
     title: 'Full Application Builder',
-    body: 'Chỉ làm vertical slice trên demo, V2 mới xây runtime tổng quát.',
+    body: 'Chỉ làm vertical slice trong V1 (Application showcase), V2 mới xây runtime tổng quát.',
   },
   {
     title: 'Workflow tự do vô hạn',
@@ -132,17 +132,17 @@ export default function RoadmapPage() {
       <PageHeader
         eyebrow="08 / Roadmap"
         title="Roadmap"
-        lead="Lộ trình từ bản demo này tới nền tảng vận hành thật, lấy nguyên từ operations playbook. Các phase dưới đây là kế hoạch, không phải tính năng đã có; ngày tháng là ước lượng, không phải deadline đã cam kết."
+        lead="Lộ trình từ mốc demo (đã xong) tới nền tảng vận hành thật, lấy nguyên từ operations playbook. Các phase dưới đây là kế hoạch, không phải tính năng đã có; ngày tháng là ước lượng, không phải deadline đã cam kết."
         aside={<StatusBadge kind="concept" />}
       />
 
       <Card className="mb-6">
         <div className="flex flex-wrap items-start justify-between gap-3">
           <div>
-            <CardTitle>Bản demo đang ở đâu</CardTitle>
+            <CardTitle>Sản phẩm đang ở đâu</CardTitle>
             <CardDescription>
-              Mốc 1 của lộ trình — kế hoạch 8 tuần — đã dựng xong trong repo này, và phần MVP V1
-              đang được triển khai tiếp trên cùng nền đó.
+              Mốc demo 8 tuần đã dựng xong và MVP V1 đang chạy trên cùng nền đó. Phần dưới đây là
+              trạng thái thật của mã nguồn, không phải kế hoạch.
             </CardDescription>
           </div>
           <StatusBadge kind="live" />
@@ -170,7 +170,7 @@ export default function RoadmapPage() {
               Mô phỏng (mock)
             </dt>
             <dd className="mt-1 text-sm">
-              Kanban và connector trong Application showcase — giao diện thật, dữ liệu fixture.
+              Kanban và connector trong Application showcase — giao diện thật, dữ liệu minh hoạ.
             </dd>
           </div>
           <div>
@@ -212,12 +212,12 @@ export default function RoadmapPage() {
         <Card>
           <CardDescription>
             Danh sách tiêu chí từ playbook để một bản phát hành được coi là dùng được — khác với
-            tiêu chuẩn của bản demo. Hiện đã đáp ứng mục 1–4 và 6 (admin dựng object, form, quy
-            trình và metric ngay trong web; nhân viên tạo bản ghi và theo dõi trạng thái; có
-            approval, nhánh điều kiện, reject/return; quyền và phạm vi kiểm tra ở server kèm audit;
-            người quản lý tự cấu hình dashboard với metric được cấp quyền). Mục 5 và 7 cũng đã có:
-            webhook ra ngoài có retry và nhật ký giao (ADR 0012), và `make smoke-restart` chứng minh
-            crash không mất state, retry không áp dụng hai lần.
+            tiêu chuẩn của mốc demo (đã xong). Hiện đã đáp ứng mục 1–4 và 6 (admin dựng object,
+            form, quy trình và metric ngay trong web; nhân viên tạo bản ghi và theo dõi trạng thái;
+            có approval, nhánh điều kiện, reject/return; quyền và phạm vi kiểm tra ở server kèm
+            audit; người quản lý tự cấu hình dashboard với metric được cấp quyền). Mục 5 và 7 cũng
+            đã có: webhook ra ngoài có retry và nhật ký giao (ADR 0012), và `make smoke-restart`
+            chứng minh crash không mất state, retry không áp dụng hai lần.
           </CardDescription>
           <ol className="mt-4 space-y-2.5">
             {MVP_ACCEPTANCE.map((item, index) => (
@@ -309,7 +309,7 @@ export default function RoadmapPage() {
                   Nguồn lực
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium">
-                  Demo
+                  Mốc demo
                 </th>
                 <th scope="col" className="px-4 py-3 font-medium">
                   MVP (từ đầu)
@@ -330,20 +330,21 @@ export default function RoadmapPage() {
         <div className="mt-4 grid gap-4 sm:grid-cols-2">
           <div className="rounded-xl border border-border p-4">
             <span className="font-mono text-xs tracking-wide text-on-surface-muted uppercase">
-              Khởi động 13/10/2026
+              Mốc demo (8 tuần)
             </span>
-            <p className="mt-2 text-lg font-semibold tracking-tight">08/12/2026</p>
+            <p className="mt-2 text-lg font-semibold tracking-tight">đã xong</p>
             <p className="mt-1 text-xs text-on-surface-muted">
-              Mục tiêu demo 8 tuần, không phải deadline đã cam kết.
+              Bản demo tương tác đã dựng xong; MVP V1 được xây tiếp trên cùng nền đó.
             </p>
           </div>
           <div className="rounded-xl border border-border p-4">
             <span className="font-mono text-xs tracking-wide text-on-surface-muted uppercase">
-              Nếu phạm vi không đổi lớn
+              MVP V1
             </span>
-            <p className="mt-2 text-lg font-semibold tracking-tight">30/03/2027</p>
+            <p className="mt-2 text-lg font-semibold tracking-tight">đang chạy trong repo</p>
             <p className="mt-1 text-xs text-on-surface-muted">
-              Mục tiêu MVP 24 tuần; playbook khuyến nghị dự phòng đến 30 tuần.
+              Ước lượng 20–30 tuần một dev full-time + AI tính từ đầu; đây là ước lượng từ playbook,
+              không phải cam kết.
             </p>
           </div>
         </div>

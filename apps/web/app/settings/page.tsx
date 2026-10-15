@@ -137,7 +137,7 @@ export default async function SettingsPage() {
       <PageHeader
         eyebrow="09 / Settings"
         title="Cài đặt"
-        lead="Cấu hình theo tổ chức (identity, phân quyền, môi trường) chưa thuộc phạm vi demo. Trang này ghi lại cấu hình kỹ thuật đang có để dev và người trình diễn đối chiếu."
+        lead="Cấu hình theo tổ chức (identity, phân quyền, môi trường) chưa thuộc phạm vi V1. Trang này ghi lại cấu hình kỹ thuật đang có để dev và người vận hành đối chiếu."
         aside={<StatusBadge kind="live" />}
       />
 
@@ -175,17 +175,18 @@ export default async function SettingsPage() {
         </Card>
 
         <Card className="lg:col-span-2">
-          <CardTitle>Dữ liệu demo</CardTitle>
+          <CardTitle>Dữ liệu mẫu và bộ lệnh kiểm tra</CardTitle>
           <CardDescription>
-            Bản ghi nằm trong PostgreSQL local; mọi màn hình đọc lại từ đó nên dữ liệu bạn nhập sẽ
-            còn sau khi khởi động lại API/web.
+            Bản ghi nằm trong PostgreSQL; mọi màn hình đọc lại từ đó nên dữ liệu bạn nhập sẽ còn sau
+            khi khởi động lại API/web.
           </CardDescription>
           <dl className="mt-4 space-y-3 text-sm">
             <div>
               <dt className="font-mono text-xs text-accent-strong">make seed-demo</dt>
               <dd className="mt-0.5 text-xs text-on-surface-muted">
-                Nạp hai business object mẫu (purchase_request, it_incident) và một số bản ghi qua
-                chính API. Idempotent: chạy lại không tạo trùng.
+                Nạp ba business object pilot (purchase_request, it_incident, hr_onboarding), quy
+                trình của chúng và một số bản ghi qua chính API. Idempotent: chạy lại không tạo
+                trùng.
               </dd>
             </div>
             <div>
@@ -197,7 +198,7 @@ export default async function SettingsPage() {
             <div>
               <dt className="font-mono text-xs text-accent-strong">make smoke-demo-flows</dt>
               <dd className="mt-0.5 text-xs text-on-surface-muted">
-                Build cả API và web, replay form của các luồng demo (nhập bản ghi, tạo object, lưu
+                Build cả API và web, replay form của các luồng chính (nhập bản ghi, tạo object, lưu
                 bố cục) rồi kiểm chứng dữ liệu đã lưu. Dừng dev server trước khi chạy.
               </dd>
             </div>
@@ -214,7 +215,7 @@ export default async function SettingsPage() {
       <section className="mt-8">
         <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
           <h2 className="text-lg font-semibold tracking-tight">Tích hợp ra ngoài (webhook)</h2>
-          <StatusBadge kind={deliveriesError ? 'mock' : 'live'} />
+          {deliveriesError ? null : <StatusBadge kind="live" />}
         </div>
         <Card>
           <CardDescription>

@@ -24,8 +24,8 @@ export default async function ObjectsPage() {
       <PageHeader
         eyebrow="02 / Business objects"
         title="Business Objects"
-        lead="Định nghĩa dữ liệu nghiệp vụ: schema, field có kiểu rõ ràng và key ổn định. Đây là lát cắt chạy thật của demo — định nghĩa và bản ghi đều đi qua API Go và lưu trong PostgreSQL. Mở một object để nhập bản ghi bằng form sinh từ schema."
-        aside={<StatusBadge kind={error ? 'mock' : 'live'} />}
+        lead="Định nghĩa dữ liệu nghiệp vụ: schema, field có kiểu rõ ràng và key ổn định. Định nghĩa và bản ghi đều đi qua API Go và lưu trong PostgreSQL. Mở một object để nhập bản ghi bằng form sinh từ schema."
+        aside={error ? undefined : <StatusBadge kind="live" />}
       />
 
       {error ? (

@@ -95,7 +95,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
         eyebrow="06 / Analytics studio"
         title="Analytics"
         lead="Dashboard tự cấu hình trên metric thật: metric định nghĩa bằng field của business object (đếm, tổng, trung bình, lọc và nhóm), chạy trên projection có kiểu và trả về đúng phạm vi dữ liệu bạn được đọc. Số liệu và bố cục đều thật."
-        aside={<StatusBadge kind={error || needsSignIn ? 'mock' : 'live'} />}
+        aside={error || needsSignIn ? undefined : <StatusBadge kind="live" />}
       />
 
       {needsSignIn ? (

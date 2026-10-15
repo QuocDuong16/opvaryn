@@ -78,7 +78,6 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
           eyebrow="04 / Workflow designer"
           title={key}
           lead="Không đọc được định nghĩa này từ API."
-          aside={<StatusBadge kind="mock" />}
         />
         <Card className="border-warning/40">
           <CardTitle className="text-warning">Không đọc được dữ liệu</CardTitle>

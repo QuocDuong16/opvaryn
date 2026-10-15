@@ -53,7 +53,7 @@ export default async function TasksPage() {
         eyebrow="05 / Task inbox"
         title="Tasks"
         lead="Inbox thật: task đang mở thuộc đúng các role mà người đang đăng nhập giữ, đọc từ engine qua API. Mở một việc để xem bản ghi, timeline sự kiện và quyết định duyệt, trả về hoặc từ chối."
-        aside={<StatusBadge kind={error || needsSignIn ? 'mock' : 'live'} />}
+        aside={error || needsSignIn ? undefined : <StatusBadge kind="live" />}
       />
 
       {needsSignIn ? (
@@ -169,9 +169,7 @@ export default async function TasksPage() {
       {me ? (
         <section className="mt-8">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-            <h2 className="text-lg font-semibold tracking-tight">
-              Engine đã có gì, inbox còn thiếu gì
-            </h2>
+            <h2 className="text-lg font-semibold tracking-tight">Engine đã có gì, còn thiếu gì</h2>
             <StatusBadge kind="concept" />
           </div>
           <div className="grid gap-4 sm:grid-cols-2">

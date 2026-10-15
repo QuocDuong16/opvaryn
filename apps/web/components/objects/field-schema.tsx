@@ -7,8 +7,8 @@ export function FieldSchema({ object }: { object: BusinessObject }) {
   if (object.fields.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-border-strong px-3 py-2 text-sm text-on-surface-muted">
-        Object chưa có field nào. Trong demo, schema được khai báo khi tạo object; chỉnh sửa schema
-        sau khi có bản ghi thuộc phạm vi MVP.
+        Object chưa có field nào. Schema được khai báo khi tạo object; chỉnh sửa schema sau khi có
+        bản ghi thuộc phạm vi MVP.
       </p>
     );
   }

@@ -6,15 +6,15 @@ export interface NavItem {
 }
 
 /**
- * Demo navigation. The order follows the playbook demo plan: the shell and
- * business objects come first, applications last.
+ * Product navigation. The order follows the playbook: the shell and business objects
+ * come first, applications last.
  */
 export const NAV_ITEMS: readonly NavItem[] = [
   {
     href: '/',
     index: '01',
     label: 'Tổng quan',
-    description: 'Tầm nhìn, phạm vi demo và trạng thái nền tảng',
+    description: 'Tầm nhìn, phạm vi V1 và trạng thái nền tảng',
   },
   {
     href: '/objects',
@@ -62,7 +62,7 @@ export const NAV_ITEMS: readonly NavItem[] = [
     href: '/settings',
     index: '09',
     label: 'Cài đặt',
-    description: 'Cấu hình tổ chức và môi trường demo',
+    description: 'Cấu hình tổ chức và môi trường',
   },
 ];
 

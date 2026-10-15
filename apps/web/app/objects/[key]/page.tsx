@@ -68,7 +68,6 @@ export default async function ObjectDetailPage({ params }: PageProps) {
           eyebrow="02 / Business objects"
           title={key}
           lead="Không đọc được định nghĩa này từ API."
-          aside={<StatusBadge kind="mock" />}
         />
         <Card className="border-warning/40">
           <CardTitle className="text-warning">Không đọc được dữ liệu</CardTitle>

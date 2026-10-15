@@ -88,7 +88,7 @@ export default async function WorkflowsPage() {
         eyebrow="04 / Workflow designer"
         title="Workflows"
         lead="Định nghĩa quy trình là dữ liệu thật: graph được publish theo phiên bản bất biến, instance gắn với phiên bản lúc start, và engine duyệt theo role với event log append-only. Trang này đọc và ghi chính những định nghĩa đó qua API."
-        aside={<StatusBadge kind={error || needsSignIn ? 'mock' : 'live'} />}
+        aside={error || needsSignIn ? undefined : <StatusBadge kind="live" />}
       />
 
       {needsSignIn ? (

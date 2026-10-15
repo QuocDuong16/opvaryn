@@ -67,7 +67,6 @@ export default async function ProcessInstancePage({ params }: PageProps) {
             eyebrow="05 / Task inbox"
             title="Cần đăng nhập"
             lead="Phiên làm việc đã hết hạn hoặc chưa đăng nhập. Đăng nhập lại để xem quy trình này."
-            aside={<StatusBadge kind="mock" />}
           />
           <Card className="border-warning/40">
             <CardTitle className="text-warning">Chưa có session hợp lệ</CardTitle>
@@ -90,7 +89,6 @@ export default async function ProcessInstancePage({ params }: PageProps) {
           eyebrow="05 / Task inbox"
           title="Không đọc được quy trình"
           lead="API không trả được instance này. Kiểm tra server Go và PostgreSQL rồi thử lại."
-          aside={<StatusBadge kind="mock" />}
         />
         <Card className="border-warning/40">
           <CardTitle className="text-warning">Lỗi khi đọc instance</CardTitle>
