@@ -16,6 +16,7 @@ import {
   formatRate,
   reworkedLabel,
 } from '@/components/analytics/process-metrics';
+import { fieldNames, labelOrKey } from '@/lib/names';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
@@ -28,6 +29,32 @@ const WINDOW_CHOICES = [7, 30, 90, 365] as const;
 
 interface PageProps {
   searchParams: Promise<{ definition?: string; window?: string }>;
+}
+
+/** OPERATOR_LABELS names the comparison operators the way a person reads them. */
+const OPERATOR_LABELS: Record<string, string> = {
+  eq: 'bằng',
+  ne: 'khác',
+  gt: 'lớn hơn',
+  gte: 'từ',
+  lt: 'nhỏ hơn',
+  lte: 'đến',
+};
+
+const AGGREGATION_LABELS: Record<string, string> = {
+  count: 'Đếm',
+  sum: 'Tổng',
+  avg: 'Trung bình',
+};
+
+/** aggregationLabel says what the metric does, in words: "Tổng của Giá trị dự kiến". */
+function aggregationLabel(metric: MetricDefinition, fields: ReadonlyMap<string, string>): string {
+  const label = AGGREGATION_LABELS[metric.aggregation] ?? metric.aggregation;
+  if (!metric.measure) {
+    return `${label} bản ghi`;
+  }
+  const field = labelOrKey(fields.get(metric.measure.key), metric.measure.key);
+  return `${label} của ${field}`;
 }
 
 export default async function AnalyticsPage({ searchParams }: PageProps) {
@@ -92,6 +119,13 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
 
   const widgets = await getDashboardWidgets(metrics.map((metric) => metric.key));
 
+  // The metric table names its object and its fields (ADR 0018).
+  const objectNames = new Map(objects.map((object) => [object.key, object.name]));
+  const fieldNameFor = (objectKey: string): Map<string, string> => {
+    const object = objects.find((candidate) => candidate.key === objectKey);
+    return object ? fieldNames(object) : new Map();
+  };
+
   return (
     <>
       <PageHeader
@@ -134,18 +168,22 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               </h2>
               <StatusBadge kind="live" />
             </div>
-            <DashboardStudio metrics={metrics} results={results} initialWidgets={widgets} />
+            <DashboardStudio
+              metrics={metrics}
+              results={results}
+              initialWidgets={widgets}
+              fieldNames={Object.fromEntries(
+                objects.map((object) => [object.key, Object.fromEntries(fieldNames(object))]),
+              )}
+            />
           </section>
 
           <section className="mb-8">
-            <h2 className="mb-3 text-lg font-semibold tracking-tight">Tạo metric</h2>
+            <h2 className="mb-3 text-lg font-semibold tracking-tight">Tạo chỉ số</h2>
             <Card>
               <CardDescription>
-                Metric là cấu hình: tạo và sửa cần role{' '}
-                <code className="font-mono text-xs">process_designer</code> hoặc{' '}
-                <code className="font-mono text-xs">admin</code>. Field lấy từ chính định nghĩa
-                business object, bộ lọc dùng đúng ngôn ngữ điều kiện của nhánh quy trình (D04), và
-                service là nơi từ chối những gì không hợp lệ — không có đường nào để viết SQL.
+                Chọn loại dữ liệu, cách tính và bộ lọc; con số chạy trên đúng những bản ghi bạn được
+                đọc. Sửa metric cần quyền thiết kế quy trình.
               </CardDescription>
               <div className="mt-5">
                 <CreateMetricForm objects={objects} />
@@ -156,7 +194,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
           <section className="mb-8">
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-lg font-semibold tracking-tight">
-                {`Metric đã định nghĩa (${metrics.length})`}
+                {`Chỉ số đã định nghĩa (${metrics.length})`}
               </h2>
               <StatusBadge kind="live" />
             </div>
@@ -194,18 +232,20 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                         <tr key={metric.key}>
                           <td className="px-4 py-3 align-top">
                             <span className="font-medium">{metric.name}</span>
-                            <span className="mt-0.5 block font-mono text-[11px] text-on-surface-muted">
-                              {`${metric.key} · ${metric.objectKey}`}
+                            <span className="mt-0.5 block text-[11px] text-on-surface-muted">
+                              {`Trên ${labelOrKey(objectNames.get(metric.objectKey), metric.objectKey)}`}
                             </span>
                           </td>
-                          <td className="px-4 py-3 align-top font-mono text-xs">
-                            {`${metric.aggregation}${metric.measure ? `(${metric.measure.key})` : ''}`}
+                          <td className="px-4 py-3 align-top text-xs">
+                            {aggregationLabel(metric, fieldNameFor(metric.objectKey))}
                           </td>
                           <td className="px-4 py-3 align-top text-xs text-on-surface-muted">
                             {metric.filter
-                              ? `${metric.filter.field} ${metric.filter.op} ${String(metric.filter.value)}`
+                              ? `${labelOrKey(fieldNameFor(metric.objectKey).get(metric.filter.field), metric.filter.field)} ${OPERATOR_LABELS[metric.filter.op] ?? metric.filter.op} ${String(metric.filter.value)}`
                               : 'không lọc'}
-                            {metric.groupBy ? ` · nhóm theo ${metric.groupBy.key}` : ''}
+                            {metric.groupBy
+                              ? ` · nhóm theo ${labelOrKey(fieldNameFor(metric.objectKey).get(metric.groupBy.key), metric.groupBy.key)}`
+                              : ''}
                           </td>
                           <td className="px-4 py-3 align-top text-xs">
                             {result ? (

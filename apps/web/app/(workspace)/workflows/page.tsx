@@ -11,9 +11,12 @@ import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { ListSearch, Pagination, pageOffset } from '@/components/ui/list-controls';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { isAdmin } from '@/lib/access';
+import { advancedVisible } from '@/lib/advanced';
+import { getAdvancedMode } from '@/lib/advanced-server';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatTimestamp } from '@/lib/format';
-import { roleLabels } from '@/lib/names';
+import { labelOrKey, roleLabels } from '@/lib/names';
 
 export const metadata = { title: 'Quy trình' };
 
@@ -56,6 +59,16 @@ interface PageProps {
   searchParams: Promise<{ q?: string; offset?: string }>;
 }
 
+/** loadRoles answers who is asking; a broken API keeps the build material hidden. */
+async function loadRoles(): Promise<string[]> {
+  try {
+    const me = await createServerApiClient().getMe();
+    return me.roles;
+  } catch {
+    return [];
+  }
+}
+
 /** One page of definitions; the API slices and reports the total. */
 const PER_PAGE = 25;
 
@@ -93,6 +106,10 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
   // Suggestions for the role field: the catalogue (roles someone holds, with the name each
   // one is shown under) plus the roles existing definitions already name, so a definition
   // that references a role nobody holds still shows it instead of looking like a typo.
+  const [roles, advanced] = await Promise.all([loadRoles(), getAdvancedMode()]);
+  const showAdvanced = advancedVisible(isAdmin(roles), advanced);
+
+  const objectNames = new Map(objects.map((object) => [object.key, object.name]));
   const named = roleLabels(roleCatalogue);
   const knownRoles: RoleEntry[] = [
     ...new Set([
@@ -179,13 +196,13 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
                     Quy trình
                   </th>
                   <th scope="col" className="px-4 py-3 font-medium">
-                    Business object
+                    Loại dữ liệu
                   </th>
                   <th scope="col" className="px-4 py-3 font-medium">
                     Phiên bản
                   </th>
                   <th scope="col" className="px-4 py-3 font-medium">
-                    Graph
+                    Quy mô
                   </th>
                   <th scope="col" className="px-4 py-3 font-medium">
                     Cập nhật
@@ -202,16 +219,10 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
                       >
                         {definition.name}
                       </Link>
-                      <span className="mt-0.5 block font-mono text-[11px] text-on-surface-muted">
-                        {definition.key}
-                      </span>
                     </td>
                     <td className="px-4 py-3 align-top">
-                      <Link
-                        href={`/objects/${definition.objectKey}`}
-                        className="font-mono text-xs hover:underline"
-                      >
-                        {definition.objectKey}
+                      <Link href={`/objects/${definition.objectKey}`} className="hover:underline">
+                        {labelOrKey(objectNames.get(definition.objectKey), definition.objectKey)}
                       </Link>
                     </td>
                     <td className="px-4 py-3 align-top">
@@ -220,7 +231,7 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
                       </span>
                     </td>
                     <td className="px-4 py-3 align-top text-xs text-on-surface-muted">
-                      {`${definition.nodes.length} node · ${definition.edges.length} đường chuyển`}
+                      {`${definition.nodes.length} bước · ${definition.edges.length} đường nối`}
                     </td>
                     <td className="px-4 py-3 align-top text-xs whitespace-nowrap text-on-surface-muted">
                       {formatTimestamp(definition.updatedAt)}
@@ -245,10 +256,9 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
         <h2 className="mb-3 text-lg font-semibold tracking-tight">Tạo quy trình mới</h2>
         <Card>
           <CardDescription>
-            Biểu mẫu này publish version 1 qua API. Graph được kiểm tra ở service: đúng một node bắt
-            đầu, ít nhất một việc của người và một node kết thúc, không chu trình, mọi node đi được
-            từ start, node điều kiện có đủ nhánh đúng/sai, và literal của điều kiện phải hợp với
-            kiểu field của business object.
+            Đặt tên, chọn loại dữ liệu quy trình đọc, rồi thêm các bước và đường nối giữa chúng.
+            Trước khi lưu, hệ thống kiểm tra quy trình có đủ điểm bắt đầu, việc giao cho người và
+            điểm kết thúc hay không.
           </CardDescription>
           <div className="mt-5">
             <CreateDefinitionForm objects={objects} knownRoles={knownRoles} />
@@ -256,53 +266,55 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
         </Card>
       </section>
 
-      <section className="mb-8">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold tracking-tight">Node catalog theo lộ trình</h2>
-          <StatusBadge kind="concept" />
-        </div>
-        <div className="overflow-x-auto rounded-xl border border-border">
-          <table className="w-full text-sm">
-            <thead className="bg-surface-raised text-left text-xs tracking-wide text-on-surface-muted uppercase">
-              <tr>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Node
-                </th>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Hành vi
-                </th>
-                <th scope="col" className="px-4 py-3 font-medium">
-                  Giai đoạn
-                </th>
-              </tr>
-            </thead>
-            <tbody className="divide-y divide-border bg-surface-raised/40">
-              {NODE_CATALOG.map((row) => (
-                <tr key={row.node}>
-                  <td className="px-4 py-3 font-medium whitespace-nowrap">{row.node}</td>
-                  <td className="px-4 py-3 text-on-surface-muted">{row.behavior}</td>
-                  <td className="px-4 py-3">
-                    <span className="rounded-full border border-border px-2 py-0.5 text-xs text-on-surface-muted">
-                      {row.phase}
-                    </span>
-                  </td>
+      {showAdvanced ? (
+        <section className="mb-8">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+            <h2 className="text-lg font-semibold tracking-tight">Node catalog theo lộ trình</h2>
+            <StatusBadge kind="concept" />
+          </div>
+          <div className="overflow-x-auto rounded-xl border border-border">
+            <table className="w-full text-sm">
+              <thead className="bg-surface-raised text-left text-xs tracking-wide text-on-surface-muted uppercase">
+                <tr>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Node
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Hành vi
+                  </th>
+                  <th scope="col" className="px-4 py-3 font-medium">
+                    Giai đoạn
+                  </th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
-        </div>
-      </section>
+              </thead>
+              <tbody className="divide-y divide-border bg-surface-raised/40">
+                {NODE_CATALOG.map((row) => (
+                  <tr key={row.node}>
+                    <td className="px-4 py-3 font-medium whitespace-nowrap">{row.node}</td>
+                    <td className="px-4 py-3 text-on-surface-muted">{row.behavior}</td>
+                    <td className="px-4 py-3">
+                      <span className="rounded-full border border-border px-2 py-0.5 text-xs text-on-surface-muted">
+                        {row.phase}
+                      </span>
+                    </td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        </section>
+      ) : null}
 
       <section className="grid gap-4 sm:grid-cols-2">
         <Card>
-          <CardTitle>Definition ≠ Instance</CardTitle>
+          <CardTitle>Định nghĩa và lần chạy là hai thứ khác nhau</CardTitle>
           <CardDescription>
             Một instance khi chạy gắn chặt với version definition đã publish tại thời điểm khởi tạo.
             Sửa definition tạo version mới; instance đang xử lý không tự đổi hành vi.
           </CardDescription>
         </Card>
         <Card>
-          <CardTitle>Ba bất biến đang giữ</CardTitle>
+          <CardTitle>Quy trình đang chạy không tự đổi</CardTitle>
           <CardDescription>
             Phiên bản đã publish không đổi; một bước chỉ có hiệu lực đúng một lần (hai người quyết
             cùng lúc thì người sau được báo việc đã xử lý); quyết định đã ghi không bị đảo ngược bởi

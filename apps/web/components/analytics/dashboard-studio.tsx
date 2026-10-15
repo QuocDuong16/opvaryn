@@ -21,6 +21,7 @@ import {
 } from '@/components/analytics/dashboard-layout';
 import { INITIAL_SAVE_DASHBOARD_STATE } from '@/components/analytics/dashboard-state';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+import { labelOrKey } from '@/lib/names';
 import { cn } from '@/lib/utils';
 
 const CONTROL_BUTTON =
@@ -28,6 +29,13 @@ const CONTROL_BUTTON =
   'hover:bg-surface-overlay disabled:opacity-50';
 
 const NUMBER_FORMAT = new Intl.NumberFormat('vi-VN', { maximumFractionDigits: 2 });
+
+/** AGGREGATION_LABELS names what a metric does, in words (ADR 0018). */
+const AGGREGATION_LABELS: Record<string, string> = {
+  count: 'Đếm',
+  sum: 'Tổng',
+  avg: 'Trung bình',
+};
 
 /** formatMetricValue renders a metric number: counts are integers, sums and averages are not. */
 export function formatMetricValue(metric: MetricDefinition, value: number): string {
@@ -45,13 +53,18 @@ export function DashboardStudio({
   metrics,
   results,
   initialWidgets,
+  fieldNames,
 }: {
   metrics: readonly MetricDefinition[];
   /** One answered metric per key, computed server-side for this signed-in user. */
   results: Record<string, MetricResult>;
   initialWidgets: readonly DashboardWidget[];
+  /** Field key to label, per object, so a widget says what it measures (ADR 0018). */
+  fieldNames: Record<string, Record<string, string>>;
 }) {
   const allowed = metrics.map((metric) => metric.key);
+  const namesFor = (objectKey: string): Map<string, string> =>
+    new Map(Object.entries(fieldNames[objectKey] ?? {}));
   const [widgets, setWidgets] = useState<DashboardWidget[]>(() => [...initialWidgets]);
   const [dragging, setDragging] = useState<number | null>(null);
   const [saveState, saveAction] = useActionState(saveDashboardAction, INITIAL_SAVE_DASHBOARD_STATE);
@@ -146,9 +159,15 @@ export function DashboardStudio({
               <div className="flex flex-wrap items-start justify-between gap-2">
                 <div className="min-w-0">
                   <p className="text-sm font-medium">{metric.name}</p>
-                  <p className="mt-0.5 font-mono text-[11px] text-on-surface-muted">
-                    {`${metric.aggregation}${metric.measure ? `(${metric.measure.key})` : ''}${
-                      metric.groupBy ? ` · nhóm theo ${metric.groupBy.key}` : ''
+                  <p className="mt-0.5 text-[11px] text-on-surface-muted">
+                    {`${AGGREGATION_LABELS[metric.aggregation] ?? metric.aggregation}${
+                      metric.measure
+                        ? ` của ${labelOrKey(namesFor(metric.objectKey).get(metric.measure.key), metric.measure.key)}`
+                        : ' bản ghi'
+                    }${
+                      metric.groupBy
+                        ? ` · nhóm theo ${labelOrKey(namesFor(metric.objectKey).get(metric.groupBy.key), metric.groupBy.key)}`
+                        : ''
                     }`}
                   </p>
                 </div>

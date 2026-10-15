@@ -107,7 +107,7 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
   return (
     <>
       <PageHeader
-        eyebrow={`02 / Dữ liệu · ${object.key}`}
+        eyebrow="02 / Dữ liệu"
         title={object.name}
         lead={
           object.description ??

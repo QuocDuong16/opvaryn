@@ -292,7 +292,7 @@ export default async function OverviewPage() {
                   <span className="min-w-0">
                     <span className="block text-sm font-medium">{item.task.title}</span>
                     <span className="block text-xs text-on-surface-muted">
-                      {`${recordNames[item.instance.recordId] ?? item.instance.objectKey} · từ ${formatTimestamp(item.task.createdAt)}`}
+                      {`${recordNames[item.instance.recordId] ?? 'Bản ghi bạn không đọc được'} · từ ${formatTimestamp(item.task.createdAt)}`}
                     </span>
                   </span>
                   <span className="text-xs font-medium">Xử lý →</span>
@@ -367,7 +367,8 @@ export default async function OverviewPage() {
                     </td>
                     <td className="px-4 py-3 text-xs text-on-surface-muted">
                       {recordNames[summary.instance.recordId] ??
-                        `${summary.instance.objectKey} · ${summary.instance.recordId.slice(0, 8)}…`}
+                        recordNames[summary.instance.recordId] ??
+                        'Bản ghi bạn không đọc được'}
                     </td>
                     <td className="px-4 py-3 text-xs text-on-surface-muted">
                       {formatTimestamp(summary.instance.startedAt)}

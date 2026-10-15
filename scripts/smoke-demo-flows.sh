@@ -570,7 +570,9 @@ check_surface "/forms?object=$object_key" "forms" "Nhập" 'name="priority"'
 # A person entering data sees the field's name and its rule, never the column key (ADR 0016).
 assert_contains "$tmp_dir/surface.html" "Nội dung" "the form names its fields"
 assert_not_contains "$tmp_dir/surface.html" ">title<" "the form does not print the field key"
-check_surface "/workflows" "workflows" "Tạo quy trình mới" "Node catalog theo lộ trình"
+# The node catalogue is planning material for the administrator, so a department head sees
+# the list and the create form only (ADR 0015).
+check_surface "/workflows" "workflows" "Tạo quy trình mới" "Đang dùng"
 # No process was started yet, so the live inbox is empty for this role — and it says so.
 check_surface "/tasks" "tasks" "Không có việc nào đang chờ bạn" "Đã có gì, còn thiếu gì"
 check_surface "/apps" "applications" "Kanban" "Cấu hình" "Tích hợp"
@@ -730,7 +732,9 @@ status="$(web_post "/tasks/$instance_id" "$tmp_dir/approved.html" \
 assert_status "$status" "200" "approve decision"
 assert_contains "$tmp_dir/approved.html" "Đã duyệt — quy trình chuyển tới node" "the approve is confirmed"
 assert_contains "$tmp_dir/approved.html" "việc tiếp theo thuộc role $director_role" "the next role is named"
-assert_contains "$tmp_dir/approved.html" "amount gte 1000000" "what the condition saw is in the log"
+# The log reads in the words a person uses: the field's label and the operator, not the
+# stored keys (ADR 0018).
+assert_contains "$tmp_dir/approved.html" "Số tiền từ 1000000" "what the condition saw is in the log"
 assert_not_contains "$tmp_dir/approved.html" "Kết thúc quy trình" "the branch not taken did not run"
 
 curl -sS -b "$cookie_jar" -o "$tmp_dir/instance-after.json" "$api_base/api/v1/process-instances/$instance_id"
@@ -850,7 +854,8 @@ assert_contains "$tmp_dir/workflow-created.html" "Đã publish" "definition crea
 
 status="$(web_get "/workflows/$web_flow_key" "$tmp_dir/workflow-detail.html")"
 assert_status "$status" "200" "workflow detail page"
-assert_contains "$tmp_dir/workflow-detail.html" "Trình soạn $web_flow_key v1" "the editor draws the published graph"
+# The canvas is labelled with the definition's name, not its key (ADR 0018).
+assert_contains "$tmp_dir/workflow-detail.html" "Trình soạn Luồng thiết kế từ web v1" "the editor draws the published graph"
 assert_contains "$tmp_dir/workflow-detail.html" "Kiểm tra yêu cầu" "the canvas names the node"
 # A role nobody has named is shown by its key — the screen never hides a role it cannot
 # name, and never invents a name for it (ADR 0016).

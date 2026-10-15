@@ -175,6 +175,12 @@
   Screens that need a sample ask for one (`{limit: RECENT_LIMIT}` in the dashboard, `RECORDS_PER_APP`
   in the showcase) — no `.slice()` after a full fetch anywhere. The client returns `Paged<T>`, so
   call sites read `.data`. Limits: default 25, max 100, refused by name when out of range.
+- **Only what the user needs** (ADR 0018): a screen shows what the person needs to decide or act —
+  no field/node keys, no record ids, no table names, no internal vocabulary (`node` → "bước",
+  `attempt 2` → "lần 2", `sum(amount)` → "Tổng của Giá trị dự kiến", `gte` → "từ"), and an
+  unreadable record says "Bản ghi bạn không đọc được" instead of an id. `lib/names.ts` decides how
+  a key becomes a name; `process-timeline.ts` takes `EventLabels` (roles + fields) so the audit log
+  reads in names. The one place a key is shown is the designer's input where a key is being chosen.
 - **Names, never keys** (ADR 0016): a department, a role, a definition and a record are shown by
   their human name. `lib/names.ts` holds the pure, tested rule — `labelOrKey(label, key)` returns
   the name when there is one and the key otherwise (never an invented name); `roleLabels(entries)`,

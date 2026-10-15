@@ -119,9 +119,7 @@ export function MiniApp({ apps }: { apps: readonly MiniAppData[] }) {
           ))}
         </div>
         <div className="flex items-center gap-2 text-xs text-on-surface-muted">
-          <span>
-            {app.records.length} bản ghi · <code className="font-mono">{app.object.key}</code>
-          </span>
+          <span>{`${app.records.length} bản ghi`}</span>
           <StatusBadge kind={activeView.stage} />
         </div>
       </div>
@@ -166,7 +164,7 @@ function ListView({ app, onOpen }: { app: MiniAppData; onOpen: (recordId: string
                 {primaryFieldValue(app.object.fields, record)}
               </span>
               <span className="mt-0.5 block font-mono text-[11px] text-on-surface-muted">
-                {app.object.key} · {record.id.slice(0, 8)}
+                Bản ghi bạn không đọc được
               </span>
             </span>
             <span className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-on-surface-muted">

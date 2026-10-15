@@ -45,7 +45,25 @@ describe('describeEvent', () => {
       event('task_created', { attempt: 2, role: 'ke_toan', title: 'Kế toán duyệt' }),
     );
 
-    expect(entry.detail).toBe('role ke_toan · attempt 2');
+    expect(entry.detail).toBe('ke_toan · lần 2');
+  });
+
+  it('reads the role and the field in their names when it is given them', () => {
+    const entry = describeEvent(
+      event('condition_evaluated', {
+        field: 'estimated_amount',
+        op: 'gte',
+        value: 20000000,
+        actual: 1500000,
+        result: false,
+      }),
+      {
+        roles: new Map([['ke_toan', 'Kế toán']]),
+        fields: new Map([['estimated_amount', 'Giá trị dự kiến (VND)']]),
+      },
+    );
+
+    expect(entry.detail).toBe('Giá trị dự kiến (VND) từ 20000000 → sai (giá trị thực tế: 1500000)');
   });
 
   it('shows what a condition saw, not only its outcome', () => {
@@ -59,7 +77,7 @@ describe('describeEvent', () => {
       }),
     );
 
-    expect(entry.detail).toBe('amount gte 1000000 → đúng (giá trị thực tế: 1500000)');
+    expect(entry.detail).toBe('amount từ 1000000 → đúng (giá trị thực tế: 1500000)');
   });
 
   it('reports a false condition as sai', () => {
@@ -96,7 +114,7 @@ describe('describeEvent', () => {
     const entry = describeEvent(event('instance_returned', { attempt: 2, previousAttempt: 1 }));
 
     expect(entry.label).toBe('Reset về điểm bắt đầu (attempt mới)');
-    expect(entry.detail).toBe('attempt 1 → 2');
+    expect(entry.detail).toBe('lần 1 → lần 2');
   });
 });
 

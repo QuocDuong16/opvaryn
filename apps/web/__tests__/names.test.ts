@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { joinLabels, labelOrKey, nameLabels, roleLabels } from '@/lib/names';
+import { fieldNames, joinLabels, labelOrKey, nameLabels, roleLabels } from '@/lib/names';
 
 describe('labelOrKey', () => {
   it('prefers the name and falls back to the key', () => {
@@ -37,5 +37,19 @@ describe('nameLabels', () => {
     expect(labelOrKey(names.get('purchase_request'), 'purchase_request')).toBe('Đề nghị mua hàng');
     expect(labelOrKey(names.get('it_incident'), 'it_incident')).toBe('it_incident');
     expect(labelOrKey(names.get('missing'), 'missing')).toBe('missing');
+  });
+});
+
+describe('fieldNames', () => {
+  it('names the fields of a definition, so a condition reads in words', () => {
+    const names = fieldNames({
+      fields: [
+        { key: 'estimated_amount', label: 'Giá trị dự kiến (VND)' },
+        { key: 'department', label: 'Bộ phận' },
+      ],
+    });
+
+    expect(names.get('estimated_amount')).toBe('Giá trị dự kiến (VND)');
+    expect(labelOrKey(names.get('nope'), 'nope')).toBe('nope');
   });
 });

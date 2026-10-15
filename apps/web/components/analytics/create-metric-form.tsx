@@ -20,6 +20,16 @@ const AGGREGATIONS = [
 
 const OPERATORS = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte'] as const;
 
+/** OPERATOR_LABELS names the comparisons the way a person reads them (ADR 0018). */
+const OPERATOR_LABELS: Record<(typeof OPERATORS)[number], string> = {
+  eq: 'bằng',
+  ne: 'khác',
+  gt: 'lớn hơn',
+  gte: 'từ',
+  lt: 'nhỏ hơn',
+  lte: 'đến',
+};
+
 /**
  * CreateMetricForm builds a metric from the object's own fields: the aggregation, an
  * optional numeric measure, an optional filter (the same shape process branches use) and
@@ -41,7 +51,7 @@ export function CreateMetricForm({ objects }: { objects: readonly BusinessObject
   if (objects.length === 0) {
     return (
       <p className="rounded-lg border border-dashed border-border-strong px-3 py-2 text-sm text-on-surface-muted">
-        Chưa có business object nào để đo. Tạo object và bản ghi trước.
+        Chưa có loại dữ liệu nào để đo. Tạo một loại dữ liệu và nhập bản ghi trước.
       </p>
     );
   }
@@ -55,7 +65,7 @@ export function CreateMetricForm({ objects }: { objects: readonly BusinessObject
     >
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-xs">
-          <span className="font-medium tracking-wide uppercase">Key</span>
+          <span className="font-medium tracking-wide uppercase">Mã metric</span>
           <input
             name="key"
             required
@@ -73,7 +83,7 @@ export function CreateMetricForm({ objects }: { objects: readonly BusinessObject
           />
         </label>
         <label className="text-xs">
-          <span className="font-medium tracking-wide uppercase">Business object</span>
+          <span className="font-medium tracking-wide uppercase">Loại dữ liệu</span>
           <select
             name="objectKey"
             value={objectKey}
@@ -82,7 +92,7 @@ export function CreateMetricForm({ objects }: { objects: readonly BusinessObject
           >
             {objects.map((candidate) => (
               <option key={candidate.key} value={candidate.key}>
-                {`${candidate.name} (${candidate.key})`}
+                {candidate.name}
               </option>
             ))}
           </select>
@@ -106,7 +116,7 @@ export function CreateMetricForm({ objects }: { objects: readonly BusinessObject
         </label>
         {aggregation === 'count' ? null : (
           <label className="text-xs">
-            <span className="font-medium tracking-wide uppercase">Field đo (kiểu số)</span>
+            <span className="font-medium tracking-wide uppercase">Đo trường nào (trường số)</span>
             <select name="field" className={cn(INPUT_CLASS, 'mt-1.5 font-mono')}>
               {numberFields.length === 0 ? (
                 <option value="">— object không có field số —</option>
@@ -137,7 +147,7 @@ export function CreateMetricForm({ objects }: { objects: readonly BusinessObject
           Bộ lọc (tuỳ chọn)
         </legend>
         <label className="text-xs">
-          <span className="font-medium tracking-wide uppercase">Field</span>
+          <span className="font-medium tracking-wide uppercase">Trường</span>
           <select name="filterField" className={cn(INPUT_CLASS, 'mt-1.5 font-mono')}>
             <option value="">— không lọc —</option>
             {scalarFields.map((field) => (
@@ -148,11 +158,11 @@ export function CreateMetricForm({ objects }: { objects: readonly BusinessObject
           </select>
         </label>
         <label className="text-xs">
-          <span className="font-medium tracking-wide uppercase">Toán tử</span>
+          <span className="font-medium tracking-wide uppercase">Điều kiện</span>
           <select name="filterOp" className={cn(INPUT_CLASS, 'mt-1.5 font-mono')}>
             {OPERATORS.map((op) => (
               <option key={op} value={op}>
-                {op}
+                {OPERATOR_LABELS[op]}
               </option>
             ))}
           </select>

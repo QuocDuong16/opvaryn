@@ -106,7 +106,7 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
       <div className="grid gap-3 sm:grid-cols-2">
         {definition === undefined ? (
           <label className="text-xs">
-            <span className="font-medium tracking-wide uppercase">Key</span>
+            <span className="font-medium tracking-wide uppercase">Mã quy trình</span>
             <input
               name="key"
               required
@@ -127,7 +127,7 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
         </label>
         {definition === undefined ? (
           <label className="text-xs">
-            <span className="font-medium tracking-wide uppercase">Business object</span>
+            <span className="font-medium tracking-wide uppercase">Loại dữ liệu</span>
             <select
               name="objectKey"
               value={objectKey}
@@ -136,15 +136,14 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
             >
               {objects.map((object) => (
                 <option key={object.key} value={object.key}>
-                  {`${object.name} (${object.key})`}
+                  {object.name}
                 </option>
               ))}
             </select>
           </label>
         ) : (
           <p className="self-end text-xs text-on-surface-muted">
-            Business object <code className="font-mono">{objectKey}</code> (không đổi được sau khi
-            tạo: điều kiện đọc trên field của object này)
+            Quy trình này đọc dữ liệu của một loại bản ghi đã chọn và không đổi được sau khi tạo.
           </p>
         )}
       </div>
@@ -161,7 +160,7 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
 
       <fieldset className="space-y-2">
         <legend className="text-xs font-medium tracking-wide uppercase">
-          Node ({nodes.length})
+          Các bước ({nodes.length})
         </legend>
         {nodes.map((draft, index) => (
           <div
@@ -172,7 +171,7 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
               value={draft.key}
               onChange={(event) => updateNode(index, { key: event.target.value })}
               placeholder="approve"
-              aria-label={`Key node ${index + 1}`}
+              aria-label={`Mã bước ${index + 1}`}
               className={cn(INPUT_CLASS, 'font-mono')}
             />
             <select
@@ -180,7 +179,7 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
               onChange={(event) =>
                 updateNode(index, { type: event.target.value as NodeDraft['type'] })
               }
-              aria-label={`Loại node ${index + 1}`}
+              aria-label={`Loại bước ${index + 1}`}
               className={INPUT_CLASS}
             >
               {NODE_TYPE_OPTIONS.map((option) => (
@@ -193,7 +192,7 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
               value={draft.title}
               onChange={(event) => updateNode(index, { title: event.target.value })}
               placeholder="Trưởng bộ phận duyệt"
-              aria-label={`Tiêu đề node ${index + 1}`}
+              aria-label={`Tên bước ${index + 1}`}
               className={INPUT_CLASS}
             />
 
@@ -264,7 +263,7 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
                 disabled={nodes.length <= 1}
                 className={cn(CONTROL_BUTTON, 'text-danger')}
               >
-                Xoá node
+                Xoá bước
               </button>
             </div>
           </div>
@@ -274,7 +273,7 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
           onClick={() => setNodes((current) => [...current, blankNodeDraft()])}
           className={CONTROL_BUTTON}
         >
-          Thêm node
+          Thêm bước
         </button>
       </fieldset>
 
@@ -290,14 +289,14 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
             <input
               value={draft.from}
               onChange={(event) => updateEdge(index, { from: event.target.value })}
-              placeholder="từ node"
+              placeholder="từ bước"
               aria-label={`Node nguồn của đường chuyển ${index + 1}`}
               className={cn(INPUT_CLASS, 'font-mono')}
             />
             <input
               value={draft.to}
               onChange={(event) => updateEdge(index, { to: event.target.value })}
-              placeholder="đến node"
+              placeholder="đến bước"
               aria-label={`Node đích của đường chuyển ${index + 1}`}
               className={cn(INPUT_CLASS, 'font-mono')}
             />
@@ -328,7 +327,7 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
           onClick={() => setEdges((current) => [...current, blankEdgeDraft()])}
           className={CONTROL_BUTTON}
         >
-          Thêm đường chuyển
+          Thêm đường nối
         </button>
       </fieldset>
 
@@ -348,12 +347,12 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
 
       <div className="flex flex-wrap items-center gap-3">
         <SubmitButton
-          label={definition === undefined ? 'Tạo và publish v1' : 'Publish phiên bản mới'}
+          label={definition === undefined ? 'Tạo và phát hành' : 'Phát hành phiên bản mới'}
         />
         {definition === undefined ? (
           <p className="text-xs text-on-surface-muted">
-            Graph phải có đúng một node bắt đầu, ít nhất một việc của người và một node kết thúc,
-            không chu trình — service sẽ nói rõ chỗ sai nếu thiếu.
+            Trước khi lưu, hệ thống kiểm tra: có đúng một điểm bắt đầu, ít nhất một việc giao cho
+            người và một điểm kết thúc, và không có vòng lặp — chỗ nào thiếu sẽ được nói rõ.
           </p>
         ) : null}
       </div>

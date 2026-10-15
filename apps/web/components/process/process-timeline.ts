@@ -1,5 +1,7 @@
 import type { ProcessEvent, ProcessInstance, ProcessTask } from '@opvaryn/contracts';
 
+import { labelOrKey } from '@/lib/names';
+
 /** Vietnamese labels for the lifecycle states in the contract enum. */
 export const INSTANCE_STATE_LABELS: Record<ProcessInstance['state'], string> = {
   running: 'Đang chạy',
@@ -48,20 +50,44 @@ export interface TimelineEntry {
   at: string;
 }
 
+/**
+ * EventLabels is what the timeline needs to read in words: the name of a role and the label of
+ * a field. The payload carries keys (they are what the engine compares), and a person reading
+ * the log needs the names (ADR 0016/0018).
+ */
+export interface EventLabels {
+  roles?: ReadonlyMap<string, string>;
+  fields?: ReadonlyMap<string, string>;
+}
+
 /** describeEvent turns one audit event into what the timeline renders. */
-export function describeEvent(event: ProcessEvent): TimelineEntry {
+export function describeEvent(event: ProcessEvent, labels: EventLabels = {}): TimelineEntry {
   const payload = (event.payload ?? {}) as Record<string, unknown>;
   return {
     id: event.id,
     label: EVENT_LABELS[event.type] ?? event.type,
-    detail: describeDetail(event.type, payload),
+    detail: describeDetail(event.type, payload, labels),
     reason: optionalString(payload.reason),
     actor: event.actor,
     at: event.createdAt,
   };
 }
 
-function describeDetail(eventType: string, payload: Record<string, unknown>): string | null {
+/** OPERATOR_LABELS names the comparison operators in the words a person uses. */
+const OPERATOR_LABELS: Record<string, string> = {
+  eq: 'bằng',
+  ne: 'khác',
+  gt: 'lớn hơn',
+  gte: 'từ',
+  lt: 'nhỏ hơn',
+  lte: 'đến',
+};
+
+function describeDetail(
+  eventType: string,
+  payload: Record<string, unknown>,
+  labels: EventLabels,
+): string | null {
   switch (eventType) {
     case 'task_created':
     case 'task_approved':
@@ -72,10 +98,10 @@ function describeDetail(eventType: string, payload: Record<string, unknown>): st
       const attempt = optionalNumber(payload.attempt);
       const parts: string[] = [];
       if (role) {
-        parts.push(`role ${role}`);
+        parts.push(labelOrKey(labels.roles?.get(role), role));
       }
       if (attempt !== null) {
-        parts.push(`attempt ${attempt}`);
+        parts.push(`lần ${attempt}`);
       }
       return parts.length > 0 ? parts.join(' · ') : null;
     }
@@ -84,10 +110,12 @@ function describeDetail(eventType: string, payload: Record<string, unknown>): st
       // timeline shows the comparison, not only the outcome.
       const field = optionalString(payload.field) ?? '?';
       const op = optionalString(payload.op) ?? '?';
+      const fieldName = labelOrKey(labels.fields?.get(field), field);
+      const opName = OPERATOR_LABELS[op] ?? op;
       const expected = formatPayloadValue(payload.value);
       const actual = formatPayloadValue(payload.actual);
       const result = payload.result === true ? 'đúng' : 'sai';
-      return `${field} ${op} ${expected} → ${result} (giá trị thực tế: ${actual})`;
+      return `${fieldName} ${opName} ${expected} → ${result} (giá trị thực tế: ${actual})`;
     }
     case 'instance_returned': {
       const previous = optionalNumber(payload.previousAttempt);
@@ -95,7 +123,7 @@ function describeDetail(eventType: string, payload: Record<string, unknown>): st
       if (previous === null || attempt === null) {
         return null;
       }
-      return `attempt ${previous} → ${attempt}`;
+      return `lần ${previous} → lần ${attempt}`;
     }
     default:
       return null;

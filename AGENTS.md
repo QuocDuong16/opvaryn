@@ -113,6 +113,12 @@ Working agreement for agents and contributors in this repository.
   that grants nothing (`lib/advanced.ts`, ADR 0015). New nav entries pick an `audience`; the
   default is `everyone`. The workspace home is a dashboard of the person's own work, never a
   status board of the build.
+- A screen shows what the person using it needs to decide or act — never what only the system
+  needs to see (ADR 0018): no field keys, node keys, record ids or table names in the interface,
+  no internal vocabulary (`node`, `attempt`, `sum(amount)`, `gte`), and an unreadable record says
+  so instead of printing an id. Support-facing ids stay small and muted. A key is shown only in
+  the input where a designer is *choosing* one. `lib/names.ts` is the one place that decides how
+  a key becomes a name.
 - Lists are paginated by the API, never by the browser (ADR 0017): a list endpoint takes
   `limit`/`offset` (and `q` when a person would search) and answers `{data, total}`; a screen
   keeps its page and search in the URL and uses `components/ui/list-controls.tsx`. A screen that

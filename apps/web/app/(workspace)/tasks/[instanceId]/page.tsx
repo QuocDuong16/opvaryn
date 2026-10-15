@@ -20,7 +20,7 @@ import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatFieldValue, formatTimestamp } from '@/lib/format';
-import { labelOrKey } from '@/lib/names';
+import { fieldNames, labelOrKey } from '@/lib/names';
 import { cn } from '@/lib/utils';
 
 interface PageProps {
@@ -52,6 +52,8 @@ export default async function ProcessInstancePage({ params }: PageProps) {
   let me: Me;
   let view: ProcessInstanceView;
   let roleLabels: Record<string, string> = {};
+  let definitionName = 'Quy trình';
+  let objectName = 'Bản ghi';
   try {
     me = await api.getMe();
     view = await api.getProcessInstance(instanceId);
@@ -59,6 +61,13 @@ export default async function ProcessInstancePage({ params }: PageProps) {
     // the chips fall back to the key rather than showing nothing.
     const catalogue = await api.listRoles().catch(() => []);
     roleLabels = Object.fromEntries(catalogue.map((entry) => [entry.key, entry.label]));
+    // Names, not keys: the process and the kind of record it runs on (ADR 0016).
+    const [definition, object] = await Promise.all([
+      api.getProcessDefinition(view.instance.definitionKey).catch(() => null),
+      api.getBusinessObject(view.instance.objectKey).catch(() => null),
+    ]);
+    definitionName = definition?.name || view.instance.definitionKey;
+    objectName = object?.name || view.instance.objectKey;
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'not_found') {
       // An instance the caller may not see is answered as absent, never as forbidden:
@@ -112,14 +121,20 @@ export default async function ProcessInstancePage({ params }: PageProps) {
   const waiting = nextTasks(tasks);
 
   const recordContext = await loadRecordContext(instance.objectKey, instance.recordId);
-  const timeline = events.map(describeEvent);
+  // The log carries keys; the screen reads names (ADR 0018).
+  const timeline = events.map((event) =>
+    describeEvent(event, {
+      roles: new Map(Object.entries(roleLabels)),
+      fields: fieldNames({ fields: recordContext.fields }),
+    }),
+  );
 
   return (
     <>
       <PageHeader
-        eyebrow={`05 / Việc của tôi · ${instance.definitionKey} v${instance.definitionVersion}`}
-        title={`Phiên chạy ${instance.id.slice(0, 8)}…`}
-        lead={`Chạy trên bản ghi của ${instance.objectKey} theo định nghĩa phiên bản ${instance.definitionVersion}. Mọi quyết định bên dưới đều được ghi lại.`}
+        eyebrow={`05 / Việc của tôi · ${definitionName} v${instance.definitionVersion}`}
+        title={recordContext.record ? 'Chi tiết công việc' : `Lần chạy ${instance.id.slice(0, 8)}…`}
+        lead={`Chạy trên ${recordContext.record ? 'bản ghi bên dưới' : 'một bản ghi bạn không đọc được'} theo ${definitionName} phiên bản ${instance.definitionVersion}. Mọi quyết định bên dưới đều được ghi lại.`}
       />
 
       <p className="mb-6 flex flex-wrap items-center gap-3 text-sm">
@@ -131,7 +146,7 @@ export default async function ProcessInstancePage({ params }: PageProps) {
             href={`/objects/${instance.objectKey}`}
             className="text-accent-strong hover:underline"
           >
-            {`Bản ghi trong ${instance.objectKey}`}
+            {objectName}
           </Link>
         ) : null}
         <span
@@ -305,7 +320,7 @@ export default async function ProcessInstancePage({ params }: PageProps) {
               <div className="flex justify-between gap-2">
                 <dt className="text-on-surface-muted">Định nghĩa</dt>
                 <dd className="font-mono text-xs">
-                  {`${instance.definitionKey} v${instance.definitionVersion}`}
+                  {`${definitionName} v${instance.definitionVersion}`}
                 </dd>
               </div>
               <div className="flex justify-between gap-2">
@@ -361,7 +376,7 @@ async function loadRecordContext(objectKey: string, recordId: string): Promise<R
     return { record, fields: version?.fields ?? [], error: null };
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'not_found') {
-      return { record: null, fields: [], error: `Business object ${objectKey} không còn tồn tại.` };
+      return { record: null, fields: [], error: 'Loại dữ liệu của bản ghi này không còn.' };
     }
     return { record: null, fields: [], error: describeApiError(cause) };
   }

@@ -47,19 +47,22 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
   let instances: ProcessInstanceSummary[] = [];
   let instanceTotal = 0;
   let roleCatalogue: RoleEntry[] = [];
+  let objectName = '';
   let labels: Record<string, string> = {};
   let error: string | null = null;
 
   try {
     definition = await api.getProcessDefinition(key);
-    const [versionList, instancePage, roles] = await Promise.all([
+    const [versionList, instancePage, roles, object] = await Promise.all([
       api.listProcessDefinitionVersions(key),
       api.listProcessInstances(
         { definitionKey: key },
         { limit: INSTANCES_PER_PAGE, offset: instanceOffset },
       ),
       api.listRoles(),
+      api.getBusinessObject(definition.objectKey).catch(() => null),
     ]);
+    objectName = object?.name || definition.objectKey;
     versions = versionList;
     instances = instancePage.data;
     instanceTotal = instancePage.total;
@@ -145,7 +148,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
   return (
     <>
       <PageHeader
-        eyebrow={`04 / Workflow designer · ${definition.key}`}
+        eyebrow="04 / Quy trình"
         title={definition.name}
         lead={
           definition.description ??
@@ -161,7 +164,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
           href={`/objects/${definition.objectKey}`}
           className="font-mono text-xs text-accent-strong hover:underline"
         >
-          {definition.objectKey}
+          {objectName}
         </Link>
         <span className="rounded-full border border-border px-2.5 py-0.5 font-mono text-xs text-on-surface-muted">
           {`phiên bản đang dùng v${definition.version}`}
@@ -224,7 +227,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
                 initialDraft={savedDraft ?? publishedDraft}
                 hasSavedDraft={savedDraft !== null}
                 knownRoles={knownRoles}
-                canvasLabel={`${definition.key} v${definition.version}`}
+                canvasLabel={`${definition.name} v${definition.version}`}
               />
             </>
           ) : (
@@ -232,7 +235,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
               <ProcessCanvas
                 graph={{ nodes: shown.nodes, edges: shown.edges }}
                 version={shown.version}
-                label={`${definition.key} v${shown.version}`}
+                label={`${definition.name} v${shown.version}`}
                 roleLabels={roleNames}
               />
               <p className="mt-3 rounded-lg border border-warning/40 px-3 py-2 text-sm text-warning">
