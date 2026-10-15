@@ -3,7 +3,7 @@
 - **Ngày**: 2026-10-15
 - **Trạng thái**: Accepted
 - **Liên quan**: [0008](0008-identity-permissions-pilot-and-deployment.md) (session, RBAC),
-  [0009](0009-deployment-topology-and-backup.md) (triển khai), [0002](0002-demo-surface-status.md) (nhãn trạng thái)
+  [0009](0009-deployment-topology-and-backup.md) (triển khai), [0002](0002-demo-scope-and-labels.md) (nhãn trạng thái)
 
 ## Bối cảnh
 
