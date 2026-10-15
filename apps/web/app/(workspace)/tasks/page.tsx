@@ -46,14 +46,26 @@ export default async function TasksPage({ searchParams }: PageProps) {
   let me: Me | null = null;
   let items: InboxItem[] = [];
   let total = 0;
+  let definitionNames: Record<string, string> = {};
+  let objectNames: Record<string, string> = {};
   let error: string | null = null;
   let needsSignIn = false;
 
   try {
     me = await api.getMe();
-    const page = await api.listInboxTasks({ q: query || undefined, limit: PER_PAGE, offset });
+    const [page, definitions, objects] = await Promise.all([
+      api.listInboxTasks({ q: query || undefined, limit: PER_PAGE, offset }),
+      api.listProcessDefinitions({ limit: 100 }),
+      api.listBusinessObjects({ limit: 100 }),
+    ]);
     items = page.data;
     total = page.total;
+    // The card names the process and the object it belongs to; both catalogues are small
+    // enough to read once and are allowed to fail without hiding the work.
+    definitionNames = Object.fromEntries(
+      definitions.data.map((definition) => [definition.key, definition.name]),
+    );
+    objectNames = Object.fromEntries(objects.data.map((object) => [object.key, object.name]));
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'unauthorized') {
       needsSignIn = true;
@@ -167,15 +179,12 @@ export default async function TasksPage({ searchParams }: PageProps) {
                     {item.task.title}
                   </h2>
                   <p className="mt-1 text-xs text-on-surface-muted">
-                    <code className="font-mono">{item.instance.definitionKey}</code>
-                    {` v${item.instance.definitionVersion} · node `}
-                    <code className="font-mono">{item.task.nodeKey}</code>
-                    {` · ${item.instance.objectKey}`}
+                    {`${labelOrKey(definitionNames[item.instance.definitionKey], item.instance.definitionKey)} v${item.instance.definitionVersion} · ${labelOrKey(objectNames[item.instance.objectKey], item.instance.objectKey)}`}
                   </p>
                 </div>
                 <div className="text-right text-xs text-on-surface-muted">
                   <p>{`Giao lúc ${formatTimestamp(item.task.createdAt)}`}</p>
-                  <p className="mt-1 font-mono">{`instance ${item.instance.id.slice(0, 8)}…`}</p>
+                  <p className="mt-1">{`Lần chạy ${item.instance.id.slice(0, 8)}…`}</p>
                 </div>
               </div>
 

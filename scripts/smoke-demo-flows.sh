@@ -703,7 +703,11 @@ status="$(web_get "/tasks" "$tmp_dir/inbox.html")"
 assert_status "$status" "200" "tasks page"
 assert_contains "$tmp_dir/inbox.html" "Trưởng bộ phận duyệt" "the inbox lists the open task"
 assert_contains "$tmp_dir/inbox.html" "Đang chờ bạn" "the inbox summary counts it"
-assert_contains "$tmp_dir/inbox.html" "$process_key" "the inbox names the definition"
+# The card names the process and the object by their names, not by their keys (ADR 0016):
+# this run starts "Luồng duyệt demo" on a record of "Luồng demo".
+assert_contains "$tmp_dir/inbox.html" "Luồng duyệt demo" "the inbox names the definition"
+assert_contains "$tmp_dir/inbox.html" "· Luồng demo" "the inbox names the object"
+assert_not_contains "$tmp_dir/inbox.html" "$process_key" "the inbox does not show the definition key"
 assert_not_contains "$tmp_dir/inbox.html" "Giám đốc duyệt" "the escalation task does not exist yet"
 
 echo "flows: [G] the instance screen shows the record with its own definition version"
