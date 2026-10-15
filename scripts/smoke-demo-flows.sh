@@ -255,8 +255,10 @@ department="flow_dept_$stamp"
 
 sign_in_through_form "$cookie_jar" "$designer_email" "$designer_password" "designer"
 
-status="$(web_get "/" "$tmp_dir/home.html")"
-assert_status "$status" "200" "home after signing in"
+# The workspace home, not the public front page: the shell (and the person it names)
+# only exists behind the sign-in (ADR 0014).
+status="$(web_get "/overview" "$tmp_dir/home.html")"
+assert_status "$status" "200" "workspace home after signing in"
 assert_contains "$tmp_dir/home.html" "Flow designer" "the shell shows who is signed in"
 
 # ------------------------------------------- flow A: schema-driven entry form ----
@@ -507,7 +509,22 @@ assert_contains "$tmp_dir/metric-invalid.html" "measures a number field" "the se
 
 # ------------------------------------------------- flow E: the demo surfaces ----
 
-echo "flows: [E] the demo surfaces render with their status labels"
+echo "flows: [E] the public front page and the workspace behind the sign-in"
+# The front page is what a visitor with no account reads: it is public, it describes the
+# product, and it must not wear the application chrome (ADR 0014).
+status="$(curl -sS -o "$tmp_dir/landing.html" -w '%{http_code}' "${web_base}/")"
+assert_status "$status" "200" "front page without a session"
+assert_contains "$tmp_dir/landing.html" "Phần mềm nội bộ theo đúng cách tổ chức bạn vận hành" "front page headline"
+assert_contains "$tmp_dir/landing.html" "Đăng nhập" "front page sign-in entry"
+assert_not_contains "$tmp_dir/landing.html" "Workspace" "front page must not render the workspace sidebar"
+
+# The workspace answers only with a session; a visitor without one is sent to the sign-in
+# screen carrying where they wanted to go, so signing in returns them there.
+status="$(curl -sS -o /dev/null -D "$tmp_dir/gate-headers.txt" -w '%{http_code}' "${web_base}/tasks")"
+assert_status "$status" "307" "workspace without a session"
+grep -qi '^location: /login?next=%2Ftasks' "$tmp_dir/gate-headers.txt" ||
+  fail "the sign-in redirect must carry the requested path (see ${tmp_dir##*/}/gate-headers.txt)"
+
 check_surface() {
   local path="$1" label="$2"
   shift 2
@@ -520,7 +537,7 @@ check_surface() {
   done
 }
 
-check_surface "/" "overview" "Các màn hình của sản phẩm" "Trạng thái nền tảng"
+check_surface "/overview" "overview" "Các màn hình của sản phẩm" "Trạng thái nền tảng"
 check_surface "/forms?object=$object_key" "forms" "Preview form" 'name="priority"'
 check_surface "/workflows" "workflows" "Tạo quy trình mới" "Node catalog theo lộ trình"
 # No process was started yet, so the live inbox is empty for this role — and it says so.
@@ -529,11 +546,11 @@ check_surface "/apps" "applications" "Kanban" "Cấu hình" "Tích hợp"
 check_surface "/roadmap" "roadmap" "Điều kiện nghiệm thu MVP V1" "Quyết định đang mở chặn tiến độ" "Concept"
 check_surface "/settings" "settings" "make seed-demo" "make smoke-api"
 
-# The inbox is per person: without a session the screen asks for a sign-in instead
-# of rendering anything.
+# The gate never lets the workspace render for an anonymous caller, so the pages no
+# longer carry a sign-in card of their own.
 status="$(curl -sS -o "$tmp_dir/tasks-anonymous.html" -w '%{http_code}' "${web_base}/tasks")"
-assert_status "$status" "200" "tasks page without a session"
-assert_contains "$tmp_dir/tasks-anonymous.html" "Cần đăng nhập để đọc inbox" "tasks page without a session"
+assert_status "$status" "307" "tasks page without a session"
+assert_not_contains "$tmp_dir/tasks-anonymous.html" "Không có việc nào đang chờ bạn" "tasks page without a session"
 
 # --------------------------------- flow F: publishing a new definition version ----
 

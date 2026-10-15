@@ -3,7 +3,7 @@
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { decideProcessTaskAction } from '@/app/tasks/actions';
+import { decideProcessTaskAction } from '@/app/(workspace)/tasks/actions';
 import { INITIAL_DECISION_STATE } from '@/components/tasks/decision-state';
 import { cn } from '@/lib/utils';
 

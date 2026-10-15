@@ -7,7 +7,7 @@ import type { BusinessObject, ProcessCondition, ProcessDefinition } from '@opvar
 import {
   createProcessDefinitionAction,
   publishProcessDefinitionAction,
-} from '@/app/workflows/actions';
+} from '@/app/(workspace)/workflows/actions';
 import {
   CONDITION_OPS,
   NODE_TYPE_OPTIONS,

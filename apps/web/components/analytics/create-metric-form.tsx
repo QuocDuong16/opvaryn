@@ -4,7 +4,7 @@ import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import type { BusinessObject } from '@opvaryn/contracts';
 
-import { createMetricAction } from '@/app/analytics/actions';
+import { createMetricAction } from '@/app/(workspace)/analytics/actions';
 import { INITIAL_CREATE_METRIC_STATE } from '@/components/analytics/create-metric-state';
 import { cn } from '@/lib/utils';
 

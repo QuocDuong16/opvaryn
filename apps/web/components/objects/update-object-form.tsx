@@ -4,7 +4,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import type { BusinessObject } from '@opvaryn/contracts';
 
-import { updateBusinessObjectAction } from '@/app/objects/actions';
+import { updateBusinessObjectAction } from '@/app/(workspace)/objects/actions';
 import { FieldEditor } from '@/components/objects/field-editor';
 import { INITIAL_UPDATE_OBJECT_STATE } from '@/components/objects/update-object-state';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';

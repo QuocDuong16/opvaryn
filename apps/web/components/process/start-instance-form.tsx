@@ -4,7 +4,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import type { ObjectRecord } from '@opvaryn/contracts';
 
-import { startProcessInstanceAction } from '@/app/objects/actions';
+import { startProcessInstanceAction } from '@/app/(workspace)/objects/actions';
 import { INITIAL_START_INSTANCE_STATE } from '@/components/process/start-instance-state';
 import { primaryFieldValue } from '@/lib/format';
 

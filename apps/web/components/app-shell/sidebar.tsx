@@ -18,13 +18,13 @@ export function Sidebar() {
 
       <div className="flex-1 overflow-y-auto px-3 py-4">
         <p className="px-3 pb-2 font-mono text-[11px] tracking-widest text-on-surface-muted uppercase">
-          Demo workspace
+          Workspace
         </p>
         <SidebarNav />
       </div>
 
       <div className="border-t border-border px-5 py-4 text-[11px] leading-relaxed text-on-surface-muted">
-        Bản demo tương tác. Yêu cầu và phạm vi: <code>operations-playbook/</code>
+        MVP V1. Yêu cầu: <code>operations-playbook/</code> · Quyết định: <code>docs/adr/</code>
       </div>
     </aside>
   );

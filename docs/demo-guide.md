@@ -31,7 +31,8 @@ make dev                     # terminal 1: API :21501 + web :21500
 make seed-demo               # 3 business object, 3 quy trình pilot + việc đang chờ, nạp qua chính API
 ```
 
-Mở http://localhost:21500. `make seed-demo` idempotent: chạy lại không tạo trùng; các instance
+Mở http://localhost:21500 — đó là trang giới thiệu công khai; đăng nhập rồi mới vào workspace
+(ADR 0014). `make seed-demo` idempotent: chạy lại không tạo trùng; các instance
 pilot chỉ được tạo khi role nhận việc chưa có việc nào của quy trình đó đang mở.
 
 ## 3. Chạy lại những lần sau (giữ dữ liệu)
@@ -60,17 +61,17 @@ make smoke-restart       # giết API bằng SIGKILL rồi kiểm state còn ngu
 make smoke-demo-flows    # build web, replay form của các luồng demo (kể cả inbox → duyệt → trả về), kiểm chứng dữ liệu lưu
 ```
 
-## 5. Walkthrough 9 màn hình
+## 5. Walkthrough theo thứ tự gợi ý
 
 Thứ tự gợi ý, kèm phần cần nói rõ để không trình bày quá:
 
 | # | Màn hình | Nên cho xem | Nhãn |
 | --- | --- | --- | --- |
-| 1 | **Tổng quan** `/` | Trạng thái API/database đọc trực tiếp (không phải ảnh chụp), thẻ Walkthrough, quy ước nhãn | live |
+| 1 | **Trang giới thiệu** `/` (công khai) → **Tổng quan** `/overview` (sau đăng nhập) | Trang bìa mô tả sản phẩm cho người chưa có tài khoản; sau khi đăng nhập là trạng thái API/database đọc trực tiếp (không phải ảnh chụp), các màn hình kèm nhãn và quy ước nhãn | live |
 | 2 | **Business Objects** `/objects` | Tạo object mới ngay tại chỗ: thêm vài field, một field `select` kèm danh sách lựa chọn | live |
 | 3 | **Object detail** `/objects/<key>` | Form nhập liệu sinh từ schema vừa tạo; lưu một bản ghi; thử để trống field bắt buộc để thấy server chặn và báo lỗi | live |
 | 3b | **Publish phiên bản** (cùng trang) | Sửa schema rồi **Publish phiên bản v2**: bản ghi cũ vẫn nằm ở nhóm "phiên bản cũ" với đúng schema cũ, bản ghi mới dùng schema mới. Đây là bất biến #1 của playbook chạy thật | live |
-| 4 | **Forms** `/forms` | Đổi schema, thấy form đổi theo; danh sách "chưa có trong demo" | live + concept |
+| 4 | **Forms** `/forms` | Đổi schema, thấy form đổi theo; danh sách "chưa có trong V1" | live + concept |
 | 5 | **Workflows** `/workflows` | Danh sách định nghĩa đọc từ API; mở một định nghĩa để **kéo thả trên canvas** (kéo node, kéo chấm tròn để nối, thêm/xoá, sửa role/điều kiện), lưu nháp rồi **Publish phiên bản mới**; xem lại phiên bản cũ. Cần role `process_designer`/`admin` mới publish được | **live** |
 | 5b | **Chạy quy trình** (trang bản ghi) | Chọn quy trình + bản ghi rồi **Chạy quy trình**: instance xuất hiện ngay trong danh sách instance của bản ghi và trong inbox của role đầu tiên | **live** |
 | 6 | **Tasks** `/tasks` | Inbox thật theo role của người đang đăng nhập; mở một việc để xem bản ghi, event log và **duyệt / trả về / từ chối**; thử bằng hai tài khoản khác role để thấy việc chuyển người | **live** |

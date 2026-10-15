@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 
-import { createBusinessObjectAction } from '@/app/objects/actions';
+import { createBusinessObjectAction } from '@/app/(workspace)/objects/actions';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { FieldEditor } from '@/components/objects/field-editor';
 import { INITIAL_CREATE_OBJECT_STATE } from '@/components/objects/create-object-state';

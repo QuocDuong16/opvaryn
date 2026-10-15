@@ -3,8 +3,8 @@
 import { useActionState, useCallback, useRef, useState, type PointerEvent } from 'react';
 import type { ProcessCondition } from '@opvaryn/contracts';
 
-import { publishProcessDefinitionAction } from '@/app/workflows/actions';
-import { saveWorkflowDraftAction } from '@/app/workflows/actions';
+import { publishProcessDefinitionAction } from '@/app/(workspace)/workflows/actions';
+import { saveWorkflowDraftAction } from '@/app/(workspace)/workflows/actions';
 import {
   NODE_HEIGHT,
   NODE_TYPE_LABELS,

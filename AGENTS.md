@@ -100,6 +100,13 @@ Working agreement for agents and contributors in this repository.
 
 - Next.js App Router with Server Components by default; keep client boundaries small and
   explicit (`'use client'` only where interaction requires it).
+- `/` is the public front page and `/login` is the sign-in screen; both stand outside the
+  workspace frame. Every screen behind the sign-in lives in the `app/(workspace)` route group,
+  which carries the shell, and `proxy.ts` sends a caller without a session cookie to
+  `/login?next=…` (ADR 0014). Do not put product chrome on the public page, and do not add a
+  screen inside the group that anonymous callers are meant to reach.
+- The front page may only state what the product does: no invented customers, logos,
+  testimonials or prices, and the "not yet" list stays on it next to the capabilities.
 - All API calls go through the shared client in `lib/api/`. Never fetch the Go API
   directly from components.
 - Follow the design tokens in `apps/web/app/globals.css` (two-layer: raw CSS variables →
@@ -108,13 +115,13 @@ Working agreement for agents and contributors in this repository.
   `components/ui/status-badge.tsx` with `live`, `mock`, or `concept`. When a screen mixes
   live data with simulated parts, label each part (the Application showcase labels views,
   not the whole page).
-- Demo fixtures for simulated surfaces live beside their components
-  (`components/workflows/demo-definitions.ts`, `components/tasks/demo-tasks.ts`,
-  `components/analytics/demo-metrics.ts`). Keep them typed, keep their state transitions in
-  pure modules that are unit-tested, and never let a fixture pretend to be server data.
+- Fixtures for the parts that are still simulated live beside their components (the kanban
+  grouping and the connector list in `components/apps/mini-app.tsx`). Keep them typed, keep any
+  state transitions in pure modules that are unit-tested, and never let a fixture pretend to be
+  server data.
 - Never build interactivity that does nothing. A control that cannot work yet is rendered
   disabled with an explanation (the Application Builder configuration tab, ADR 0004); toggles,
-  drag handles or forms that silently discard input are not acceptable demo material.
+  drag handles or forms that silently discard input are not acceptable.
 - User configuration that needs no new entity goes in a cookie behind an httpOnly server action
   (`opvaryn.theme`, `opvaryn.dashboard`) and is validated on write by a pure module, never stored
   loosely in the browser.

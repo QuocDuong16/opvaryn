@@ -3,7 +3,7 @@
 import { useActionState, useState, type DragEvent } from 'react';
 import type { MetricDefinition, MetricResult } from '@opvaryn/contracts';
 
-import { saveDashboardAction } from '@/app/analytics/actions';
+import { saveDashboardAction } from '@/app/(workspace)/analytics/actions';
 import {
   GRID_COLUMNS,
   MAX_WIDGETS,

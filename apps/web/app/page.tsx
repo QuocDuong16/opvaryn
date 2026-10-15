@@ -1,321 +1,263 @@
 import Link from 'next/link';
-import type { Meta } from '@opvaryn/contracts';
+import { ApiError, type Meta } from '@opvaryn/contracts';
 
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
-import { PageHeader } from '@/components/ui/page-header';
-import { StatusBadge, type StatusKind } from '@/components/ui/status-badge';
-import { createServerApiClient, describeApiError } from '@/lib/api/server';
+import { createServerApiClient } from '@/lib/api/server';
+import { stageLabel } from '@/lib/stage';
 
-export const metadata = { title: 'Tổng quan' };
+export const metadata = {
+  title: 'OPVARYN — Business Operations Platform',
+  description:
+    'Nền tảng để tổ chức tự định nghĩa dữ liệu, quy trình phê duyệt, biểu mẫu và báo cáo của mình — thay vì mua một công cụ cho mỗi nghiệp vụ.',
+};
 
-interface PlatformStatus {
-  api: boolean;
-  database: boolean;
-  meta: Meta | null;
-  message: string | null;
-}
+/**
+ * The public front page (ADR 0014): what the product is, what it does and what it does
+ * not do yet, for someone who has no account. It must stay honest — no invented
+ * customers, logos, testimonials or prices — because the same page is what a buyer
+ * reads before asking for a pilot.
+ */
+const CAPABILITIES: readonly { title: string; body: string }[] = [
+  {
+    title: 'Dữ liệu do bạn định nghĩa',
+    body: 'Khai business object với field có kiểu, publish theo phiên bản bất biến. Bản ghi cũ giữ đúng schema lúc nó được tạo, nên đổi định nghĩa không phá dữ liệu đã có.',
+  },
+  {
+    title: 'Biểu mẫu sinh từ schema',
+    body: 'Mỗi định nghĩa có ngay màn hình nhập liệu tương ứng, không phải viết code cho từng form. Kiểm tra dữ liệu nằm ở server, theo đúng phiên bản định nghĩa của bản ghi.',
+  },
+  {
+    title: 'Quy trình phê duyệt chạy thật',
+    body: 'Việc giao cho người theo vai trò, rẽ nhánh bằng điều kiện trên dữ liệu, duyệt / trả về / từ chối. Mọi thay đổi đi qua engine và để lại dấu trong event log append-only.',
+  },
+  {
+    title: 'Hộp việc theo vai trò',
+    body: 'Mỗi người chỉ thấy việc thuộc vai trò mình giữ, kèm bản ghi và lịch sử của lần chạy. Hai người quyết cùng lúc thì người sau nhận lỗi xung đột, không ghi đè.',
+  },
+  {
+    title: 'Báo cáo không cần SQL',
+    body: 'Metric tự định nghĩa trên field của object (đếm, tổng, trung bình, lọc, nhóm) cùng số liệu vận hành của quy trình: thời gian một vòng, tỉ lệ duyệt, tỉ lệ làm lại. Con số luôn theo phạm vi dữ liệu người đọc được.',
+  },
+  {
+    title: 'Nối ra hệ thống khác',
+    body: 'Sự kiện của engine được thông báo ra ngoài bằng webhook ký HMAC, có thử lại và nhật ký giao. Quyết định của người dùng không bao giờ phụ thuộc vào việc gửi thành công.',
+  },
+];
 
-async function loadPlatformStatus(): Promise<PlatformStatus> {
-  const api = createServerApiClient();
+const TRUST: readonly { title: string; body: string }[] = [
+  {
+    title: 'Phân quyền kiểm tra ở server',
+    body: 'Quyền theo vai trò và bộ phận được kiểm tra ở API cho mọi lần đọc và ghi. Bản ghi ngoài phạm vi trả về "không tồn tại" thay vì tiết lộ rằng nó có ở đó.',
+  },
+  {
+    title: 'Định nghĩa bất biến theo phiên bản',
+    body: 'Sửa một định nghĩa là publish phiên bản mới. Quy trình đang chạy và bản ghi đã nhập giữ nguyên phiên bản chúng bắt đầu, nên thay đổi không làm sai lệch lịch sử.',
+  },
+  {
+    title: 'Chạy trong hạ tầng của bạn',
+    body: 'Một host nội bộ bằng Docker Compose: TLS, job sao lưu định kỳ và quy trình diễn tập phục hồi có kiểm chứng. Không phải SaaS nhiều tổ chức, dữ liệu không đi ra ngoài.',
+  },
+  {
+    title: 'Nhãn trạng thái trung thực',
+    body: 'Phần nào mô phỏng được gắn nhãn rõ ràng, phần nào chưa làm thì nói là chưa làm — trên chính sản phẩm, không chỉ trong tài liệu.',
+  },
+];
+
+const STATUS: readonly { title: string; body: string }[] = [
+  {
+    title: 'Đang chạy (MVP V1)',
+    body: 'Business object và bản ghi, biểu mẫu sinh từ schema, engine quy trình với hộp việc, phân quyền theo vai trò và bộ phận, metric tự định nghĩa cùng số liệu vận hành, webhook ra ngoài, và triển khai một host có sao lưu.',
+  },
+  {
+    title: 'Chưa có',
+    body: 'Đăng nhập qua OIDC/SSO (chờ IdP của tổ chức), SLA và tự động chuyển cấp (cần chính sách thời gian làm việc), adapter hai chiều với hệ thống ngoài, và các dạng xem kanban/connector đang ở mức minh hoạ.',
+  },
+];
+
+async function loadMeta(): Promise<Meta | null> {
   try {
-    const [meta, readiness] = await Promise.all([api.getMeta(), api.getReadiness()]);
-    return {
-      api: true,
-      database: readiness.status === 'ok',
-      meta,
-      message: null,
-    };
-  } catch (cause) {
-    return { api: false, database: false, meta: null, message: describeApiError(cause) };
+    return await createServerApiClient().getMeta();
+  } catch {
+    return null;
   }
 }
 
-/**
- * The screens of the product, each with the label its own content earns: a screen that
- * reads real rows is `live`, a screen that draws simulated data is `mock`, a screen that
- * only describes the plan is `concept` (AGENTS.md).
- */
-const SURFACES: readonly {
-  href: string;
-  stage: StatusKind;
-  title: string;
-  body: string;
-}[] = [
-  {
-    href: '/objects',
-    stage: 'live',
-    title: 'Business Objects & bản ghi',
-    body: 'Khai schema với field có kiểu, publish định nghĩa theo phiên bản bất biến và nhập bản ghi thật vào PostgreSQL.',
-  },
-  {
-    href: '/forms',
-    stage: 'live',
-    title: 'Form builder',
-    body: 'Form nhập liệu sinh trực tiếp từ schema; validate ở server theo đúng phiên bản định nghĩa mà bản ghi được tạo dưới.',
-  },
-  {
-    href: '/workflows',
-    stage: 'live',
-    title: 'Workflow designer',
-    body: 'Canvas kéo thả trên bản nháp của trình duyệt rồi publish thành phiên bản mới; bản đã publish là bất biến và instance giữ phiên bản lúc start.',
-  },
-  {
-    href: '/tasks',
-    stage: 'live',
-    title: 'Task inbox',
-    body: 'Việc đang mở thuộc đúng các role người đăng nhập giữ; mở một việc để xem bản ghi, timeline sự kiện và quyết định duyệt / trả về / từ chối.',
-  },
-  {
-    href: '/analytics',
-    stage: 'live',
-    title: 'Analytics',
-    body: 'Metric tự định nghĩa trên field của object (đếm / tổng / trung bình, lọc, nhóm) chạy trên projection có kiểu, cộng số liệu vận hành của engine — tất cả theo phạm vi đọc.',
-  },
-  {
-    href: '/apps',
-    stage: 'live',
-    title: 'Application showcase',
-    body: 'Cùng một object dưới nhiều dạng xem: danh sách và chi tiết đọc dữ liệu thật; kanban và panel connector là mô phỏng, tab cấu hình là concept — mỗi view gắn nhãn riêng.',
-  },
-  {
-    href: '/settings',
-    stage: 'live',
-    title: 'Cài đặt',
-    body: 'Endpoint đang chạy, cổng và toolchain được pin, cùng nhật ký giao webhook ra ngoài (kể cả lần thử lại).',
-  },
-  {
-    href: '/roadmap',
-    stage: 'concept',
-    title: 'Roadmap',
-    body: 'Bốn phase, điều kiện nghiệm thu MVP V1 và những gì còn thiếu — kế hoạch, không phải tính năng đã có.',
-  },
-];
+async function hasSession(): Promise<boolean> {
+  try {
+    await createServerApiClient().getMe();
+    return true;
+  } catch (cause) {
+    if (cause instanceof ApiError && cause.code === 'unauthorized') {
+      return false;
+    }
+    return false;
+  }
+}
 
-const PRINCIPLES: readonly { title: string; body: string }[] = [
-  {
-    title: 'Không giới hạn trong "phiếu"',
-    body: 'Form chỉ là một giao diện nhập liệu; quy trình có thể khởi tạo từ người dùng, lịch, webhook, event hoặc API.',
-  },
-  {
-    title: 'Definition ≠ Instance',
-    body: 'Định nghĩa và lần chạy là hai thực thể riêng, có versioning để thay đổi cấu hình không phá quy trình đang xử lý.',
-  },
-  {
-    title: 'Platform-first, không over-engineer',
-    body: 'Domain và interface đủ mở rộng, nhưng V1 chỉ hiện thực hóa một tập use case an toàn và dùng được.',
-  },
-  {
-    title: 'Data & security by design',
-    body: 'Field có kiểu rõ ràng, audit, quyền theo dữ liệu và analytics-ready được tính từ đầu, không bổ sung về sau.',
-  },
-  {
-    title: 'MVP phải xử lý nghiệp vụ thật',
-    body: 'V1 không phải một bộ UI: workflow phải chạy đúng, quyền hợp lệ, dữ liệu bền vững và theo dõi được.',
-  },
-  {
-    title: 'Nhãn trạng thái phải trung thực',
-    body: 'Phần mô phỏng được gắn nhãn rõ ràng và không bao giờ được trình bày như chức năng thật — theo cả hai chiều.',
-  },
-];
-
-/**
- * What the product does not do yet. Kept next to the surfaces so the page never reads as
- * if the platform were finished; the roadmap page carries the detail and the phases.
- */
-const NOT_YET: readonly { title: string; body: string }[] = [
-  {
-    title: 'OIDC / SSO',
-    body: 'Đăng nhập hiện dùng tài khoản nội bộ có role và bộ phận. Cắm IdP của tổ chức đang chờ chính IdP đó.',
-  },
-  {
-    title: 'SLA và escalation',
-    body: 'Hạn xử lý, timer và tự động chuyển cấp cần một chính sách thời gian làm việc — thuộc V1.x, nên không có hạn giả nào được hiển thị.',
-  },
-  {
-    title: 'Integration Hub đầy đủ',
-    body: 'Hiện có webhook ra ngoài kèm retry và nhật ký giao; adapter hai chiều với mapping thì chưa.',
-  },
-  {
-    title: 'Kanban và connector thật',
-    body: 'Hai dạng xem này trong Application showcase là mô phỏng để minh hoạ Application Builder (V2).',
-  },
-  {
-    title: 'Tiện ích của trình soạn quy trình',
-    body: 'Undo/redo và nhiều người cùng sửa một định nghĩa cần khoá lạc quan — chưa nằm trong V1.',
-  },
-  {
-    title: 'Song song và join',
-    body: 'Nhiều nhánh cùng lúc, gộp nhánh và điều kiện join nằm ngoài phạm vi đã chốt của ADR 0007.',
-  },
-];
-
-const STATUS_LEGEND: readonly { kind: StatusKind; body: string }[] = [
-  {
-    kind: 'live',
-    body: 'Chạy thật: dữ liệu đi qua API Go và PostgreSQL, thao tác có hiệu lực thật.',
-  },
-  {
-    kind: 'mock',
-    body: 'Mô phỏng: giao diện thật nhưng dữ liệu và hành vi được giả lập để minh hoạ.',
-  },
-  {
-    kind: 'concept',
-    body: 'Concept: minh họa tầm nhìn dài hạn, chưa có hành vi và chưa thuộc phạm vi V1.',
-  },
-];
-
-export default async function OverviewPage() {
-  const status = await loadPlatformStatus();
+export default async function LandingPage() {
+  const [meta, signedIn] = await Promise.all([loadMeta(), hasSession()]);
+  const entry = signedIn
+    ? { href: '/overview', label: 'Vào workspace' }
+    : { href: '/login', label: 'Đăng nhập' };
 
   return (
-    <>
-      <PageHeader
-        eyebrow="01 / Tổng quan"
-        title="OPVARYN — Business Operations Platform"
-        lead="Một nền tảng xây dựng và điều phối hoạt động nội bộ, nơi tổ chức tự định nghĩa dữ liệu, quy trình, ứng dụng nghiệp vụ và báo cáo của mình. MVP V1 đang chạy trong repo này: ba quy trình pilot, engine duyệt thật, phân quyền theo role và bộ phận, analytics trên projection có kiểu, và triển khai một host có backup."
-      />
+    <div className="flex min-h-dvh flex-col">
+      <header className="sticky top-0 z-10 border-b border-border bg-surface/85 backdrop-blur">
+        <div className="mx-auto flex h-16 w-full max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+          <Link href="/" className="flex items-center gap-3">
+            <span
+              aria-hidden
+              className="grid size-8 shrink-0 place-items-center rounded-lg bg-accent/15 font-mono text-sm text-accent-strong"
+            >
+              ◎
+            </span>
+            <span className="min-w-0">
+              <span className="block truncate text-sm font-semibold tracking-tight">OPVARYN</span>
+              <span className="block truncate text-[11px] text-on-surface-muted">
+                Business Operations Platform
+              </span>
+            </span>
+          </Link>
 
-      <Card className="mb-6">
-        <div className="flex flex-wrap items-start justify-between gap-3">
-          <div>
-            <CardTitle>Trạng thái nền tảng</CardTitle>
-            <CardDescription>
-              Đọc trực tiếp từ API đang chạy, không có dữ liệu giả ở khối này.
-            </CardDescription>
-          </div>
-          <StatusBadge kind={status.api ? 'live' : 'mock'} />
+          <nav className="hidden items-center gap-6 text-sm text-on-surface-muted md:flex">
+            <a href="#nang-luc" className="hover:text-on-surface">
+              Năng lực
+            </a>
+            <a href="#vi-sao" className="hover:text-on-surface">
+              Vì sao
+            </a>
+            <a href="#trang-thai" className="hover:text-on-surface">
+              Trạng thái
+            </a>
+          </nav>
+
+          <Link
+            href={entry.href}
+            className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-opacity hover:opacity-90"
+          >
+            {entry.label}
+          </Link>
         </div>
+      </header>
 
-        <dl className="mt-5 grid gap-4 sm:grid-cols-3">
-          <div>
-            <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Sản phẩm</dt>
-            <dd className="mt-1 font-medium">{status.meta?.name ?? 'OPVARYN'}</dd>
-          </div>
-          <div>
-            <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Phiên bản</dt>
-            <dd className="mt-1 font-mono text-sm">{status.meta?.version ?? '—'}</dd>
-          </div>
-          <div>
-            <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Giai đoạn</dt>
-            <dd className="mt-1 font-mono text-sm">{status.meta?.stage ?? '—'}</dd>
-          </div>
-        </dl>
-
-        <div className="mt-5 flex flex-wrap gap-2 text-sm">
-          <DependencyChip label="API (Go)" up={status.api} />
-          <DependencyChip label="PostgreSQL" up={status.database} />
-        </div>
-
-        {status.message ? (
-          <div className="mt-5 rounded-lg border border-warning/40 bg-warning/5 px-4 py-3 text-sm">
-            <p className="font-medium text-warning">API chưa sẵn sàng</p>
-            <p className="mt-1 text-on-surface-muted">{status.message}</p>
-            <pre className="mt-3 overflow-x-auto rounded-md border border-border bg-surface px-3 py-2 font-mono text-xs text-on-surface-muted">
-              make docker-up{'\n'}cd apps/api &amp;&amp; go run ./cmd/migrate
-            </pre>
-          </div>
-        ) : null}
-      </Card>
-
-      <div className="mb-6 grid gap-4 sm:grid-cols-3">
-        <KpiCard
-          label="Quy trình pilot"
-          value="3"
-          note="Duyệt mua hàng, xử lý sự cố IT và onboarding nhân sự (D07)."
-        />
-        <KpiCard
-          label="Điều kiện nghiệm thu MVP V1"
-          value="1–7"
-          note="Có bằng chứng chạy được trong repo; chi tiết ở trang Roadmap."
-        />
-        <KpiCard
-          label="Triển khai"
-          value="1 host"
-          note="Docker Compose, TLS qua Caddy, backup có diễn tập phục hồi (ADR 0009)."
-        />
-      </div>
-
-      <section className="mb-6">
-        <h2 className="mb-3 text-lg font-semibold tracking-tight">Các màn hình của sản phẩm</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {SURFACES.map((stop, index) => (
-            <Link key={stop.href} href={stop.href} className="group">
-              <Card className="h-full transition-colors group-hover:border-border-strong">
-                <div className="flex items-start justify-between gap-3">
-                  <p className="text-sm font-semibold">
-                    <span className="mr-2 font-mono text-xs text-accent-strong">
-                      {String(index + 1).padStart(2, '0')}
-                    </span>
-                    {stop.title}
-                  </p>
-                  <StatusBadge kind={stop.stage} />
-                </div>
-                <p className="mt-2 text-sm leading-relaxed text-on-surface-muted">{stop.body}</p>
-              </Card>
+      <main className="flex-1">
+        <section className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 sm:py-24 lg:px-8">
+          <p className="font-mono text-xs tracking-widest text-on-surface-muted uppercase">
+            Business Operations Platform
+          </p>
+          <h1 className="mt-4 max-w-3xl text-3xl font-semibold tracking-tight sm:text-5xl">
+            Phần mềm nội bộ theo đúng cách tổ chức bạn vận hành
+          </h1>
+          <p className="mt-6 max-w-2xl text-base leading-relaxed text-on-surface-muted">
+            OPVARYN để đội của bạn tự định nghĩa dữ liệu, quy trình phê duyệt, biểu mẫu và báo cáo
+            của mình — thay vì mua một công cụ cho mỗi nghiệp vụ rồi ghép chúng lại bằng bảng tính
+            và tin nhắn.
+          </p>
+          <div className="mt-8 flex flex-wrap items-center gap-3">
+            <Link
+              href={entry.href}
+              className="rounded-lg bg-accent px-5 py-2.5 text-sm font-medium text-on-accent transition-opacity hover:opacity-90"
+            >
+              {entry.label}
             </Link>
-          ))}
-        </div>
-      </section>
+            <a
+              href="#nang-luc"
+              className="rounded-lg border border-border px-5 py-2.5 text-sm font-medium hover:bg-surface-overlay"
+            >
+              Xem năng lực
+            </a>
+          </div>
 
-      <section className="mb-6">
-        <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
-          <h2 className="text-lg font-semibold tracking-tight">Chưa có trong V1</h2>
-          <StatusBadge kind="concept" />
-        </div>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {NOT_YET.map((item) => (
-            <Card key={item.title}>
-              <h3 className="text-sm font-semibold">{item.title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-on-surface-muted">{item.body}</p>
-            </Card>
-          ))}
-        </div>
-      </section>
+          <dl className="mt-14 grid gap-6 border-t border-border pt-8 sm:grid-cols-3">
+            <div>
+              <dt className="text-xs tracking-wide text-on-surface-muted uppercase">
+                Quy trình pilot
+              </dt>
+              <dd className="mt-1 text-sm">
+                Duyệt mua hàng, xử lý sự cố IT và onboarding nhân sự — chạy trên engine thật.
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Kiểm soát</dt>
+              <dd className="mt-1 text-sm">
+                Phân quyền theo vai trò và bộ phận, audit append-only, định nghĩa theo phiên bản.
+              </dd>
+            </div>
+            <div>
+              <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Triển khai</dt>
+              <dd className="mt-1 text-sm">
+                Một host nội bộ, TLS, sao lưu định kỳ và diễn tập phục hồi có kiểm chứng.
+              </dd>
+            </div>
+          </dl>
+        </section>
 
-      <section className="mb-6">
-        <h2 className="mb-3 text-lg font-semibold tracking-tight">Nguyên tắc đã thống nhất</h2>
-        <div className="grid gap-4 sm:grid-cols-2">
-          {PRINCIPLES.map((principle) => (
-            <Card key={principle.title}>
-              <h3 className="text-sm font-semibold">{principle.title}</h3>
-              <p className="mt-1.5 text-sm leading-relaxed text-on-surface-muted">
-                {principle.body}
-              </p>
-            </Card>
-          ))}
+        <section id="nang-luc" className="border-t border-border bg-surface-raised/40">
+          <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
+            <h2 className="text-2xl font-semibold tracking-tight">Nền tảng làm được gì</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-on-surface-muted">
+              Sáu năng lực dưới đây đều đang chạy trong bản MVP V1, không phải bản mô phỏng giao
+              diện.
+            </p>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {CAPABILITIES.map((item) => (
+                <Card key={item.title}>
+                  <CardTitle>{item.title}</CardTitle>
+                  <CardDescription>{item.body}</CardDescription>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="vi-sao" className="border-t border-border">
+          <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
+            <h2 className="text-2xl font-semibold tracking-tight">Vì sao đáng tin</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-on-surface-muted">
+              Những điều dưới đây là ràng buộc kỹ thuật của sản phẩm, được kiểm chứng bằng test và
+              bằng chứng chạy được trong repo — không phải lời hứa trên trang giới thiệu.
+            </p>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              {TRUST.map((item) => (
+                <Card key={item.title}>
+                  <CardTitle>{item.title}</CardTitle>
+                  <CardDescription>{item.body}</CardDescription>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+
+        <section id="trang-thai" className="border-t border-border bg-surface-raised/40">
+          <div className="mx-auto w-full max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
+            <h2 className="text-2xl font-semibold tracking-tight">Trạng thái hiện tại</h2>
+            <p className="mt-3 max-w-2xl text-sm leading-relaxed text-on-surface-muted">
+              OPVARYN đang ở bản MVP V1. Chúng tôi nói rõ phần nào đã chạy và phần nào chưa, để bạn
+              đánh giá được trước khi đưa vào dùng thật.
+            </p>
+            <div className="mt-8 grid gap-4 sm:grid-cols-2">
+              {STATUS.map((item) => (
+                <Card key={item.title}>
+                  <CardTitle>{item.title}</CardTitle>
+                  <CardDescription>{item.body}</CardDescription>
+                </Card>
+              ))}
+            </div>
+          </div>
+        </section>
+      </main>
+
+      <footer className="border-t border-border">
+        <div className="mx-auto flex w-full max-w-6xl flex-col gap-3 px-4 py-8 text-xs text-on-surface-muted sm:flex-row sm:items-center sm:justify-between sm:px-6 lg:px-8">
+          <p>
+            OPVARYN · {meta ? `${stageLabel(meta.stage)} · phiên bản ${meta.version}` : 'MVP V1'}
+          </p>
+          <p>
+            Yêu cầu &amp; phạm vi: <code className="font-mono">operations-playbook/</code> · Quyết
+            định kỹ thuật: <code className="font-mono">docs/adr/</code>
+          </p>
         </div>
-      </section>
-
-      <section>
-        <h2 className="mb-3 text-lg font-semibold tracking-tight">Quy ước nhãn trạng thái</h2>
-        <div className="grid gap-4 sm:grid-cols-3">
-          {STATUS_LEGEND.map((entry) => (
-            <Card key={entry.kind}>
-              <StatusBadge kind={entry.kind} />
-              <p className="mt-3 text-sm leading-relaxed text-on-surface-muted">{entry.body}</p>
-            </Card>
-          ))}
-        </div>
-      </section>
-    </>
-  );
-}
-
-function DependencyChip({ label, up }: { label: string; up: boolean }) {
-  return (
-    <span className="inline-flex items-center gap-2 rounded-full border border-border px-3 py-1 text-xs">
-      <span aria-hidden className={`size-1.5 rounded-full ${up ? 'bg-success' : 'bg-danger'}`} />
-      {label}: {up ? 'sẵn sàng' : 'chưa kết nối'}
-    </span>
-  );
-}
-
-function KpiCard({ label, value, note }: { label: string; value: string; note: string }) {
-  return (
-    <Card>
-      <p className="text-xs tracking-wide text-on-surface-muted uppercase">{label}</p>
-      <p className="mt-2 text-xl font-semibold tracking-tight">{value}</p>
-      <p className="mt-1 text-sm text-on-surface-muted">{note}</p>
-    </Card>
+      </footer>
+    </div>
   );
 }

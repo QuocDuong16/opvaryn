@@ -16,12 +16,19 @@ describe('StatusBadge', () => {
 });
 
 describe('navigation', () => {
-  it('covers every demo area with a unique path', () => {
+  it('covers every workspace area with a unique path', () => {
     const hrefs = NAV_ITEMS.map((item) => item.href);
     expect(new Set(hrefs).size).toBe(hrefs.length);
     expect(hrefs).toContain('/objects');
     expect(hrefs).toContain('/workflows');
     expect(hrefs).toContain('/roadmap');
+  });
+
+  it('leaves the public front page and the sign-in screen out of the workspace nav', () => {
+    const hrefs = NAV_ITEMS.map((item) => item.href);
+    expect(hrefs).not.toContain('/');
+    expect(hrefs).not.toContain('/login');
+    expect(hrefs).toContain('/overview');
   });
 
   it('numbers the areas without gaps or repeats', () => {

@@ -87,8 +87,9 @@ make dev                     # terminal 1: API :21501 + web :21500
 make seed-demo               # 3 business object, 3 quy trình pilot + việc đang chờ, qua chính API
 ```
 
-Mở http://localhost:21500 và đi theo Walkthrough ở trang Tổng quan. Trang Objects cho phép tạo
-business object thật với field schema; mở một object để nhập bản ghi bằng form sinh từ schema.
+Mở http://localhost:21500 — trang giới thiệu công khai; bấm **Đăng nhập** rồi vào workspace (màn
+hình Tổng quan ở `/overview`). Trang Objects cho phép tạo business object thật với field schema; mở
+một object để nhập bản ghi bằng form sinh từ schema.
 
 ## Chạy trên host nội bộ
 

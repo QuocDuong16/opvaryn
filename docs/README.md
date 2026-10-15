@@ -40,3 +40,4 @@
 - [0011 — Metric vận hành quy trình: read model cố định trên cột có kiểu](adr/0011-process-operational-metrics.md)
 - [0012 — Tích hợp ra ngoài: webhook có hàng đợi, retry và nhật ký giao](adr/0012-outbound-webhook-integration.md)
 - [0013 — Kéo thả trên canvas: bản nháp nằm ở trình duyệt, engine không bao giờ thấy](adr/0013-canvas-draft-editing.md)
+- [0014 — Trang giới thiệu công khai, workspace nằm sau đăng nhập](adr/0014-public-landing-and-workspace.md)

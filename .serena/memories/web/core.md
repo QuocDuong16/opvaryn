@@ -2,24 +2,37 @@
 
 ## Routes and shell
 
-- Routes follow the demo nav defined once in `app/nav.ts` (`NAV_ITEMS`, `navItemFor`):
-  `/` overview, `/objects` (+ `/objects/[key]`), `/forms`, `/workflows`, `/tasks`, `/analytics`,
-  `/apps`, `/roadmap`, `/settings`. `navItemFor` matches nested routes by longest prefix, so
-  `/objects/it_incident` resolves to the Objects area; nav `index` values are sequential and the
-  shell test enforces both invariants.
-- Root layout (`app/layout.tsx`) reads the theme cookie server-side, sets `data-theme` on
-  `<html>` (no flash, no client theme script), loads Inter via `next/font`, and mounts
-  `Sidebar` (lg+) / `Topbar` (breadcrumb + compact mobile nav + theme toggle).
+- Routes: `/` is the **public front page** and `/login` the sign-in screen; both stand outside the
+  workspace frame (ADR 0014). Every screen behind the sign-in lives in the `app/(workspace)` route
+  group — `/overview` (workspace home), `/objects` (+ `/objects/[key]`), `/forms`, `/workflows`
+  (+ `[key]`), `/tasks` (+ `[instanceId]`), `/analytics`, `/apps`, `/roadmap`, `/settings` — and the
+  group's `layout.tsx` carries the shell. `proxy.ts` (Next 16's name for middleware; `middleware.ts`
+  is deprecated) sends a caller without the session cookie to `/login?next=<path>`; the API still
+  validates the token on every call, so a stale cookie reaches the screen and the screen says it
+  could not read (ADR 0008). Components import server actions by their real path, e.g.
+  `@/app/(workspace)/objects/actions`.
+- `app/nav.ts` (`NAV_ITEMS`, `navItemFor`) holds the **workspace** nav only: no `/` and no `/login`;
+  `index` values stay sequential and the shell test enforces both. `navItemFor` matches nested routes
+  by longest prefix, so `/objects/it_incident` resolves to the Objects area.
+- Root layout (`app/layout.tsx`) reads the theme cookie server-side, sets `data-theme` on `<html>`
+  (no flash, no client theme script) and loads Inter via `next/font`; the shell itself (`Sidebar`
+  lg+ / `Topbar` with breadcrumb, stage chip and compact mobile nav, plus the footer) lives in
+  `(workspace)/layout.tsx`. The session cookie name/options live in `lib/session-cookie.ts` — no
+  `next/headers` import, so the edge proxy can name the cookie — and `lib/session.ts` re-exports
+  them. `lib/stage.ts` maps the API build stage to a label, passing unknown stages through.
 - Theme plumbing: `lib/theme.ts` (`Theme`, `getTheme`, `nextTheme`, cookie `opvaryn.theme`,
   `DEFAULT_THEME = 'dark'`) + server action `app/actions/theme.ts`.
 - `components/app-shell/nav.tsx` exports `SidebarNav` (desktop) and `CompactNav` (mobile), both
   client components using `usePathname`; `breadcrumb.tsx` resolves the current area via
   `navItemFor`.
 
-## Demo screens (status per screen, ADR 0002/0003)
+## Screens (status per screen, ADR 0002/0003)
 
 - `/` **live**: platform status from `/api/v1/meta` + `/readyz` in try/catch (never crashes when
-  the API is off), plus a `DEMO_TOUR` grid that is the walkthrough entry point.
+  the API is off), then `SURFACES` (each screen with the label it earns), a "Chưa có trong V1"
+  list and the label legend. This page describes the product, not the demo milestone that built
+  it. Labels must be true in both directions: a live screen is never badged `mock`, and a screen
+  that could not read the API carries no badge at all — an error is not simulated behaviour.
 - `/objects` **live**: definition list (`object-list.tsx`, rows link to the detail page) and the
   create form with the schema editor.
 - `/objects/[key]` **live**: version badge, field schema table, version history table, records
@@ -44,9 +57,9 @@
   gone. Pure, tested modules: `components/workflows/definition-layout.ts` (column layout by distance
   from start, `conditionSummary`, `nodeSubtitle`, `outgoingEdges`) and `definition-draft.ts` (node/edge
   rows ↔ API graph, condition literal typed by the bound object's field, `serializeGraph`/`parseGraph`
-  for the hidden input). The canvas is read-only on purpose: a published version is immutable, so the
-  editor is a form and publishing is the only write; keep it that way instead of adding drag-and-drop
-  that would need an unpublished draft model.
+  for the hidden input). Publishing stays the only write to a definition: an older version is rendered
+  read-only with `ProcessCanvas`, and every edit happens on the browser-local draft described above
+  (ADR 0013).
 - `/objects/[key]` also carries `StartInstanceForm` (only definitions bound to that object are
   offered — conditions read its fields) and `InstanceList` for its records, backed by
   `listProcessInstances({objectKey})`; `/workflows/[key]` reuses `InstanceList` with
@@ -87,9 +100,10 @@
   every control is disabled and the copy says nothing is stored), integration panel lists mock
   connectors. Status badges are per view, not per page.
 - `/roadmap` **concept**: the playbook roadmap as a screen (four phases, MVP acceptance criteria,
-  non-goals, resourcing estimates). `OPEN_DECISIONS` lists only what is still open (D06 analytics,
-  D10 deployment) and `DECIDED` maps the closed ones (D04/D05/D07/D08/D09) to their ADRs — keep both
-  in step with `docs/adr/`; the MVP-acceptance note states which criteria are met (3 and 4).
+  non-goals, resourcing estimates). `OPEN_DECISIONS` is empty (every playbook decision D04–D10 is
+  settled) and `DECIDED` maps each to its ADR — keep both in step with `docs/adr/`; the
+  MVP-acceptance note states that criteria 1–4 and 6 are met, plus 5 and 7 through the outbound
+  webhook and `make smoke-restart`.
 - `/settings` **live**: endpoint table (kept in sync with the OpenAPI paths), ports, toolchain pins,
   the demo-data commands, and the **webhook delivery log** (enabled/off, status, attempts, last error)
   with its own try/catch so a missing role or a stopped API only greys that card.

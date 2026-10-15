@@ -4,7 +4,7 @@ import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
 import type { BusinessObject, FieldDefinition } from '@opvaryn/contracts';
 
-import { createObjectRecordAction } from '@/app/objects/actions';
+import { createObjectRecordAction } from '@/app/(workspace)/objects/actions';
 import { INITIAL_CREATE_RECORD_STATE } from '@/components/forms/object-form-state';
 import { FIELD_TYPE_LABELS } from '@/lib/format';
 

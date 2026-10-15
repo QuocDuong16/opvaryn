@@ -11,7 +11,7 @@ export interface NavItem {
  */
 export const NAV_ITEMS: readonly NavItem[] = [
   {
-    href: '/',
+    href: '/overview',
     index: '01',
     label: 'Tổng quan',
     description: 'Tầm nhìn, phạm vi V1 và trạng thái nền tảng',

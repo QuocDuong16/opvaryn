@@ -31,7 +31,22 @@ export async function loginAction(_previous: LoginState, formData: FormData): Pr
     ...SESSION_COOKIE_OPTIONS,
     maxAge: 60 * 60 * 12,
   });
-  redirect('/');
+  redirect(safeNext(formData.get('next')) ?? '/overview');
+}
+
+/**
+ * safeNext keeps the post-sign-in redirect on this site: only a path starting with a
+ * single slash qualifies. An absolute URL or a protocol-relative `//host` falls back to
+ * the workspace home, so `?next=` can never bounce someone off the app.
+ */
+function safeNext(value: FormDataEntryValue | null): string | null {
+  if (typeof value !== 'string') {
+    return null;
+  }
+  if (!value.startsWith('/') || value.startsWith('//')) {
+    return null;
+  }
+  return value;
 }
 
 /** Signs out: the API session ends and the local cookie is removed. */
