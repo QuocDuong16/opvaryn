@@ -53,6 +53,8 @@ type identityStore interface {
 	FindUserByID(ctx context.Context, id uuid.UUID) (domain.User, bool, error)
 	ListUsers(ctx context.Context) ([]domain.User, error)
 	ListRoles(ctx context.Context) ([]string, error)
+	ListRoleLabels(ctx context.Context) (map[string]string, error)
+	UpsertRoleLabel(ctx context.Context, role string, label string) error
 	CreateUser(ctx context.Context, user domain.User, passwordHash string) (domain.User, error)
 	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
 	FindDepartment(ctx context.Context, key string) (domain.Department, bool, error)
@@ -346,16 +348,71 @@ func (s *Identity) ListUsers(ctx context.Context) ([]domain.User, error) {
 	return users, nil
 }
 
-// ListRoles returns the role catalogue: every role at least one user holds. It is
-// what the workflow designer offers, because a definition that assigns a role nobody
-// holds would wait forever — an instance stops at that node until someone gets the
-// role. Any signed-in user may read it: role names already appear in every definition
-// they can read, so this adds no new information (ADR 0008).
-func (s *Identity) ListRoles(ctx context.Context, principal domain.Principal) ([]string, error) {
+// ListRoles returns the role catalogue: every role at least one user holds, each with the
+// display name it has been given. It is what the workflow designer offers, because a
+// definition that assigns a role nobody holds would wait forever — an instance stops at
+// that node until someone gets the role. Any signed-in user may read it: role keys already
+// appear in every definition they can read, so this adds no new information (ADR 0008);
+// the labels are what a screen shows instead of the key (ADR 0016).
+func (s *Identity) ListRoles(ctx context.Context, principal domain.Principal) ([]domain.RoleEntry, error) {
 	if err := requireAuthenticated(principal); err != nil {
 		return nil, err
 	}
-	return s.store.ListRoles(ctx)
+
+	keys, err := s.store.ListRoles(ctx)
+	if err != nil {
+		return nil, err
+	}
+	labels, err := s.store.ListRoleLabels(ctx)
+	if err != nil {
+		return nil, err
+	}
+
+	entries := make([]domain.RoleEntry, 0, len(keys))
+	for _, key := range keys {
+		entries = append(entries, domain.RoleEntry{Key: key, Label: labels[key]})
+	}
+	return entries, nil
+}
+
+// RoleLabels returns the display names of the roles one person holds, keyed by role. A role
+// nobody has named is absent, so the caller shows the key for it.
+func (s *Identity) RoleLabels(ctx context.Context, user domain.User) (map[string]string, error) {
+	if len(user.Roles) == 0 {
+		return map[string]string{}, nil
+	}
+	labels, err := s.store.ListRoleLabels(ctx)
+	if err != nil {
+		return nil, err
+	}
+	held := make(map[string]string, len(user.Roles))
+	for _, role := range user.Roles {
+		if label, ok := labels[role]; ok {
+			held[role] = label
+		}
+	}
+	return held, nil
+}
+
+// SetRoleLabel names a role for the interface. Only an administrator may do it: a label is
+// organization-wide text that everyone reads, unlike the roles a designer types on a node.
+func (s *Identity) SetRoleLabel(ctx context.Context, principal domain.Principal, role string, label string) error {
+	if err := requireAdmin(principal); err != nil {
+		return err
+	}
+
+	problems := make([]string, 0, 2)
+	if !KeyPattern.MatchString(role) {
+		problems = append(problems, "role must be a lower-case key like truong_bo_phan")
+	}
+	if strings.TrimSpace(label) == "" {
+		problems = append(problems, "label must not be blank")
+	}
+	if len(problems) > 0 {
+		return &ValidationError{Problems: problems}
+	}
+
+	return s.store.UpsertRoleLabel(ctx, role, strings.TrimSpace(label))
 }
 
 // PruneSessions deletes expired sessions and reports how many were removed. Expired

@@ -168,6 +168,17 @@
 - Tokens: two layers in `app/globals.css` — raw CSS variables under `[data-theme='dark'|'light']`,
   then `@theme inline` mapping them to Tailwind color utilities. Dark is the default. Add tokens
   there; never hard-code hex in components.
+- **Names, never keys** (ADR 0016): a department, a role, a definition and a record are shown by
+  their human name. `lib/names.ts` holds the pure, tested rule — `labelOrKey(label, key)` returns
+  the name when there is one and the key otherwise (never an invented name); `roleLabels(entries)`,
+  `nameLabels(items)` and `joinLabels(keys, map)` build the lookups. Sources: `me.departmentName`
+  and `me.roleLabels` (a map, only for the roles the person holds), `GET /api/v1/roles` which now
+  returns `[{key, label}]` (RoleEntry), `listProcessDefinitions()` for definition names, and
+  `recordLabels()` from each record's own version. Keys are acceptable only on the operator screen
+  (Vận hành) and inside inputs where a designer is choosing a key (the role datalist shows the
+  label as option text, the value stays the key). Role labels are data: table `role_labels`
+  (migration 0009), set with `useradm -set-role-label` by an administrator, seeded by
+  `scripts/seed-demo.sh`.
 - **Audience rule** (ADR 0015): the workspace is built for the person using it. Everyone signed in
   sees the product screens (nav labels are Vietnamese: Dữ liệu, Nhập liệu, Quy trình, Việc của tôi,
   Báo cáo, Ứng dụng); `/settings` (Vận hành) and `/roadmap` (Lộ trình) are `audience: 'admin'` and

@@ -58,7 +58,7 @@ export function StartInstanceForm({
           <select id="start-definition" name="definitionKey" className={SELECT_CLASS}>
             {definitions.map((definition) => (
               <option key={definition.key} value={definition.key}>
-                {`${definition.name} (${definition.key})`}
+                {definition.name}
               </option>
             ))}
           </select>

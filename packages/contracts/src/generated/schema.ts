@@ -837,9 +837,25 @@ export interface components {
             id: string;
             email: string;
             name: string;
-            /** @description Department key (D09b scoping). */
+            /** @description Department key (D09b scoping). Keys are for the engine, not for screens. */
             department: string;
+            /**
+             * @description Display name of the department, for screens (ADR 0016).
+             * @example Kỹ thuật
+             */
+            departmentName: string;
+            /** @description Role keys the person holds; these are what authorization compares. */
             roles: string[];
+            /**
+             * @description Display name per role key the person holds. A role nobody has named is absent, so
+             *     the caller shows the key for it (ADR 0016).
+             * @example {
+             *       "truong_bo_phan": "Trưởng bộ phận"
+             *     }
+             */
+            roleLabels: {
+                [key: string]: string;
+            };
         };
         StartProcessInstanceRequest: {
             definitionKey: string;
@@ -847,8 +863,20 @@ export interface components {
             recordId: string;
         };
         RoleList: {
-            /** @description Role keys held by at least one user, sorted. */
-            data: string[];
+            /** @description Roles held by at least one user, sorted by key. */
+            data: components["schemas"]["RoleEntry"][];
+        };
+        RoleEntry: {
+            /**
+             * @description The key a process node assigns and authorization compares.
+             * @example truong_bo_phan
+             */
+            key: string;
+            /**
+             * @description Display name; empty when the role has not been named yet.
+             * @example Trưởng bộ phận
+             */
+            label: string;
         };
         /**
          * @description Count records, or measure one numeric field.

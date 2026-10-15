@@ -113,6 +113,11 @@ Working agreement for agents and contributors in this repository.
   that grants nothing (`lib/advanced.ts`, ADR 0015). New nav entries pick an `audience`; the
   default is `everyone`. The workspace home is a dashboard of the person's own work, never a
   status board of the build.
+- Screens show names, never keys (ADR 0016). A department, a role, a process definition and a
+  record all have a human name — use `lib/names.ts` (`labelOrKey`) instead of printing the key,
+  and where nobody has named something yet, show the key rather than inventing a name. New
+  contract fields that identify something need a display name next to the key. Keys stay in the
+  operator screen and in inputs where a designer is *choosing* a key.
 - Copy on product screens speaks to the person doing the work. No ADR numbers, decision
   codes, repository paths, `make` commands, or database/HTTP vocabulary ("PostgreSQL",
   "cookie httpOnly", "event log", "engine") — those belong in code comments, docs and

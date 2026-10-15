@@ -1451,7 +1451,7 @@ components:
           example: correct horse battery staple
     Me:
       type: object
-      required: [id, email, name, department, roles]
+      required: [id, email, name, department, departmentName, roles, roleLabels]
       properties:
         id:
           type: string
@@ -1462,11 +1462,24 @@ components:
           type: string
         department:
           type: string
-          description: Department key (D09b scoping).
+          description: Department key (D09b scoping). Keys are for the engine, not for screens.
+        departmentName:
+          type: string
+          description: Display name of the department, for screens (ADR 0016).
+          example: Kỹ thuật
         roles:
           type: array
+          description: Role keys the person holds; these are what authorization compares.
           items:
             type: string
+        roleLabels:
+          type: object
+          description: |
+            Display name per role key the person holds. A role nobody has named is absent, so
+            the caller shows the key for it (ADR 0016).
+          additionalProperties:
+            type: string
+          example: { truong_bo_phan: Trưởng bộ phận }
     StartProcessInstanceRequest:
       type: object
       required: [definitionKey, recordId]
@@ -1482,9 +1495,21 @@ components:
       properties:
         data:
           type: array
-          description: Role keys held by at least one user, sorted.
+          description: Roles held by at least one user, sorted by key.
           items:
-            type: string
+            $ref: '#/components/schemas/RoleEntry'
+    RoleEntry:
+      type: object
+      required: [key, label]
+      properties:
+        key:
+          type: string
+          description: The key a process node assigns and authorization compares.
+          example: truong_bo_phan
+        label:
+          type: string
+          description: Display name; empty when the role has not been named yet.
+          example: Trưởng bộ phận
     MetricAggregation:
       type: string
       enum: [count, sum, avg]

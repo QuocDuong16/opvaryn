@@ -4,6 +4,7 @@ import { LoginForm } from '@/components/auth/login-form';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { ThemeToggle } from '@/components/app-shell/theme-toggle';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
+import { labelOrKey } from '@/lib/names';
 import { logoutAction } from '@/app/login/actions';
 
 export const metadata = { title: 'Đăng nhập' };
@@ -21,7 +22,13 @@ export default async function LoginPage({ searchParams }: PageProps) {
   const { next } = await searchParams;
   const api = createServerApiClient();
 
-  let signedIn: { name: string; email: string; department: string; roles: string[] } | null = null;
+  let signedIn: {
+    name: string;
+    email: string;
+    departmentName: string;
+    roles: string[];
+    roleLabels: Record<string, string>;
+  } | null = null;
   let error: string | null = null;
   try {
     const me = await api.getMe();
@@ -63,8 +70,11 @@ export default async function LoginPage({ searchParams }: PageProps) {
               <CardTitle>Đang đăng nhập</CardTitle>
               <CardDescription>
                 <span className="font-medium">{signedIn.name}</span> ({signedIn.email}) — bộ phận{' '}
-                <code className="font-mono text-xs">{signedIn.department}</code>, role{' '}
-                <code className="font-mono text-xs">{signedIn.roles.join(', ')}</code>.
+                {signedIn.departmentName}, role{' '}
+                {signedIn.roles
+                  .map((role) => labelOrKey(signedIn.roleLabels[role], role))
+                  .join(', ')}
+                .
               </CardDescription>
               <div className="mt-4 flex flex-wrap items-center gap-3">
                 <Link

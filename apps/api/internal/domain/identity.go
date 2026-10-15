@@ -26,18 +26,28 @@ type Department struct {
 	CreatedAt time.Time
 }
 
+// RoleEntry is a role as a screen shows it: the key the engine compares, and the label a
+// person reads. Label is empty when nobody has named the role yet — the interface falls
+// back to the key rather than hiding the role (ADR 0016).
+type RoleEntry struct {
+	Key   string
+	Label string
+}
+
 // User is a person who can log in. PasswordHash is the argon2id PHC string and is
-// never serialized to a client or written to a log.
+// never serialized to a client or written to a log. DepartmentName is the display name of
+// the department the key points at, so no screen has to show a key to a person.
 type User struct {
-	ID            uuid.UUID
-	Email         string
-	Name          string
-	PasswordHash  string
-	DepartmentKey string
-	Roles         []string
-	Status        string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	ID             uuid.UUID
+	Email          string
+	Name           string
+	PasswordHash   string
+	DepartmentKey  string
+	DepartmentName string
+	Roles          []string
+	Status         string
+	CreatedAt      time.Time
+	UpdatedAt      time.Time
 }
 
 // Active reports whether the user may log in.

@@ -6,6 +6,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatTimestamp } from '@/lib/format';
+import { labelOrKey } from '@/lib/names';
 
 export const metadata = { title: 'Việc của tôi' };
 
@@ -52,7 +53,7 @@ export default async function TasksPage() {
       <PageHeader
         eyebrow="05 / Việc của tôi"
         title="Việc của tôi"
-        lead="Hộp việc của bạn: chỉ những việc đang mở thuộc role bạn giữ. Mở một việc để xem bản ghi, diễn biến và quyết định duyệt, trả về hoặc từ chối."
+        lead="Hộp việc của bạn: chỉ những việc đang mở thuộc vai trò bạn giữ. Mở một việc để xem bản ghi, diễn biến và quyết định duyệt, trả về hoặc từ chối."
       />
 
       {needsSignIn ? (
@@ -88,12 +89,14 @@ export default async function TasksPage() {
               <dd className="font-semibold text-warning">{items.length}</dd>
             </div>
             <div className="flex items-center gap-2">
-              <dt className="text-on-surface-muted">Role của bạn</dt>
-              <dd className="font-mono text-xs">{me.roles.join(', ') || '—'}</dd>
+              <dt className="text-on-surface-muted">Vai trò của bạn</dt>
+              <dd className="text-xs">
+                {me.roles.map((role) => labelOrKey(me.roleLabels[role], role)).join(', ') || '—'}
+              </dd>
             </div>
             <div className="flex items-center gap-2">
               <dt className="text-on-surface-muted">Bộ phận</dt>
-              <dd className="font-mono text-xs">{me.department || '—'}</dd>
+              <dd className="text-xs">{me.departmentName || '—'}</dd>
             </div>
           </dl>
           <p className="text-xs text-on-surface-muted">Việc cũ nhất ở trên đầu.</p>
@@ -104,13 +107,13 @@ export default async function TasksPage() {
         <div className="mt-6 rounded-xl border border-dashed border-border-strong px-5 py-10 text-center">
           <p className="text-sm font-medium">Không có việc nào đang chờ bạn</p>
           <p className="mx-auto mt-1 max-w-lg text-sm text-on-surface-muted">
-            Inbox chỉ chứa việc đang mở thuộc role bạn giữ. Mở một bản ghi và khởi động quy trình từ
-            đó, rồi tải lại trang.
+            Hộp việc chỉ chứa việc đang mở thuộc vai trò bạn giữ. Mở một bản ghi và khởi động quy
+            trình từ đó, rồi tải lại trang.
           </p>
         </div>
       ) : null}
 
-      {items.length > 0 ? (
+      {me && items.length > 0 ? (
         <ul className="mt-6 space-y-4">
           {items.map((item) => (
             <li
@@ -123,12 +126,12 @@ export default async function TasksPage() {
                     <span className="rounded-full border border-warning/40 px-2 py-0.5 text-[11px] text-warning">
                       Đang chờ quyết định
                     </span>
-                    <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[11px] text-on-surface-muted">
-                      {`role ${item.task.assigneeRole}`}
+                    <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-on-surface-muted">
+                      {labelOrKey(me.roleLabels[item.task.assigneeRole], item.task.assigneeRole)}
                     </span>
                     {item.task.attempt > 1 ? (
                       <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-on-surface-muted">
-                        {`attempt ${item.task.attempt}`}
+                        {`lần ${item.task.attempt}`}
                       </span>
                     ) : null}
                   </p>

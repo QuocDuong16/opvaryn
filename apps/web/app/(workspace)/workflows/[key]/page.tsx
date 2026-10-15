@@ -5,6 +5,7 @@ import {
   type ProcessDefinition,
   type ProcessDefinitionVersion,
   type ProcessInstanceSummary,
+  type RoleEntry,
 } from '@opvaryn/contracts';
 
 import { InstanceList } from '@/components/process/instance-list';
@@ -17,6 +18,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatTimestamp } from '@/lib/format';
+import { labelOrKey, roleLabels } from '@/lib/names';
 import { getWorkflowDraft } from '@/lib/workflow-draft';
 import { cn } from '@/lib/utils';
 
@@ -38,7 +40,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
   let definition: ProcessDefinition | null = null;
   let versions: ProcessDefinitionVersion[] = [];
   let instances: ProcessInstanceSummary[] = [];
-  let roleCatalogue: string[] = [];
+  let roleCatalogue: RoleEntry[] = [];
   let labels: Record<string, string> = {};
   let error: string | null = null;
 
@@ -108,7 +110,13 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
         .filter((role): role is string => role !== undefined && role !== ''),
     ),
   ].sort();
-  const knownRoles = [...new Set([...roleCatalogue, ...definitionRoles])].sort();
+  const named = roleLabels(roleCatalogue);
+  const knownRoles: RoleEntry[] = [
+    ...new Set([...roleCatalogue.map((entry) => entry.key), ...definitionRoles]),
+  ]
+    .sort()
+    .map((key) => ({ key, label: named.get(key) ?? '' }));
+  const roleNames = Object.fromEntries(knownRoles.map((entry) => [entry.key, entry.label]));
 
   // The editor works on a draft (ADR 0013): the newest published graph is the baseline,
   // and a saved draft from this browser takes its place when one exists.
@@ -117,7 +125,9 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
   // A role nobody holds is a real hazard: the instance stops at that node and no
   // inbox shows the work. The definition is still valid, so this warns instead of
   // blocking — an administrator may be about to grant the role.
-  const unheldRoles = definitionRoles.filter((role) => !roleCatalogue.includes(role));
+  const unheldRoles = definitionRoles.filter(
+    (role) => !roleCatalogue.some((entry) => entry.key === role),
+  );
 
   return (
     <>
@@ -150,9 +160,9 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
 
       {unheldRoles.length > 0 ? (
         <Card className="mb-6 border-warning/40">
-          <CardTitle className="text-warning">Role chưa có ai giữ</CardTitle>
+          <CardTitle className="text-warning">Vai trò chưa có ai giữ</CardTitle>
           <CardDescription>
-            {`Quy trình này giao việc cho ${unheldRoles.map((role) => `"${role}"`).join(', ')}, nhưng hiện không tài khoản nào giữ role đó. Quy trình chạy tới bước ấy sẽ dừng lại và không xuất hiện trong hộp việc của ai — hãy gán role này cho ít nhất một người, rồi tải lại trang.`}
+            {`Quy trình này giao việc cho ${unheldRoles.map((role) => labelOrKey(roleNames[role], role)).join(', ')}, nhưng hiện không tài khoản nào giữ vai trò đó. Quy trình chạy tới bước ấy sẽ dừng lại và không xuất hiện trong hộp việc của ai — hãy gán vai trò này cho ít nhất một người, rồi tải lại trang.`}
           </CardDescription>
         </Card>
       ) : null}
@@ -210,6 +220,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
                 graph={{ nodes: shown.nodes, edges: shown.edges }}
                 version={shown.version}
                 label={`${definition.key} v${shown.version}`}
+                roleLabels={roleNames}
               />
               <p className="mt-3 rounded-lg border border-warning/40 px-3 py-2 text-sm text-warning">
                 {`Đang xem v${shown.version} — bản đang dùng là v${definition.version}. Instance cũ vẫn chạy theo phiên bản này, nên bản cũ chỉ để xem: chọn v${definition.version} ở dải phiên bản để sửa.`}

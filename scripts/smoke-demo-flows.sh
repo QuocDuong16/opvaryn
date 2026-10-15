@@ -252,6 +252,10 @@ department="flow_dept_$stamp"
   -password "$designer_password" -department "$department" \
   -roles "process_designer,$approver_role") >/dev/null ||
   fail "creating the flow designer failed"
+# Roles and departments are shown by name, so the run names the ones it uses (ADR 0016).
+(cd "$api_dir" && ./bin/useradm -set-role-label -role process_designer \
+  -label "Người thiết kế quy trình") >/dev/null ||
+  fail "naming the designer role failed"
 
 # The build and operations screens belong to an administrator (ADR 0015), so the run needs
 # one person of each kind: a department head who sees the product, and an admin who can turn
@@ -270,6 +274,10 @@ sign_in_through_form "$admin_jar" "$admin_email" "$designer_password" "admin"
 status="$(web_get "/overview" "$tmp_dir/home.html")"
 assert_status "$status" "200" "workspace home after signing in"
 assert_contains "$tmp_dir/home.html" "Flow designer" "the shell shows who is signed in"
+# Names, not keys: the department by its name and the role by its label (ADR 0016).
+assert_contains "$tmp_dir/home.html" "Flow $stamp" "the home names the department"
+assert_not_contains "$tmp_dir/home.html" "$department" "the home does not show the department key"
+assert_contains "$tmp_dir/home.html" "Người thiết kế quy trình" "the home names the role"
 
 # ------------------------------------------- flow A: schema-driven entry form ----
 
@@ -731,7 +739,7 @@ PY
 echo "flows: [G] the task belongs to the other person, not to the approver"
 status="$(web_get "/tasks/$instance_id" "$tmp_dir/instance-other-role.html")"
 assert_status "$status" "200" "instance page as the approver"
-assert_contains "$tmp_dir/instance-other-role.html" "bạn không giữ role đó nên không quyết định được" \
+assert_contains "$tmp_dir/instance-other-role.html" "bạn không giữ vai trò đó nên không quyết định được" \
   "a role the viewer does not hold is not decidable"
 assert_not_contains "$tmp_dir/instance-other-role.html" 'name="decision"' \
   "no decision form is offered for another role"
@@ -762,12 +770,12 @@ status="$(web_post_as "$director_jar" "/tasks/$instance_id" "$tmp_dir/returned.h
   "${director_args[@]}" --form-string 'decision=return' \
   --form-string 'reason=Bổ sung báo giá của hai nhà cung cấp')"
 assert_status "$status" "200" "return decision"
-assert_contains "$tmp_dir/returned.html" "Đã trả về người đề nghị — quy trình chạy lại từ đầu với attempt 2" \
+assert_contains "$tmp_dir/returned.html" "Đã trả về người đề nghị — quy trình chạy lại từ đầu với lần 2" \
   "the return is confirmed with the new attempt"
 
 status="$(web_get "/tasks" "$tmp_dir/inbox-attempt2.html")"
 assert_status "$status" "200" "inbox after the return"
-assert_contains "$tmp_dir/inbox-attempt2.html" "attempt 2" "the reopened task carries its attempt"
+assert_contains "$tmp_dir/inbox-attempt2.html" "lần 2" "the reopened task carries its attempt"
 
 status="$(web_get "/tasks/$instance_id" "$tmp_dir/instance-attempt2.html")"
 assert_status "$status" "200" "instance page after the return"
@@ -829,7 +837,9 @@ status="$(web_get "/workflows/$web_flow_key" "$tmp_dir/workflow-detail.html")"
 assert_status "$status" "200" "workflow detail page"
 assert_contains "$tmp_dir/workflow-detail.html" "Trình soạn $web_flow_key v1" "the editor draws the published graph"
 assert_contains "$tmp_dir/workflow-detail.html" "Kiểm tra yêu cầu" "the canvas names the node"
-assert_contains "$tmp_dir/workflow-detail.html" "role $approver_role" "the node shows its role"
+# A role nobody has named is shown by its key — the screen never hides a role it cannot
+# name, and never invents a name for it (ADR 0016).
+assert_contains "$tmp_dir/workflow-detail.html" "$approver_role" "the node shows its role"
 assert_contains "$tmp_dir/workflow-detail.html" "Trùng bản đã publish" "a fresh editor reports nothing unpublished"
 assert_contains "$tmp_dir/workflow-detail.html" "Instance của quy trình này" "the instance section"
 assert_contains "$tmp_dir/workflow-detail.html" "Publish phiên bản mới" "the publish button"
@@ -911,9 +921,9 @@ assert_status "$status" "201" "creating a definition with an unheld role"
 # instance would stop at that node and appear in nobody's inbox.
 status="$(web_get "/workflows/$ghost_key" "$tmp_dir/ghost-detail.html")"
 assert_status "$status" "200" "detail page of the definition with an unheld role"
-assert_contains "$tmp_dir/ghost-detail.html" "Role chưa có ai giữ" "the unheld role is flagged"
+assert_contains "$tmp_dir/ghost-detail.html" "Vai trò chưa có ai giữ" "the unheld role is flagged"
 assert_contains "$tmp_dir/ghost-detail.html" "$ghost_role" "the warning names the role"
-assert_contains "$tmp_dir/ghost-detail.html" "gán role này cho ít nhất một người" "the warning says how to fix it"
+assert_contains "$tmp_dir/ghost-detail.html" "gán vai trò này cho ít nhất một người" "the warning says how to fix it"
 
 echo "flows: [H] a draft stays in the browser and never reaches the engine"
 curl -sS -b "$cookie_jar" -o "$tmp_dir/definition-before-draft.json" \

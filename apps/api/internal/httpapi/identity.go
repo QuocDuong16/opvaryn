@@ -102,7 +102,7 @@ func handleLogin(identity *service.Identity, secureCookies bool, log *slog.Logge
 		}
 
 		http.SetCookie(w, sessionCookie(secureCookies, token, int(service.SessionTTL.Seconds())))
-		writeJSON(w, log, http.StatusOK, toAPIMe(user))
+		writeJSON(w, log, http.StatusOK, meResponse(r.Context(), identity, user, log))
 	}
 }
 
@@ -119,13 +119,13 @@ func handleLogout(identity *service.Identity, secureCookies bool, log *slog.Logg
 	}
 }
 
-func handleMe(log *slog.Logger) http.HandlerFunc {
+func handleMe(identity *service.Identity, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		user, ok := requireUser(w, log, r)
 		if !ok {
 			return
 		}
-		writeJSON(w, log, http.StatusOK, toAPIMe(user))
+		writeJSON(w, log, http.StatusOK, meResponse(r.Context(), identity, user, log))
 	}
 }
 
@@ -141,20 +141,47 @@ func handleListRoles(identity *service.Identity, log *slog.Logger) http.HandlerF
 			writeStoreError(w, log, err, "list roles")
 			return
 		}
-		writeJSON(w, log, http.StatusOK, apiv1.RoleList{Data: roles})
+		entries := make([]apiv1.RoleEntry, 0, len(roles))
+		for _, role := range roles {
+			entries = append(entries, apiv1.RoleEntry{Key: role.Key, Label: role.Label})
+		}
+		writeJSON(w, log, http.StatusOK, apiv1.RoleList{Data: entries})
 	}
 }
 
-func toAPIMe(user domain.User) apiv1.Me {
+// meResponse answers who is signed in, with the display names a screen needs: the department
+// name and the label of every role the person holds (ADR 0016). A role nobody has named is
+// absent from the map, so the caller shows its key.
+func meResponse(
+	ctx context.Context,
+	identity *service.Identity,
+	user domain.User,
+	log *slog.Logger,
+) apiv1.Me {
+	labels, err := identity.RoleLabels(ctx, user)
+	if err != nil {
+		// A missing label must not break signing in: fall back to keys.
+		log.Warn("read role labels failed", "error", err)
+		labels = map[string]string{}
+	}
+	return toAPIMe(user, labels)
+}
+
+func toAPIMe(user domain.User, roleLabels map[string]string) apiv1.Me {
 	roles := user.Roles
 	if roles == nil {
 		roles = []string{}
 	}
+	if roleLabels == nil {
+		roleLabels = map[string]string{}
+	}
 	return apiv1.Me{
-		Id:         user.ID,
-		Email:      user.Email,
-		Name:       user.Name,
-		Department: user.DepartmentKey,
-		Roles:      roles,
+		Id:             user.ID,
+		Email:          user.Email,
+		Name:           user.Name,
+		Department:     user.DepartmentKey,
+		DepartmentName: user.DepartmentName,
+		Roles:          roles,
+		RoleLabels:     roleLabels,
 	}
 }

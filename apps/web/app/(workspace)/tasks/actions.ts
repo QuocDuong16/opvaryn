@@ -63,7 +63,7 @@ function describeOutcome(view: ProcessInstanceView, decision: Decision): string 
     return 'Đã duyệt — quy trình hoàn tất. Sự kiện đã ghi vào event log append-only.';
   }
   if (decision === 'return') {
-    return `Đã trả về người đề nghị — quy trình chạy lại từ đầu với attempt ${attempt}${nextStepLabel(waiting)}.`;
+    return `Đã trả về người đề nghị — quy trình chạy lại từ đầu với lần ${attempt}${nextStepLabel(waiting)}.`;
   }
   return `Đã duyệt — quy trình chuyển tới node "${currentNode}"${nextStepLabel(waiting)}.`;
 }

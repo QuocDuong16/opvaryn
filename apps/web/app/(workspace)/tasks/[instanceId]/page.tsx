@@ -20,6 +20,7 @@ import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatFieldValue, formatTimestamp } from '@/lib/format';
+import { labelOrKey } from '@/lib/names';
 import { cn } from '@/lib/utils';
 
 interface PageProps {
@@ -50,9 +51,14 @@ export default async function ProcessInstancePage({ params }: PageProps) {
 
   let me: Me;
   let view: ProcessInstanceView;
+  let roleLabels: Record<string, string> = {};
   try {
     me = await api.getMe();
     view = await api.getProcessInstance(instanceId);
+    // The screen names roles, so it needs the catalogue. A missing catalogue is not fatal:
+    // the chips fall back to the key rather than showing nothing.
+    const catalogue = await api.listRoles().catch(() => []);
+    roleLabels = Object.fromEntries(catalogue.map((entry) => [entry.key, entry.label]));
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'not_found') {
       // An instance the caller may not see is answered as absent, never as forbidden:
@@ -136,8 +142,8 @@ export default async function ProcessInstancePage({ params }: PageProps) {
         >
           {INSTANCE_STATE_LABELS[instance.state] ?? instance.state}
         </span>
-        <span className="rounded-full border border-border px-2.5 py-0.5 font-mono text-xs text-on-surface-muted">
-          {`attempt ${instance.attempt}`}
+        <span className="rounded-full border border-border px-2.5 py-0.5 text-xs text-on-surface-muted">
+          {`lần ${instance.attempt}`}
         </span>
       </p>
 
@@ -166,12 +172,12 @@ export default async function ProcessInstancePage({ params }: PageProps) {
                           >
                             {TASK_STATUS_LABELS[task.status] ?? task.status}
                           </span>
-                          <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[11px] text-on-surface-muted">
-                            {`role ${task.assigneeRole}`}
+                          <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-on-surface-muted">
+                            {labelOrKey(roleLabels[task.assigneeRole], task.assigneeRole)}
                           </span>
                           {task.attempt > 1 ? (
                             <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-on-surface-muted">
-                              {`attempt ${task.attempt}`}
+                              {`lần ${task.attempt}`}
                             </span>
                           ) : null}
                         </p>
@@ -204,11 +210,11 @@ export default async function ProcessInstancePage({ params }: PageProps) {
 
                     {task.status === 'open' && !canDecide ? (
                       <p className="mt-3 text-xs text-on-surface-muted">
-                        {'Việc này thuộc role '}
-                        <code className="font-mono">{task.assigneeRole}</code>
-                        {
-                          '; bạn không giữ role đó nên không quyết định được. API cũng từ chối (403) nếu gọi thẳng.'
-                        }
+                        {'Việc này thuộc '}
+                        <strong>
+                          {labelOrKey(roleLabels[task.assigneeRole], task.assigneeRole)}
+                        </strong>
+                        {'; bạn không giữ vai trò đó nên không quyết định được.'}
                       </p>
                     ) : null}
                   </li>

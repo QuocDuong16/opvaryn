@@ -16,16 +16,16 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
   { method: 'GET', path: '/healthz', purpose: 'Liveness probe' },
   { method: 'POST', path: '/api/v1/auth/login', purpose: 'Đăng nhập, mở phiên làm việc' },
   { method: 'POST', path: '/api/v1/auth/logout', purpose: 'Kết thúc session hiện tại' },
-  { method: 'GET', path: '/api/v1/me', purpose: 'Người dùng hiện tại kèm role và bộ phận' },
+  { method: 'GET', path: '/api/v1/me', purpose: 'Người dùng hiện tại kèm vai trò và bộ phận' },
   {
     method: 'GET',
     path: '/api/v1/roles',
-    purpose: 'Danh mục role có ít nhất một người giữ (trình thiết kế dùng để gợi ý)',
+    purpose: 'Danh mục vai trò có ít nhất một người giữ (trình thiết kế dùng để gợi ý)',
   },
   {
     method: 'GET',
     path: '/api/v1/tasks',
-    purpose: 'Inbox: task mở của các role mà người đang đăng nhập giữ',
+    purpose: 'Hộp việc: việc đang mở của các vai trò mà người đang đăng nhập giữ',
   },
   { method: 'GET', path: '/readyz', purpose: 'Readiness, kiểm tra database' },
   { method: 'GET', path: '/api/v1/meta', purpose: 'Tên, phiên bản và giai đoạn build' },
@@ -140,7 +140,7 @@ export default async function SettingsPage() {
   } catch (cause) {
     deliveriesError =
       cause instanceof ApiError && cause.code === 'forbidden'
-        ? 'Cần role process_designer hoặc admin để xem nhật ký giao.'
+        ? 'Cần vai trò process_designer hoặc admin để xem nhật ký giao.'
         : describeApiError(cause);
   }
 

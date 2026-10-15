@@ -465,9 +465,14 @@ grep -q "\"$director_role\"" "$body_file" || fail "the role catalogue lost the d
 python3 - "$body_file" <<'PY' || fail "the role catalogue is not sorted and distinct"
 import json, sys
 
-roles = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
-if roles != sorted(set(roles)):
-    sys.exit(f"expected sorted distinct roles, got {roles}")
+entries = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+keys = [entry["key"] for entry in entries]
+if keys != sorted(set(keys)):
+    sys.exit(f"expected roles sorted by key and distinct, got {keys}")
+# Every entry carries the display name field, even when nobody has named the role yet:
+# the interface shows the key then, rather than hiding the role (ADR 0016).
+if any("label" not in entry for entry in entries):
+    sys.exit(f"a role entry is missing its label field: {entries}")
 print("smoke: the role catalogue is sorted and distinct")
 PY
 status="$(request GET /api/v1/roles)"

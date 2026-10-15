@@ -13,6 +13,7 @@ import {
   outgoingEdges,
   type ProcessGraph,
 } from '@/components/workflows/definition-layout';
+import { labelOrKey } from '@/lib/names';
 import { cn } from '@/lib/utils';
 
 const NODE_STROKE: Record<ProcessNode['type'], string> = {
@@ -33,11 +34,14 @@ export function ProcessCanvas({
   graph,
   version,
   label,
+  roleLabels = {},
 }: {
   graph: ProcessGraph;
   version: number;
   /** What this graph is, e.g. "purchase_approval v2". */
   label: string;
+  /** Role key to display name; a role nobody has named keeps its key. */
+  roleLabels?: Record<string, string>;
 }) {
   const layout = layoutGraph(graph);
   const [selectedKey, setSelectedKey] = useState(graph.nodes[0]?.key ?? '');
@@ -207,7 +211,9 @@ export function ProcessCanvas({
                   Role nhận việc
                 </dt>
                 <dd className="mt-0.5 font-mono text-sm">
-                  {selected.node.assigneeRole ?? '— chưa gán'}
+                  {selected.node.assigneeRole
+                    ? labelOrKey(roleLabels[selected.node.assigneeRole], selected.node.assigneeRole)
+                    : '— chưa gán'}
                 </dd>
               </div>
             ) : null}

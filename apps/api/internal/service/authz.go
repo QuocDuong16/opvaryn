@@ -26,6 +26,19 @@ func requireAuthenticated(principal domain.Principal) error {
 	return nil
 }
 
+// requireAdmin refuses callers who are not administrators. It guards organization-wide
+// text and settings (the display name of a role), not business actions: an approval still
+// belongs to the role it was assigned to.
+func requireAdmin(principal domain.Principal) error {
+	if err := requireAuthenticated(principal); err != nil {
+		return err
+	}
+	if !principal.IsAdmin() {
+		return fmt.Errorf("%w: this needs the %s role", ErrForbidden, domain.RoleAdmin)
+	}
+	return nil
+}
+
 // requireDesigner refuses callers who may not change definitions.
 func requireDesigner(principal domain.Principal) error {
 	if err := requireAuthenticated(principal); err != nil {

@@ -1,5 +1,10 @@
 import Link from 'next/link';
-import { ApiError, type BusinessObject, type ProcessDefinition } from '@opvaryn/contracts';
+import {
+  ApiError,
+  type BusinessObject,
+  type ProcessDefinition,
+  type RoleEntry,
+} from '@opvaryn/contracts';
 
 import { CreateDefinitionForm } from '@/components/workflows/definition-editor';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
@@ -7,6 +12,7 @@ import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatTimestamp } from '@/lib/format';
+import { roleLabels } from '@/lib/names';
 
 export const metadata = { title: 'Quy trình' };
 
@@ -50,7 +56,7 @@ export default async function WorkflowsPage() {
 
   let definitions: ProcessDefinition[] = [];
   let objects: BusinessObject[] = [];
-  let roleCatalogue: string[] = [];
+  let roleCatalogue: RoleEntry[] = [];
   let error: string | null = null;
   let needsSignIn = false;
 
@@ -68,26 +74,29 @@ export default async function WorkflowsPage() {
     }
   }
 
-  // Suggestions for the role field: the catalogue (roles someone holds) plus the roles
-  // existing definitions already name, so a definition that references a role nobody
-  // holds still shows it instead of looking like a typo.
-  const knownRoles = [
+  // Suggestions for the role field: the catalogue (roles someone holds, with the name each
+  // one is shown under) plus the roles existing definitions already name, so a definition
+  // that references a role nobody holds still shows it instead of looking like a typo.
+  const named = roleLabels(roleCatalogue);
+  const knownRoles: RoleEntry[] = [
     ...new Set([
-      ...roleCatalogue,
+      ...roleCatalogue.map((entry) => entry.key),
       ...definitions.flatMap((definition) =>
         definition.nodes
           .map((node) => node.assigneeRole)
           .filter((role): role is string => role !== undefined && role !== ''),
       ),
     ]),
-  ].sort();
+  ]
+    .sort()
+    .map((key) => ({ key, label: named.get(key) ?? '' }));
 
   return (
     <>
       <PageHeader
         eyebrow="04 / Quy trình"
         title="Quy trình"
-        lead="Thiết kế quy trình phê duyệt: vẽ các bước, giao việc theo role và đặt điều kiện rẽ nhánh. Sửa một định nghĩa là publish phiên bản mới; quy trình đang chạy vẫn giữ phiên bản cũ."
+        lead="Thiết kế quy trình phê duyệt: vẽ các bước, giao việc theo vai trò và đặt điều kiện rẽ nhánh. Sửa một định nghĩa là phát hành phiên bản mới; quy trình đang chạy vẫn giữ phiên bản cũ."
       />
 
       {needsSignIn ? (

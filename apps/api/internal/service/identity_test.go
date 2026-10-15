@@ -19,6 +19,7 @@ type fakeIdentityStore struct {
 	hashes      map[uuid.UUID]string
 	departments map[string]domain.Department
 	sessions    map[string]domain.Session
+	roleLabels  map[string]string
 }
 
 func newFakeIdentityStore() *fakeIdentityStore {
@@ -26,6 +27,7 @@ func newFakeIdentityStore() *fakeIdentityStore {
 		hashes:      map[uuid.UUID]string{},
 		departments: map[string]domain.Department{"ky_thuat": {Key: "ky_thuat", Name: "Kỹ thuật"}},
 		sessions:    map[string]domain.Session{},
+		roleLabels:  map[string]string{},
 	}
 }
 
@@ -63,6 +65,24 @@ func (f *fakeIdentityStore) FindUserByID(_ context.Context, id uuid.UUID) (domai
 
 func (f *fakeIdentityStore) ListUsers(context.Context) ([]domain.User, error) {
 	return f.users, nil
+}
+
+// ListRoleLabels mirrors the store's role_labels table.
+func (f *fakeIdentityStore) ListRoleLabels(context.Context) (map[string]string, error) {
+	labels := make(map[string]string, len(f.roleLabels))
+	for role, label := range f.roleLabels {
+		labels[role] = label
+	}
+	return labels, nil
+}
+
+// UpsertRoleLabel mirrors the store's upsert.
+func (f *fakeIdentityStore) UpsertRoleLabel(_ context.Context, role string, label string) error {
+	if f.roleLabels == nil {
+		f.roleLabels = make(map[string]string)
+	}
+	f.roleLabels[role] = label
+	return nil
 }
 
 // ListRoles mirrors the store's DISTINCT + ORDER BY over user_roles.
@@ -467,8 +487,21 @@ func TestListRolesIsTheRoleCatalogue(t *testing.T) {
 	if err != nil {
 		t.Fatalf("ListRoles returned error: %v", err)
 	}
-	if len(roles) != 2 || roles[0] != "ke_toan" || roles[1] != managerRole {
+	if len(roles) != 2 || roles[0].Key != "ke_toan" || roles[1].Key != managerRole {
 		t.Fatalf("expected the distinct roles sorted, got %v", roles)
+	}
+
+	// A label is shown instead of the key, and a role nobody has named keeps its key.
+	if roles[0].Label != "" || roles[1].Label != "" {
+		t.Fatalf("roles without labels must carry an empty label, got %q and %q", roles[0].Label, roles[1].Label)
+	}
+	store.roleLabels[managerRole] = "Trưởng bộ phận"
+	labelled, err := identity.ListRoles(context.Background(), managerPrincipal())
+	if err != nil {
+		t.Fatalf("ListRoles returned error: %v", err)
+	}
+	if labelled[1].Label != "Trưởng bộ phận" || labelled[0].Label != "" {
+		t.Fatalf("labels did not follow the table: %+v", labelled)
 	}
 
 	if _, err := identity.ListRoles(context.Background(), anonymous()); !errors.Is(err, ErrUnauthorized) {

@@ -59,6 +59,10 @@ docker compose -f deployments/docker-compose.yml --profile pilot exec api \
 ```
 
 > `useradm` cần bộ phận tồn tại trước: `-create-department -key ban_giam_doc -department-name 'Ban giám đốc'`.
+>
+> Đặt tên hiển thị cho role để màn hình không in khoá máy (ADR 0016):
+> `/app/useradm -set-role-label -role truong_bo_phan -label 'Trưởng bộ phận'`. Role chưa đặt tên
+> vẫn dùng được — màn hình hiện khoá của nó.
 
 ## 3. HTTPS, bí mật và cấu hình
 

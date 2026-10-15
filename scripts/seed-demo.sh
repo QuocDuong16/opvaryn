@@ -69,6 +69,12 @@ ensure_department() {
     fail "không tạo được bộ phận '$1'"
 }
 
+# ensure_role_label <role> <label>: the name a screen shows for a role (ADR 0016).
+ensure_role_label() {
+  useradm -set-role-label -role "$1" -label "$2" >/dev/null ||
+    fail "không đặt được tên hiển thị cho role '$1'"
+}
+
 # ensure_user <email> <name> <department> <roles>
 ensure_user() {
   local email="$1" name="$2" department="$3" roles="$4"
@@ -273,6 +279,16 @@ ensure_user seed_it@opvaryn.local "IT support" ky_thuat "it_support"
 # HR opens the onboarding records, so this account is also the department account
 # the record seeder signs in with.
 ensure_user seed_nhan_su@opvaryn.local "Nhân sự" nhan_su "nhan_vien,nhan_su"
+
+# Roles are shown by name on every screen, so the seed names the ones it uses (ADR 0016).
+ensure_role_label admin "Quản trị hệ thống"
+ensure_role_label nhan_vien "Nhân viên"
+ensure_role_label truong_bo_phan "Trưởng bộ phận"
+ensure_role_label ke_toan "Kế toán"
+ensure_role_label giam_doc "Giám đốc"
+ensure_role_label it_support "Hỗ trợ IT"
+ensure_role_label nhan_su "Nhân sự"
+ensure_role_label process_designer "Người thiết kế quy trình"
 
 admin_jar="$(jar_for seed@opvaryn.local)"
 

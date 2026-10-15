@@ -42,3 +42,4 @@
 - [0013 — Kéo thả trên canvas: bản nháp nằm ở trình duyệt, engine không bao giờ thấy](adr/0013-canvas-draft-editing.md)
 - [0014 — Trang giới thiệu công khai, workspace nằm sau đăng nhập](adr/0014-public-landing-and-workspace.md)
 - [0015 — Màn hình cho người dùng, thông tin kỹ thuật cho quản trị viên ở chế độ nâng cao](adr/0015-role-based-surfaces-and-advanced-mode.md)
+- [0016 — Khoá máy không bao giờ hiện trên màn hình: tên hiển thị cho role và bộ phận](adr/0016-display-names-instead-of-keys.md)

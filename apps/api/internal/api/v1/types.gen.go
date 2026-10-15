@@ -514,12 +514,26 @@ type LoginRequest struct {
 
 // Me defines model for Me.
 type Me struct {
-	// Department Department key (D09b scoping).
-	Department string             `json:"department"`
-	Email      string             `json:"email"`
-	Id         openapi_types.UUID `json:"id"`
-	Name       string             `json:"name"`
-	Roles      []string           `json:"roles"`
+	// Department Department key (D09b scoping). Keys are for the engine, not for screens.
+	Department string `json:"department"`
+
+	// DepartmentName Display name of the department, for screens (ADR 0016).
+	//
+	// Example: Kỹ thuật
+	DepartmentName string             `json:"departmentName"`
+	Email          string             `json:"email"`
+	Id             openapi_types.UUID `json:"id"`
+	Name           string             `json:"name"`
+
+	// RoleLabels Display name per role key the person holds. A role nobody has named is absent, so
+	// the caller shows the key for it (ADR 0016).
+	//
+	//
+	// Example: {"truong_bo_phan":"Trưởng bộ phận"}
+	RoleLabels map[string]string `json:"roleLabels"`
+
+	// Roles Role keys the person holds; these are what authorization compares.
+	Roles []string `json:"roles"`
 }
 
 // Meta defines model for Meta.
@@ -847,10 +861,23 @@ type ProcessTask struct {
 // ProcessTaskStatus defines model for ProcessTaskStatus.
 type ProcessTaskStatus string
 
+// RoleEntry defines model for RoleEntry.
+type RoleEntry struct {
+	// Key The key a process node assigns and authorization compares.
+	//
+	// Example: truong_bo_phan
+	Key string `json:"key"`
+
+	// Label Display name; empty when the role has not been named yet.
+	//
+	// Example: Trưởng bộ phận
+	Label string `json:"label"`
+}
+
 // RoleList defines model for RoleList.
 type RoleList struct {
-	// Data Role keys held by at least one user, sorted.
-	Data []string `json:"data"`
+	// Data Roles held by at least one user, sorted by key.
+	Data []RoleEntry `json:"data"`
 }
 
 // StartProcessInstanceRequest defines model for StartProcessInstanceRequest.

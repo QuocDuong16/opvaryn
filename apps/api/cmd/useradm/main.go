@@ -22,7 +22,10 @@ import (
 	"strings"
 	"time"
 
+	"github.com/google/uuid"
+
 	"github.com/QuocDuong16/opvaryn/api/internal/config"
+	"github.com/QuocDuong16/opvaryn/api/internal/domain"
 	"github.com/QuocDuong16/opvaryn/api/internal/service"
 	"github.com/QuocDuong16/opvaryn/api/internal/store"
 )
@@ -41,6 +44,7 @@ func run() error {
 		setPassword      = flag.Bool("set-password", false, "replace a user's password")
 		addRole          = flag.Bool("add-role", false, "grant roles to an existing user")
 		pruneSessions    = flag.Bool("prune-sessions", false, "delete expired sessions")
+		setRoleLabel     = flag.Bool("set-role-label", false, "name a role for the interface")
 		list             = flag.Bool("list", false, "list users")
 
 		email      = flag.String("email", "", "user email (normalised to lower case)")
@@ -50,6 +54,8 @@ func run() error {
 		roles      = flag.String("roles", "", "comma-separated roles, e.g. truong_bo_phan,ke_toan")
 		key        = flag.String("key", "", "department key")
 		depName    = flag.String("department-name", "", "department display name")
+		role       = flag.String("role", "", "role key, e.g. truong_bo_phan")
+		label      = flag.String("label", "", "display name of the role, e.g. 'Trưởng bộ phận'")
 
 		timeout = flag.Duration("timeout", 30*time.Second, "database timeout")
 	)
@@ -111,6 +117,13 @@ func run() error {
 		fmt.Printf("password updated for %s\n", user.Email)
 		return nil
 
+	case *setRoleLabel:
+		if err := identity.SetRoleLabel(ctx, domain.NewPrincipal(adminUser()), *role, *label); err != nil {
+			return err
+		}
+		fmt.Printf("role %s is shown as %q\n", *role, *label)
+		return nil
+
 	case *pruneSessions:
 		removed, err := identity.PruneSessions(ctx)
 		if err != nil {
@@ -132,7 +145,19 @@ func run() error {
 
 	default:
 		flag.Usage()
-		return fmt.Errorf("nothing to do: pass -create, -add-role, -set-password, -create-department, -prune-sessions or -list")
+		return fmt.Errorf("nothing to do: pass -create, -add-role, -set-password, -create-department, -set-role-label, -prune-sessions or -list")
+	}
+}
+
+// adminUser is the principal the CLI acts as. The binary is the bootstrap tool (ADR 0008): it
+// already runs with database credentials, so it holds the administrator role rather than
+// pretending to have a session. The id is freshly generated per run — the principal has to look
+// authenticated to the service, and nothing stores it.
+func adminUser() domain.User {
+	return domain.User{
+		ID:     uuid.New(),
+		Roles:  []string{domain.RoleAdmin},
+		Status: domain.UserActive,
 	}
 }
 

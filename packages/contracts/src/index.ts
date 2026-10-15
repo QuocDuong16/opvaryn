@@ -46,6 +46,9 @@ export type CreateProcessDefinitionRequest =
 /** Request body for publishing the next version of a process definition. */
 export type UpdateProcessDefinitionRequest =
   components['schemas']['UpdateProcessDefinitionRequest'];
+/** A role as a screen shows it: the key the engine compares, and its display name. */
+export type RoleEntry = components['schemas']['RoleEntry'];
+
 /** One open task with the instance it belongs to. */
 export type InboxItem = components['schemas']['InboxItem'];
 /** Request body for deciding one human task. */
@@ -98,7 +101,7 @@ export interface ApiClient {
   listProcessDefinitionVersions(key: string): Promise<ProcessDefinitionVersion[]>;
   listInboxTasks(): Promise<InboxItem[]>;
   /** Role keys held by at least one user: what the workflow designer offers. */
-  listRoles(): Promise<string[]>;
+  listRoles(): Promise<RoleEntry[]>;
   listMetrics(): Promise<MetricDefinition[]>;
   getMetric(key: string): Promise<MetricDefinition>;
   createMetric(input: CreateMetricDefinitionRequest): Promise<MetricDefinition>;
@@ -231,7 +234,7 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
     },
 
     async listRoles() {
-      const payload = await request<{ data: string[] }>('/api/v1/roles');
+      const payload = await request<{ data: RoleEntry[] }>('/api/v1/roles');
       return payload.data;
     },
 

@@ -2,12 +2,18 @@
 
 import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
-import type { BusinessObject, ProcessCondition, ProcessDefinition } from '@opvaryn/contracts';
+import type {
+  BusinessObject,
+  ProcessCondition,
+  ProcessDefinition,
+  RoleEntry,
+} from '@opvaryn/contracts';
 
 import {
   createProcessDefinitionAction,
   publishProcessDefinitionAction,
 } from '@/app/(workspace)/workflows/actions';
+import { labelOrKey } from '@/lib/names';
 import {
   CONDITION_OPS,
   NODE_TYPE_OPTIONS,
@@ -35,7 +41,8 @@ interface GraphEditorProps {
   /** Business objects a definition can bind to; the first is selected by default. */
   objects: readonly BusinessObject[];
   /** Roles already used by a definition, offered as suggestions. */
-  knownRoles: readonly string[];
+  /** The role catalogue: the key a node stores, and the name a person reads. */
+  knownRoles: readonly RoleEntry[];
   definition?: ProcessDefinition;
 }
 
@@ -192,7 +199,7 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
 
             {draft.type === 'human_task' ? (
               <label className="text-[11px] text-on-surface-muted sm:col-span-3">
-                Role nhận việc
+                Vai trò nhận việc
                 <input
                   value={draft.assigneeRole}
                   onChange={(event) => updateNode(index, { assigneeRole: event.target.value })}
@@ -332,8 +339,10 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
       />
 
       <datalist id="known-roles">
-        {knownRoles.map((role) => (
-          <option key={role} value={role} />
+        {knownRoles.map((entry) => (
+          <option key={entry.key} value={entry.key}>
+            {labelOrKey(entry.label, entry.key)}
+          </option>
         ))}
       </datalist>
 

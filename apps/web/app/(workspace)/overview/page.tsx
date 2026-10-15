@@ -7,6 +7,7 @@ import {
   type ProcessInstanceSummary,
 } from '@opvaryn/contracts';
 
+import { recordLabels } from '@/components/objects/record-labels';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge, type StatusKind } from '@/components/ui/status-badge';
@@ -15,6 +16,7 @@ import { advancedVisible } from '@/lib/advanced';
 import { getAdvancedMode } from '@/lib/advanced-server';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatTimestamp } from '@/lib/format';
+import { labelOrKey } from '@/lib/names';
 import { stageLabel } from '@/lib/stage';
 
 export const metadata = { title: 'Tổng quan' };
@@ -37,7 +39,7 @@ const SHORTCUTS: readonly { href: string; title: string; body: string }[] = [
   {
     href: '/tasks',
     title: 'Xử lý việc đang chờ',
-    body: 'Duyệt, trả về hoặc từ chối những việc thuộc role của bạn.',
+    body: 'Duyệt, trả về hoặc từ chối những việc thuộc vai trò của bạn.',
   },
   {
     href: '/analytics',
@@ -149,6 +151,10 @@ interface Overview {
   me: Me | null;
   inbox: InboxItem[];
   instances: ProcessInstanceSummary[];
+  /** Definition key to its name, so a run is named rather than keyed. */
+  definitionNames: Record<string, string>;
+  /** Record id to the label that identifies it, built from the record's own version. */
+  recordNames: Record<string, string>;
   error: string | null;
 }
 
@@ -162,9 +168,23 @@ async function loadOverview(): Promise<Overview> {
     if (cause instanceof ApiError && cause.code === 'unauthorized') {
       // The proxy already sends anonymous callers to the sign-in screen; a session that
       // expired between the two calls lands here.
-      return { me: null, inbox: [], instances: [], error: 'Phiên làm việc đã hết hạn.' };
+      return {
+        me: null,
+        inbox: [],
+        instances: [],
+        definitionNames: {},
+        recordNames: {},
+        error: 'Phiên làm việc đã hết hạn.',
+      };
     }
-    return { me: null, inbox: [], instances: [], error: describeApiError(cause) };
+    return {
+      me: null,
+      inbox: [],
+      instances: [],
+      definitionNames: {},
+      recordNames: {},
+      error: describeApiError(cause),
+    };
   }
 
   // Each part fails on its own: a slow list must not blank the whole page.
@@ -173,12 +193,34 @@ async function loadOverview(): Promise<Overview> {
     api.listProcessInstances().catch(() => []),
   ]);
 
-  return { me, inbox, instances, error: null };
+  // A screen names things: the process by its name, the record by its own label (built from
+  // the version it was created under, ADR 0006). Both lookups are best-effort — a missing
+  // name falls back to the key rather than blanking the table.
+  const definitions = await api.listProcessDefinitions().catch(() => []);
+  const definitionNames = Object.fromEntries(definitions.map((item) => [item.key, item.name]));
+
+  const objectKeys = [...new Set(instances.map((summary) => summary.instance.objectKey))];
+  const perObject = await Promise.all(
+    objectKeys.map(async (objectKey) => {
+      try {
+        const [versions, records] = await Promise.all([
+          api.listBusinessObjectVersions(objectKey),
+          api.listObjectRecords(objectKey),
+        ]);
+        return recordLabels(records, versions);
+      } catch {
+        return {};
+      }
+    }),
+  );
+  const recordNames = Object.assign({}, ...perObject);
+
+  return { me, inbox, instances, definitionNames, recordNames, error: null };
 }
 
 export default async function OverviewPage() {
   const [overview, advanced] = await Promise.all([loadOverview(), getAdvancedMode()]);
-  const { me, inbox, instances, error } = overview;
+  const { me, inbox, instances, definitionNames, recordNames, error } = overview;
   const showAdvanced = advancedVisible(isAdmin(me?.roles), advanced);
 
   if (!me) {
@@ -210,7 +252,9 @@ export default async function OverviewPage() {
       <PageHeader
         eyebrow="01 / Tổng quan"
         title={`Xin chào, ${me.name}`}
-        lead={`Bộ phận ${me.department || '—'} · role ${me.roles.join(', ') || '—'}. Dưới đây là việc đang chờ bạn và những chỗ bạn hay dùng.`}
+        lead={`Bộ phận ${me.departmentName || '—'} · ${
+          me.roles.map((role) => labelOrKey(me.roleLabels[role], role)).join(', ') || '—'
+        }. Dưới đây là việc đang chờ bạn và những chỗ bạn hay dùng.`}
       />
 
       <Card className="mb-6">
@@ -218,7 +262,7 @@ export default async function OverviewPage() {
           <div>
             <CardTitle>Việc đang chờ bạn</CardTitle>
             <CardDescription>
-              Chỉ những việc thuộc role bạn giữ, mới nhất ở trên đầu.
+              Chỉ những việc thuộc vai trò bạn giữ, mới nhất ở trên đầu.
             </CardDescription>
           </div>
           <span className="rounded-full border border-warning/40 px-2.5 py-0.5 text-xs font-medium text-warning">
@@ -241,7 +285,7 @@ export default async function OverviewPage() {
                   <span className="min-w-0">
                     <span className="block text-sm font-medium">{item.task.title}</span>
                     <span className="block text-xs text-on-surface-muted">
-                      {`${item.instance.objectKey} · từ ${formatTimestamp(item.task.createdAt)}`}
+                      {`${recordNames[item.instance.recordId] ?? item.instance.objectKey} · từ ${formatTimestamp(item.task.createdAt)}`}
                     </span>
                   </span>
                   <span className="text-xs font-medium">Xử lý →</span>
@@ -305,14 +349,18 @@ export default async function OverviewPage() {
                         href={`/tasks/${summary.instance.id}`}
                         className="font-medium hover:text-accent-strong"
                       >
-                        {summary.instance.definitionKey}
+                        {labelOrKey(
+                          definitionNames[summary.instance.definitionKey],
+                          summary.instance.definitionKey,
+                        )}
                       </Link>
                     </td>
                     <td className="px-4 py-3 text-xs">
                       {STATE_LABELS[summary.instance.state] ?? summary.instance.state}
                     </td>
-                    <td className="px-4 py-3 font-mono text-xs text-on-surface-muted">
-                      {`${summary.instance.objectKey} · ${summary.instance.recordId.slice(0, 8)}…`}
+                    <td className="px-4 py-3 text-xs text-on-surface-muted">
+                      {recordNames[summary.instance.recordId] ??
+                        `${summary.instance.objectKey} · ${summary.instance.recordId.slice(0, 8)}…`}
                     </td>
                     <td className="px-4 py-3 text-xs text-on-surface-muted">
                       {formatTimestamp(summary.instance.startedAt)}

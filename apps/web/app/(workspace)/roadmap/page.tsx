@@ -41,7 +41,7 @@ const PHASES: readonly {
     name: 'V2',
     title: 'Trình dựng ứng dụng',
     scope:
-      'Danh sách/chi tiết/form/kanban tự dựng, quan hệ dữ liệu, hành động theo role và trạng thái, dashboard nhúng, tự động hoá giữa các quy trình, thư viện mẫu.',
+      'Danh sách/chi tiết/form/kanban tự dựng, quan hệ dữ liệu, hành động theo vai trò và trạng thái, bảng số liệu nhúng, tự động hoá giữa các quy trình, thư viện mẫu.',
     goal: 'Mục tiêu: tự dựng mini-app theo nghiệp vụ.',
     tone: 'purple',
   },
@@ -128,7 +128,7 @@ export default async function RoadmapPage() {
             </dt>
             <dd className="mt-1 text-sm">
               Tự định nghĩa dữ liệu và nhập bản ghi, với màn hình nhập sinh từ định nghĩa và dữ liệu
-              được kiểm tra khi lưu. Đăng nhập và phân quyền theo role và bộ phận. Hộp việc theo
+              được kiểm tra khi lưu. Đăng nhập và phân quyền theo vai trò và bộ phận. Hộp việc theo
               người, duyệt / trả về / từ chối, mọi quyết định đều được ghi lại. Thiết kế quy trình
               bằng canvas kéo thả trên bản nháp, publish thành phiên bản mới, chạy quy trình từ bản
               ghi và theo dõi từng lần chạy. Bảng số liệu tự cấu hình: metric định nghĩa trên field

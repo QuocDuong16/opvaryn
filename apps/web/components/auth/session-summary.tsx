@@ -2,6 +2,7 @@ import Link from 'next/link';
 
 import { logoutAction } from '@/app/login/actions';
 import { createServerApiClient } from '@/lib/api/server';
+import { labelOrKey } from '@/lib/names';
 
 /**
  * SessionSummary is the account menu in the topbar: who is signed in, and the way out. The
@@ -9,7 +10,13 @@ import { createServerApiClient } from '@/lib/api/server';
  * It fails soft: the shell must keep rendering when the API is down or no session exists.
  */
 export async function SessionSummary() {
-  let me: { name: string; email: string; department: string; roles: string[] } | null = null;
+  let me: {
+    name: string;
+    email: string;
+    departmentName: string;
+    roles: string[];
+    roleLabels: Record<string, string>;
+  } | null = null;
 
   try {
     me = await createServerApiClient().getMe();
@@ -45,11 +52,13 @@ export async function SessionSummary() {
         <dl className="mt-3 space-y-1.5 border-t border-border pt-3 text-xs">
           <div className="flex items-baseline justify-between gap-3">
             <dt className="text-on-surface-muted">Bộ phận</dt>
-            <dd className="font-mono">{me.department || '—'}</dd>
+            <dd>{me.departmentName || '—'}</dd>
           </div>
           <div className="flex items-baseline justify-between gap-3">
-            <dt className="text-on-surface-muted">Role</dt>
-            <dd className="text-right font-mono">{me.roles.join(', ') || '—'}</dd>
+            <dt className="text-on-surface-muted">Vai trò</dt>
+            <dd className="text-right">
+              {me.roles.map((role) => labelOrKey(me.roleLabels[role], role)).join(', ') || '—'}
+            </dd>
           </div>
         </dl>
 

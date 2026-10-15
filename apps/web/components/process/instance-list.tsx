@@ -3,6 +3,7 @@ import type { ProcessInstanceSummary } from '@opvaryn/contracts';
 
 import { INSTANCE_STATE_LABELS } from '@/components/process/process-timeline';
 import { formatTimestamp } from '@/lib/format';
+import { labelOrKey } from '@/lib/names';
 import { cn } from '@/lib/utils';
 
 const STATE_STYLES: Record<string, string> = {
@@ -26,10 +27,13 @@ export function InstanceList({
   instances,
   emptyHint,
   recordLabels = {},
+  roleLabels = {},
 }: {
   instances: readonly ProcessInstanceSummary[];
   emptyHint: string;
   recordLabels?: Record<string, string>;
+  /** Role key to display name; a role nobody has named keeps its key. */
+  roleLabels?: Record<string, string>;
 }) {
   if (instances.length === 0) {
     return (
@@ -95,8 +99,8 @@ export function InstanceList({
                   <ul className="space-y-1">
                     {openTasks.map((task) => (
                       <li key={task.id} className="text-xs">
-                        <span className="rounded-full border border-border px-2 py-0.5 font-mono text-[10px] text-on-surface-muted">
-                          {task.assigneeRole}
+                        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-on-surface-muted">
+                          {labelOrKey(roleLabels[task.assigneeRole], task.assigneeRole)}
                         </span>
                         <span className="ml-2">{task.title}</span>
                       </li>

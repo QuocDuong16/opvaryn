@@ -1,10 +1,11 @@
 'use client';
 
 import { useActionState, useCallback, useRef, useState, type PointerEvent } from 'react';
-import type { ProcessCondition } from '@opvaryn/contracts';
+import type { ProcessCondition, RoleEntry } from '@opvaryn/contracts';
 
 import { publishProcessDefinitionAction } from '@/app/(workspace)/workflows/actions';
 import { saveWorkflowDraftAction } from '@/app/(workspace)/workflows/actions';
+import { labelOrKey, roleLabels as indexRoleLabels } from '@/lib/names';
 import {
   NODE_HEIGHT,
   NODE_TYPE_LABELS,
@@ -79,10 +80,12 @@ export function WorkflowEditor({
   /** The saved draft when one exists, otherwise the published graph. */
   initialDraft: WorkflowDraft;
   hasSavedDraft: boolean;
-  knownRoles: readonly string[];
+  /** The role catalogue: the key a node stores, and the name a person reads. */
+  knownRoles: readonly RoleEntry[];
   /** Accessible name of the diagram, e.g. "purchase_approval v2". */
   canvasLabel: string;
 }) {
+  const knownRoleLabels = indexRoleLabels(knownRoles);
   const svgRef = useRef<SVGSVGElement | null>(null);
   const [draft, setDraft] = useState<WorkflowDraft>(() => initialDraft);
   const [selectedKey, setSelectedKey] = useState<string>(() => initialDraft.nodes[0]?.key ?? '');
@@ -379,7 +382,7 @@ export function WorkflowEditor({
                       >
                         {node.type === 'human_task'
                           ? node.assigneeRole
-                            ? `role ${node.assigneeRole}`
+                            ? labelOrKey(knownRoleLabels.get(node.assigneeRole), node.assigneeRole)
                             : 'chưa gán role'
                           : node.type === 'condition'
                             ? conditionSummary(node.condition)
@@ -479,7 +482,7 @@ export function WorkflowEditor({
               {humanTasksWithoutRole.map((node) => (
                 <li
                   key={node.key}
-                >{`${node.key}: việc của người chưa gán role — instance sẽ dừng ở đây.`}</li>
+                >{`${node.key}: việc của người chưa gán vai trò — quy trình sẽ dừng ở đây.`}</li>
               ))}
               {conditionNodesWithoutField.map((node) => (
                 <li key={node.key}>{`${node.key}: node điều kiện chưa chọn field.`}</li>
@@ -517,7 +520,7 @@ export function WorkflowEditor({
 
                   {selected.type === 'human_task' ? (
                     <label className="block text-xs">
-                      <span className="font-medium tracking-wide uppercase">Role nhận việc</span>
+                      <span className="font-medium tracking-wide uppercase">Vai trò nhận việc</span>
                       <input
                         value={selected.assigneeRole ?? ''}
                         list="known-roles"
@@ -727,8 +730,10 @@ export function WorkflowEditor({
       </div>
 
       <datalist id="known-roles">
-        {knownRoles.map((role) => (
-          <option key={role} value={role} />
+        {knownRoles.map((entry) => (
+          <option key={entry.key} value={entry.key}>
+            {labelOrKey(entry.label, entry.key)}
+          </option>
         ))}
       </datalist>
     </div>

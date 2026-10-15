@@ -61,7 +61,7 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 			r.Post("/login", handleLogin(services.Identity, secureCookies, log))
 			r.Post("/logout", handleLogout(services.Identity, secureCookies, log))
 		})
-		r.Get("/me", handleMe(log))
+		r.Get("/me", handleMe(services.Identity, log))
 		r.Get("/roles", handleListRoles(services.Identity, log))
 		r.Get("/tasks", handleInbox(services.ProcessRuntime, log))
 		r.Route("/business-objects", func(r chi.Router) {

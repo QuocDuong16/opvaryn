@@ -9,7 +9,7 @@ export default function ProcessInstanceNotFound() {
       <h1 className="mt-3 text-xl font-semibold tracking-tight">Không tìm thấy quy trình</h1>
       <p className="mx-auto mt-2 max-w-md text-sm text-on-surface-muted">
         Instance có thể đã bị gõ sai, hoặc bản ghi của nó nằm ngoài phạm vi đọc của bạn và API trả
-        404 thay vì xác nhận nó tồn tại. Inbox của bạn chỉ liệt kê việc thuộc role bạn giữ.
+        404 thay vì xác nhận nó tồn tại. Hộp việc của bạn chỉ liệt kê việc thuộc vai trò bạn giữ.
       </p>
       <Link
         href="/tasks"

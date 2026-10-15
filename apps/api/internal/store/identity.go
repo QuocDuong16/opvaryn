@@ -15,10 +15,11 @@ import (
 // userSelect reads a user with the roles it holds. Nothing else in the codebase
 // selects password_hash, so there is one place to audit.
 const userSelect = `
-	SELECT u.id, u.email, u.name, u.password_hash, u.department_key, u.status,
-	       COALESCE(r.roles, ARRAY[]::text[]) AS roles,
+	SELECT u.id, u.email, u.name, u.password_hash, u.department_key, d.name AS department_name,
+	       u.status, COALESCE(r.roles, ARRAY[]::text[]) AS roles,
 	       u.created_at, u.updated_at
 	  FROM users u
+	  JOIN departments d ON d.key = u.department_key
 	  LEFT JOIN LATERAL (
 	       SELECT array_agg(role ORDER BY role) AS roles
 	         FROM user_roles
@@ -258,7 +259,7 @@ func scanUser(row rowScanner) (domain.User, error) {
 	)
 	err := row.Scan(
 		&user.ID, &user.Email, &user.Name, &user.PasswordHash, &user.DepartmentKey,
-		&user.Status, &roles, &user.CreatedAt, &user.UpdatedAt,
+		&user.DepartmentName, &user.Status, &roles, &user.CreatedAt, &user.UpdatedAt,
 	)
 	if err != nil {
 		return domain.User{}, fmt.Errorf("scan user: %w", err)
