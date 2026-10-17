@@ -328,7 +328,7 @@ assert_status "$status" "200" "records tab"
 assert_contains "$tmp_dir/detail-records.html" 'name="title"' "records tab (entry form)"
 assert_contains "$tmp_dir/detail-records.html" 'name="priority"' "records tab (entry form)"
 assert_contains "$tmp_dir/detail-records.html" 'value="urgent"' "records tab (entry form)"
-assert_contains "$tmp_dir/detail-records.html" "Chưa có bản ghi nào" "empty records state"
+assert_contains "$tmp_dir/detail-records.html" "Không có bản ghi nào bạn đọc được" "empty records state says whose records these are"
 assert_contains "$tmp_dir/detail-records.html" "Nhập bản ghi" "the entry form is on the records tab"
 
 mapfile -t record_args < <(form_args "$tmp_dir/detail-records.html" objectKey)

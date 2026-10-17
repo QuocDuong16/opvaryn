@@ -30,12 +30,12 @@ export function RecordList({
     return (
       <div className="rounded-xl border border-dashed border-border-strong px-5 py-10 text-center">
         <p className="text-sm font-medium">
-          {filtered ? 'Không có bản ghi nào khớp từ khoá' : 'Chưa có bản ghi nào'}
+          {filtered ? 'Không có bản ghi nào khớp từ khoá' : 'Không có bản ghi nào bạn đọc được'}
         </p>
         <p className="mx-auto mt-1 max-w-md text-sm text-on-surface-muted">
           {filtered
             ? 'Thử từ khoá khác, hoặc xoá lọc để xem tất cả.'
-            : 'Nhập bản ghi đầu tiên ở biểu mẫu bên cạnh. Dữ liệu được kiểm tra theo định nghĩa mới nhất trước khi lưu.'}
+            : 'Bản ghi của bộ phận khác không hiện ở đây. Nhập bản ghi đầu tiên ở biểu mẫu bên cạnh — dữ liệu được kiểm tra theo định nghĩa mới nhất trước khi lưu.'}
         </p>
       </div>
     );

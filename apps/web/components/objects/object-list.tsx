@@ -40,7 +40,7 @@ export function ObjectList({
               Tên
             </th>
             <th scope="col" className="px-4 py-3 font-medium">
-              Fields
+              Số trường
             </th>
             <th scope="col" className="px-4 py-3 font-medium">
               Cập nhật

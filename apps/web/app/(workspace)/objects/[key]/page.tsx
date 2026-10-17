@@ -310,6 +310,10 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
                   keep={{ tab: 'records' }}
                 />
               </div>
+              <p className="mb-3 text-xs text-on-surface-muted">
+                Bạn thấy bản ghi của bộ phận mình, bản ghi do mình tạo, và bản ghi đang có việc chờ
+                bạn quyết định. Số trên tab đếm theo đúng phạm vi đó.
+              </p>
               <RecordList
                 versions={versions}
                 records={records}
