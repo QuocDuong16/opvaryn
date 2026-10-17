@@ -65,7 +65,7 @@ function describeOutcome(view: ProcessInstanceView, decision: Decision): string 
   if (decision === 'return') {
     return `Đã trả về người đề nghị — quy trình chạy lại từ đầu với lần ${attempt}${nextStepLabel(waiting)}.`;
   }
-  return `Đã duyệt — quy trình chuyển tới node "${currentNode}"${nextStepLabel(waiting)}.`;
+  return `Đã duyệt — quy trình chuyển tới bước “${currentNode}”${nextStepLabel(waiting)}.`;
 }
 
 function nextStepLabel(waiting: ProcessInstanceView['tasks']): string {

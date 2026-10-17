@@ -10,6 +10,7 @@ import type { UpdateObjectState } from '@/components/objects/update-object-state
 import type { StartInstanceState } from '@/components/process/start-instance-state';
 import { recordValuesFromForm } from '@/components/forms/record-values';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
+import { labelOrKey, roleLabels } from '@/lib/names';
 
 /**
  * Creates a business object through the API. Validation lives in the Go service;
@@ -96,7 +97,7 @@ export async function updateBusinessObjectAction(
     revalidatePath('/apps');
     return {
       status: 'success',
-      message: `Đã publish phiên bản v${updated.version} với ${updated.fields.length} field. Bản ghi cũ vẫn đọc theo phiên bản của chúng.`,
+      message: `Đã phát hành phiên bản v${updated.version} với ${updated.fields.length} trường. Bản ghi cũ vẫn đọc theo phiên bản của chúng.`,
       publishedVersion: updated.version,
     };
   } catch (cause) {
@@ -157,21 +158,35 @@ export async function startProcessInstanceAction(
     return { status: 'error', message: 'Chọn một quy trình và một bản ghi để chạy.' };
   }
 
+  const api = createServerApiClient();
   try {
-    const view = await createServerApiClient().startProcessInstance({ definitionKey, recordId });
+    const view = await api.startProcessInstance({ definitionKey, recordId });
     revalidatePath(`/objects/${view.instance.objectKey}`);
     revalidatePath(`/workflows/${view.instance.definitionKey}`);
     revalidatePath('/workflows');
     revalidatePath('/tasks');
+
+    // The confirmation names what the person just ran and who holds the work now, in
+    // names (ADR 0016): the process by its name and the role by its label. Both reads
+    // failing only costs a nicer sentence, so neither can fail the run.
+    const [definition, catalogue] = await Promise.all([
+      api.getProcessDefinition(definitionKey).catch(() => null),
+      api.listRoles().catch(() => []),
+    ]);
+    const name = labelOrKey(definition?.name, definitionKey);
+    const named = roleLabels(catalogue);
     const waiting = view.tasks.filter((task) => task.status === 'open');
-    const roles = [...new Set(waiting.map((task) => task.assigneeRole))].join(', ');
+    const roles = [...new Set(waiting.map((task) => task.assigneeRole))]
+      .map((role) => labelOrKey(named.get(role), role))
+      .join(', ');
+
     return {
       status: 'success',
       instanceId: view.instance.id,
       message:
         waiting.length === 0
-          ? `Đã chạy ${definitionKey} — quy trình kết thúc ngay vì không có bước chờ người.`
-          : `Đã chạy ${definitionKey} ở phiên bản v${view.instance.definitionVersion} — việc đầu tiên thuộc role ${roles}.`,
+          ? `Đã chạy “${name}” — quy trình kết thúc ngay vì không có bước chờ người.`
+          : `Đã chạy “${name}” ở phiên bản v${view.instance.definitionVersion} — việc đầu tiên thuộc ${roles}.`,
     };
   } catch (cause) {
     return { status: 'error', message: describeApiError(cause) };

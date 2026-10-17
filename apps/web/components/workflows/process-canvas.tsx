@@ -60,7 +60,7 @@ export function ProcessCanvas({
           <svg
             viewBox={`0 0 ${layout.width} ${layout.height}`}
             role="img"
-            aria-label={`Sơ đồ ${label}: ${graph.nodes.length} node, ${graph.edges.length} đường chuyển`}
+            aria-label={`Sơ đồ ${label}: ${graph.nodes.length} bước, ${graph.edges.length} đường nối`}
             className="w-full"
           >
             <defs>

@@ -106,10 +106,10 @@ export function validateDraft(
 
   const candidate = value as { nodes?: unknown; edges?: unknown };
   if (!Array.isArray(candidate.nodes) || !Array.isArray(candidate.edges)) {
-    return { ok: false, reason: 'Bản nháp phải có danh sách node và đường chuyển.' };
+    return { ok: false, reason: 'Bản nháp phải có danh sách bước và đường nối.' };
   }
   if (candidate.nodes.length > DRAFT_MAX_NODES || candidate.edges.length > DRAFT_MAX_EDGES) {
-    return { ok: false, reason: 'Bản nháp vượt quá số node hoặc đường chuyển cho phép.' };
+    return { ok: false, reason: 'Bản nháp vượt quá số bước hoặc đường nối cho phép.' };
   }
 
   const nodes: DraftNode[] = [];
@@ -137,7 +137,7 @@ export function validateDraft(
     });
   }
   if (nodes.length === 0) {
-    return { ok: false, reason: 'Bản nháp không có node nào dùng được.' };
+    return { ok: false, reason: 'Bản nháp không có bước nào dùng được.' };
   }
 
   const edges: DraftEdge[] = [];
@@ -317,7 +317,7 @@ export function connectNodes(
   when?: 'true' | 'false',
 ): { draft: WorkflowDraft; error: string | null } {
   if (from === to) {
-    return { draft, error: 'Không nối một node với chính nó.' };
+    return { draft, error: 'Không nối một bước với chính nó.' };
   }
   const exists = draft.edges.some(
     (edge) => edge.from === from && edge.to === to && (edge.when ?? '') === (when ?? ''),
@@ -326,7 +326,7 @@ export function connectNodes(
     return { draft, error: 'Đường chuyển này đã có.' };
   }
   if (draft.edges.length >= DRAFT_MAX_EDGES) {
-    return { draft, error: 'Bản nháp đã đủ số đường chuyển.' };
+    return { draft, error: 'Bản nháp đã đủ số đường nối.' };
   }
   return {
     draft: {

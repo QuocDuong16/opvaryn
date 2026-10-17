@@ -77,8 +77,13 @@ login_as() {
 # Leftovers from earlier runs made the Data screen unreadable (118 objects after a day), so
 # every run tidies up first. Only smoke-tagged rows are removed: make clean-smoke-data does the
 # same thing by hand, and the pilot data never matches.
-sh "$root_dir/scripts/clean-smoke-data.sh" >/dev/null 2>&1 ||
-  echo "smoke: could not clean leftovers from earlier runs (is Postgres up?)"
+clean_log="$(mktemp -t opvaryn-clean.XXXXXX)"
+if ! bash "$root_dir/scripts/clean-smoke-data.sh" >"$clean_log" 2>&1; then
+  # Loud on purpose: a cleanup that fails silently is how the Data screen filled up.
+  echo "smoke: could not clean leftovers from earlier runs — continuing anyway:" >&2
+  tail -n 5 "$clean_log" >&2
+fi
+rm -f "$clean_log"
 
 echo "smoke: building the API server"
 (cd "$api_dir" && go build -o bin/server ./cmd/server)

@@ -29,7 +29,7 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps) {
   const { instanceId } = await params;
-  return { title: `Instance ${instanceId.slice(0, 8)}` };
+  return { title: `Lần chạy ${instanceId.slice(0, 8)}` };
 }
 
 const STATE_STYLES: Record<string, string> = {
@@ -302,7 +302,7 @@ export default async function ProcessInstancePage({ params }: PageProps) {
 
             {recordContext.record && recordContext.fields.length === 0 && !recordContext.error ? (
               <p className="mt-4 text-sm text-on-surface-muted">
-                {`Phiên bản v${recordContext.record.objectVersion} của định nghĩa không tìm thấy trong lịch sử publish, nên giá trị không được gán nhãn.`}
+                {`Phiên bản v${recordContext.record.objectVersion} của định nghĩa không có trong lịch sử phát hành, nên giá trị không được gán nhãn.`}
               </p>
             ) : null}
 

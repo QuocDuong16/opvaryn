@@ -2,6 +2,7 @@
 
 import { revalidatePath } from 'next/cache';
 import { cookies } from 'next/headers';
+import { redirect } from 'next/navigation';
 
 import type { ProcessDefinition } from '@opvaryn/contracts';
 
@@ -15,6 +16,7 @@ import {
   validateDraft,
 } from '@/components/workflows/definition-draft-model';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
+import { keyFromLabel } from '@/lib/names';
 import { DRAFT_COOKIE_OPTIONS, draftCookieName } from '@/lib/workflow-draft';
 
 /**
@@ -38,7 +40,7 @@ export async function saveWorkflowDraftAction(
   if (raw === 'discard') {
     store.delete(draftCookieName(key));
     revalidatePath(`/workflows/${key}`);
-    return { status: 'saved', message: 'Đã bỏ bản nháp — canvas quay về bản đã publish.' };
+    return { status: 'saved', message: 'Đã bỏ bản nháp — sơ đồ quay về bản đã phát hành.' };
   }
 
   if (raw === '' || raw.length > DRAFT_MAX_SERIALIZED) {
@@ -61,35 +63,42 @@ export async function saveWorkflowDraftAction(
   revalidatePath(`/workflows/${key}`);
   return {
     status: 'saved',
-    message: `Đã lưu bản nháp (${result.draft.nodes.length} node, ${result.draft.edges.length} đường chuyển) cho trình duyệt này.`,
+    message: `Đã lưu bản nháp (${result.draft.nodes.length} bước, ${result.draft.edges.length} đường nối) cho trình duyệt này.`,
   };
 }
 
 /**
- * Publishes version 1 of a new process definition. The graph arrives as one JSON
- * hidden input assembled by the editor; every rule about that graph (single start,
- * reachability, branch shapes, condition literals against the object's fields) is
- * enforced by the Go service, and its message is what the editor shows.
+ * Publishes version 1 of a new process definition: the graph the designer drew on the
+ * canvas arrives as one JSON hidden input. Every rule about that graph (single start,
+ * reachability, branch shapes, condition literals against the object's fields) is enforced
+ * by the Go service, and its message is what the form shows; the canvas' own checklist
+ * (definition-preflight.ts) covers the common ones in the designer's words first.
+ *
+ * A successful create lands on the new definition, which is where it is edited further
+ * (ADR 0019) — hence the redirect, and no success message to read.
  */
 export async function createProcessDefinitionAction(
   _previous: CreateDefinitionState,
   formData: FormData,
 ): Promise<CreateDefinitionState> {
-  const key = String(formData.get('key') ?? '').trim();
   const name = String(formData.get('name') ?? '').trim();
   const description = String(formData.get('description') ?? '').trim();
   const objectKey = String(formData.get('objectKey') ?? '').trim();
+  // The key sits behind a disclosure in the create form, so a submit that never opened it
+  // derives the key from the name rather than failing on an empty field.
+  const key = String(formData.get('key') ?? '').trim() || keyFromLabel(name);
 
   const graph = parseGraph(String(formData.get('graph') ?? ''));
   if (graph === null) {
     return {
       status: 'error',
-      message: 'Không đọc được graph. Tải lại trang rồi nhập lại node và đường chuyển.',
+      message: 'Không đọc được sơ đồ. Tải lại trang rồi vẽ lại các bước.',
     };
   }
 
+  let created: ProcessDefinition;
   try {
-    const created = await createServerApiClient().createProcessDefinition({
+    created = await createServerApiClient().createProcessDefinition({
       key,
       name,
       objectKey,
@@ -97,16 +106,13 @@ export async function createProcessDefinitionAction(
       nodes: graph.nodes,
       edges: graph.edges,
     });
-    revalidatePath('/workflows');
-    revalidatePath(`/objects/${created.objectKey}`);
-    return {
-      status: 'success',
-      message: `Đã publish "${created.name}" (${created.key}) v1 với ${created.nodes.length} node.`,
-      createdKey: created.key,
-    };
   } catch (cause) {
     return { status: 'error', message: describeApiError(cause) };
   }
+
+  revalidatePath('/workflows');
+  revalidatePath(`/objects/${created.objectKey}`);
+  redirect(`/workflows/${created.key}`);
 }
 
 /**
@@ -126,7 +132,7 @@ export async function publishProcessDefinitionAction(
   if (graph === null) {
     return {
       status: 'error',
-      message: 'Không đọc được graph. Tải lại trang rồi nhập lại node và đường chuyển.',
+      message: 'Không đọc được sơ đồ. Tải lại trang rồi vẽ lại các bước.',
     };
   }
 
@@ -154,7 +160,7 @@ export async function publishProcessDefinitionAction(
 
   return {
     status: 'success',
-    message: `Đã publish phiên bản v${updated.version} với ${updated.nodes.length} node. Instance đang chạy vẫn giữ phiên bản cũ.`,
+    message: `Đã phát hành phiên bản v${updated.version} với ${updated.nodes.length} bước. Các lần chạy đang xử lý vẫn giữ phiên bản cũ.`,
     publishedVersion: updated.version,
   };
 }

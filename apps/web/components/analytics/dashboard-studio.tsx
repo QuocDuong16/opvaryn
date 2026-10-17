@@ -99,9 +99,8 @@ export function DashboardStudio({
       <Card>
         <CardTitle>Chưa có chỉ số nào để hiển thị</CardTitle>
         <CardDescription>
-          Dashboard đọc metric thật từ API. Tạo metric đầu tiên ở biểu mẫu bên dưới (cần role
-          <code className="mx-1 font-mono text-xs">process_designer</code> hoặc{' '}
-          <code className="font-mono text-xs">admin</code>), rồi tải lại trang này.
+          Bảng số liệu đọc chỉ số thật từ hệ thống. Tạo chỉ số đầu tiên ở biểu mẫu bên dưới (cần vai
+          trò thiết kế quy trình hoặc quản trị hệ thống), rồi tải lại trang này.
         </CardDescription>
       </Card>
     );

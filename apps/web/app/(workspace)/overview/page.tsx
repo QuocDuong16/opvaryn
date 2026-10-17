@@ -59,7 +59,7 @@ const SURFACES: readonly {
     href: '/objects',
     stage: 'live',
     title: 'Dữ liệu',
-    body: 'Định nghĩa có phiên bản và bản ghi; sửa định nghĩa là publish phiên bản mới.',
+    body: 'Định nghĩa có phiên bản và bản ghi; sửa định nghĩa là phát hành phiên bản mới.',
   },
   {
     href: '/forms',
@@ -71,7 +71,7 @@ const SURFACES: readonly {
     href: '/workflows',
     stage: 'live',
     title: 'Quy trình',
-    body: 'Canvas kéo thả trên bản nháp, publish thành phiên bản mới; lần chạy giữ phiên bản của nó.',
+    body: 'Sơ đồ kéo thả trên bản nháp, phát hành thành phiên bản mới; lần chạy giữ phiên bản của nó.',
   },
   {
     href: '/tasks',

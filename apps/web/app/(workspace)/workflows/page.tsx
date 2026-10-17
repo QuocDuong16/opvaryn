@@ -1,12 +1,6 @@
 import Link from 'next/link';
-import {
-  ApiError,
-  type BusinessObject,
-  type ProcessDefinition,
-  type RoleEntry,
-} from '@opvaryn/contracts';
+import { ApiError, type BusinessObject, type ProcessDefinition } from '@opvaryn/contracts';
 
-import { CreateDefinitionForm } from '@/components/workflows/definition-editor';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { ListSearch, Pagination, pageOffset } from '@/components/ui/list-controls';
 import { PageHeader } from '@/components/ui/page-header';
@@ -16,7 +10,7 @@ import { advancedVisible } from '@/lib/advanced';
 import { getAdvancedMode } from '@/lib/advanced-server';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatTimestamp } from '@/lib/format';
-import { labelOrKey, roleLabels } from '@/lib/names';
+import { labelOrKey } from '@/lib/names';
 
 export const metadata = { title: 'Quy trình' };
 
@@ -81,20 +75,17 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
   let definitions: ProcessDefinition[] = [];
   let definitionTotal = 0;
   let objects: BusinessObject[] = [];
-  let roleCatalogue: RoleEntry[] = [];
   let error: string | null = null;
   let needsSignIn = false;
 
   try {
-    const [definitionPage, objectPage, roles] = await Promise.all([
+    const [definitionPage, objectPage] = await Promise.all([
       api.listProcessDefinitions({ q: query || undefined, limit: PER_PAGE, offset }),
       api.listBusinessObjects({ limit: 100 }),
-      api.listRoles(),
     ]);
     definitions = definitionPage.data;
     definitionTotal = definitionPage.total;
     objects = objectPage.data;
-    roleCatalogue = roles;
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'unauthorized') {
       needsSignIn = true;
@@ -103,26 +94,10 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
     }
   }
 
-  // Suggestions for the role field: the catalogue (roles someone holds, with the name each
-  // one is shown under) plus the roles existing definitions already name, so a definition
-  // that references a role nobody holds still shows it instead of looking like a typo.
   const [roles, advanced] = await Promise.all([loadRoles(), getAdvancedMode()]);
   const showAdvanced = advancedVisible(isAdmin(roles), advanced);
 
   const objectNames = new Map(objects.map((object) => [object.key, object.name]));
-  const named = roleLabels(roleCatalogue);
-  const knownRoles: RoleEntry[] = [
-    ...new Set([
-      ...roleCatalogue.map((entry) => entry.key),
-      ...definitions.flatMap((definition) =>
-        definition.nodes
-          .map((node) => node.assigneeRole)
-          .filter((role): role is string => role !== undefined && role !== ''),
-      ),
-    ]),
-  ]
-    .sort()
-    .map((key) => ({ key, label: named.get(key) ?? '' }));
 
   return (
     <>
@@ -134,14 +109,13 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
 
       {needsSignIn ? (
         <Card className="mb-6 border-warning/40">
-          <CardTitle className="text-warning">Cần đăng nhập để xem định nghĩa</CardTitle>
+          <CardTitle className="text-warning">Cần đăng nhập để xem quy trình</CardTitle>
           <CardDescription>
-            Đọc định nghĩa mở cho mọi user đã đăng nhập; tạo và publish cần role{' '}
-            <code className="font-mono text-xs">process_designer</code> hoặc{' '}
-            <code className="font-mono text-xs">admin</code>.
+            Ai đã đăng nhập cũng xem được các quy trình đang dùng; tạo và sửa quy trình cần vai trò
+            thiết kế quy trình hoặc quản trị hệ thống.
           </CardDescription>
           <Link
-            href="/login"
+            href="/login?next=/workflows"
             className="mt-4 inline-block rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:opacity-90"
           >
             Đăng nhập
@@ -151,7 +125,7 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
 
       {error ? (
         <Card className="mb-6 border-warning/40">
-          <CardTitle className="text-warning">Không đọc được process definition</CardTitle>
+          <CardTitle className="text-warning">Không đọc được quy trình</CardTitle>
           <CardDescription>{error}</CardDescription>
           <p className="mt-4 text-sm text-on-surface-muted">
             Thử lại sau ít phút. Nếu vẫn không được, báo cho người quản trị hệ thống.
@@ -166,12 +140,20 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
               ? `Kết quả cho “${query}” (${definitionTotal})`
               : `Đang dùng (${definitionTotal})`}
           </h2>
-          <ListSearch
-            basePath="/workflows"
-            value={query}
-            placeholder="Tìm theo tên hoặc key"
-            label="Tìm quy trình"
-          />
+          <div className="flex flex-wrap items-center gap-2">
+            <ListSearch
+              basePath="/workflows"
+              value={query}
+              placeholder="Tìm theo tên quy trình"
+              label="Tìm quy trình"
+            />
+            <Link
+              href="/workflows/new"
+              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:opacity-90"
+            >
+              Tạo quy trình mới
+            </Link>
+          </div>
         </div>
 
         {definitions.length === 0 && !error && !needsSignIn ? (
@@ -182,7 +164,7 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
             <p className="mx-auto mt-1 max-w-lg text-sm text-on-surface-muted">
               {query
                 ? 'Thử từ khoá khác, hoặc xoá lọc để xem tất cả.'
-                : 'Tạo định nghĩa đầu tiên ở biểu mẫu bên dưới. Bộ dữ liệu mẫu có ba quy trình pilot để bạn tham khảo.'}
+                : 'Bắt đầu bằng một quy trình mới, hoặc chạy bộ dữ liệu mẫu để xem ba quy trình pilot có sẵn.'}
             </p>
           </div>
         ) : null}
@@ -250,20 +232,6 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
           basePath="/workflows"
           params={{ q: query || undefined }}
         />
-      </section>
-
-      <section className="mb-8">
-        <h2 className="mb-3 text-lg font-semibold tracking-tight">Tạo quy trình mới</h2>
-        <Card>
-          <CardDescription>
-            Đặt tên, chọn loại dữ liệu quy trình đọc, rồi thêm các bước và đường nối giữa chúng.
-            Trước khi lưu, hệ thống kiểm tra quy trình có đủ điểm bắt đầu, việc giao cho người và
-            điểm kết thúc hay không.
-          </CardDescription>
-          <div className="mt-5">
-            <CreateDefinitionForm objects={objects} knownRoles={knownRoles} />
-          </div>
-        </Card>
       </section>
 
       {showAdvanced ? (

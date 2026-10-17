@@ -25,7 +25,7 @@ const RUNTIME_GAPS: readonly { title: string; body: string }[] = [
     body: 'Hạn xử lý và tự động chuyển cấp chưa có, nên màn hình này không hiển thị hạn giả.',
   },
   {
-    title: 'Chưa có: uỷ quyền và huỷ instance',
+    title: 'Chưa có: uỷ quyền và huỷ một lần chạy',
     body: 'Uỷ quyền cho người khác, quy trình con và huỷ một lần chạy giữa đường đều chưa có.',
   },
 ];

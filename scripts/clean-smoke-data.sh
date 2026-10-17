@@ -12,7 +12,11 @@
 # it_incident, hr_onboarding, the departments and the @opvaryn.local accounts) never matches
 # a prefix. Run `make backup` first if you want a way back.
 #
-# Usage: sh scripts/clean-smoke-data.sh   (or: make clean-smoke-data)
+# Usage: bash scripts/clean-smoke-data.sh   (or: make clean-smoke-data)
+#
+# It needs bash, not sh: the compose invocation is kept in an array. A caller that runs it
+# with sh gets a syntax error — and a smoke script that swallowed that error would quietly
+# leave its rows behind, which is how the Data screen filled up with test objects.
 set -eu
 
 root_dir="$(cd "$(dirname "$0")/.." && pwd)"

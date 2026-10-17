@@ -73,8 +73,11 @@ export function describeEvent(event: ProcessEvent, labels: EventLabels = {}): Ti
   };
 }
 
-/** OPERATOR_LABELS names the comparison operators in the words a person uses. */
-const OPERATOR_LABELS: Record<string, string> = {
+/**
+ * OPERATOR_LABELS names the comparison operators in the words a person uses. Two screens
+ * read a condition: the audit log (a sentence) and the designer's condition step (a select).
+ */
+export const OPERATOR_LABELS: Record<string, string> = {
   eq: 'bằng',
   ne: 'khác',
   gt: 'lớn hơn',

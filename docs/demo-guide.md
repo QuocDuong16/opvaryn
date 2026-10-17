@@ -70,9 +70,9 @@ Thứ tự gợi ý, kèm phần cần nói rõ để không trình bày quá:
 | 1 | **Trang giới thiệu** `/` (công khai) → **Tổng quan** `/overview` (sau đăng nhập) | Trang bìa mô tả sản phẩm cho người chưa có tài khoản; sau khi đăng nhập là trạng thái API/database đọc trực tiếp (không phải ảnh chụp), các màn hình kèm nhãn và quy ước nhãn | live |
 | 2 | **Business Objects** `/objects` | Tạo object mới ngay tại chỗ: thêm vài field, một field `select` kèm danh sách lựa chọn | live |
 | 3 | **Object detail** `/objects/<key>` | Form nhập liệu sinh từ schema vừa tạo; lưu một bản ghi; thử để trống field bắt buộc để thấy server chặn và báo lỗi | live |
-| 3b | **Publish phiên bản** (cùng trang) | Sửa schema rồi **Publish phiên bản v2**: bản ghi cũ vẫn nằm ở nhóm "phiên bản cũ" với đúng schema cũ, bản ghi mới dùng schema mới. Đây là bất biến #1 của playbook chạy thật | live |
+| 3b | **Phát hành phiên bản** (cùng trang) | Sửa schema rồi **Phát hành phiên bản v2**: bản ghi cũ vẫn nằm ở nhóm "phiên bản cũ" với đúng schema cũ, bản ghi mới dùng schema mới. Đây là bất biến #1 của playbook chạy thật | live |
 | 4 | **Forms** `/forms` | Đổi schema, thấy form đổi theo; danh sách "chưa có trong V1" | live + concept |
-| 5 | **Workflows** `/workflows` | Danh sách định nghĩa đọc từ API; mở một định nghĩa để **kéo thả trên canvas** (kéo node, kéo chấm tròn để nối, thêm/xoá, sửa role/điều kiện), lưu nháp rồi **Publish phiên bản mới**; xem lại phiên bản cũ. Cần role `process_designer`/`admin` mới publish được | **live** |
+| 5 | **Workflows** `/workflows` | Danh sách định nghĩa đọc từ API và lối vào **Tạo quy trình mới** (`/workflows/new`): trả lời ba câu hỏi (tên, loại dữ liệu, ai nhận việc ở bước đầu) rồi **vẽ các bước trên canvas** ngay từ đầu — bản mẫu ba bước có sẵn, checklist bên cạnh nói còn gì phải sửa trước khi phát hành. Mở một định nghĩa để **kéo thả trên canvas** (kéo bước, kéo chấm tròn để nối, thêm/xoá, sửa vai trò/điều kiện), lưu nháp rồi **Phát hành phiên bản mới**; xem lại phiên bản cũ. Cần vai trò thiết kế quy trình hoặc quản trị hệ thống mới phát hành được | **live** |
 | 5b | **Chạy quy trình** (trang bản ghi) | Chọn quy trình + bản ghi rồi **Chạy quy trình**: instance xuất hiện ngay trong danh sách instance của bản ghi và trong inbox của role đầu tiên | **live** |
 | 6 | **Tasks** `/tasks` | Inbox thật theo role của người đang đăng nhập; mở một việc để xem bản ghi, event log và **duyệt / trả về / từ chối**; thử bằng hai tài khoản khác role để thấy việc chuyển người | **live** |
 | 7 | **Analytics** `/analytics` | Metric thật trên dữ liệu thật: tạo metric từ field của object (đếm/tổng/trung bình, lọc, nhóm), thấy con số và phân rã ngay; kéo–thả sắp widget, **Lưu bố cục**, F5 để thấy còn nguyên | **live** |
@@ -104,23 +104,31 @@ con số trong dashboard là một truy vấn thật trên projection có kiểu
 
 ### Walkthrough màn hình Workflows (live)
 
-1. `/workflows` liệt kê định nghĩa đọc từ API (kèm số node và business object). Mở một định nghĩa
-   (`purchase_approval` sau khi seed) để thấy canvas **vẽ graph của phiên bản đã publish** — toạ độ
-   tính từ graph nên sơ đồ luôn khớp với cái engine chạy; click từng node để xem role, điều kiện và
-   các đường chuyển tiếp.
-2. Chọn `v1` ở dải phiên bản để thấy bản cũ vẫn xem lại được: instance đang chạy vẫn theo bản đó.
-3. Kéo thả trên canvas: di chuyển node, kéo chấm tròn ở cạnh phải để nối sang node khác, thêm node
-   mới, sửa role/điều kiện ở bảng bên phải. Bấm **Lưu nháp** rồi F5 — bản nháp còn nguyên, và badge
-   chuyển sang "Bản nháp khác bản đã publish". **Bản nháp chỉ nằm ở trình duyệt này: mở lại định nghĩa
-   qua API sẽ thấy engine vẫn đang chạy đúng bản cũ.**
-4. Bấm **Publish phiên bản mới**: bảng lịch sử có v2, canvas đổi theo, và **instance đang chạy vẫn ghi
-   v1** — bất biến version chạy thật trên màn hình. Nút **Bỏ nháp** đưa canvas về đúng bản engine đang
-   chạy.
-5. Graph sai (thiếu việc của người, chu trình, điều kiện sai kiểu) sẽ bị service từ chối kèm lý do
-   cụ thể — thử xoá node việc của người rồi publish để thấy thông báo.
-6. Muốn chạy thử: mở một bản ghi của business object tương ứng, chọn quy trình ở khung **Chạy quy
-   trình** rồi bấm chạy; instance hiện ngay trong mục "Quy trình trên các bản ghi này" và việc đầu
-   tiên rơi vào inbox của role tương ứng.
+1. `/workflows` liệt kê định nghĩa đọc từ API (kèm số bước và loại dữ liệu). Mở một định nghĩa
+   (`purchase_approval` sau khi seed) để thấy canvas **vẽ sơ đồ của phiên bản đã phát hành** — toạ độ
+   tính từ graph nên sơ đồ luôn khớp với cái engine chạy; bấm từng bước để xem vai trò, điều kiện và
+   các đường nối đi tiếp.
+2. Tạo một quy trình mới: bấm **Tạo quy trình mới** ở `/workflows`. Trang `/workflows/new` hỏi ba câu
+   — tên quy trình, loại dữ liệu nó đọc, ai nhận việc ở bước đầu tiên — rồi mở canvas với bản mẫu
+   `Nhận yêu cầu → Duyệt yêu cầu → Kết thúc`. Chưa chọn vai trò thì khung bên cạnh nói còn một điểm
+   cần sửa và nút **Tạo và phát hành** vẫn khoá. Bấm phát hành là quy trình chạy được ngay, và màn
+   hình chuyển sang trang của quy trình vừa tạo.
+3. Chọn `v1` ở dải phiên bản để thấy bản cũ vẫn xem lại được: lần chạy đang xử lý vẫn theo bản đó.
+4. Kéo thả trên canvas: di chuyển bước, kéo chấm tròn ở cạnh phải để nối sang bước khác, thêm bước
+   mới, sửa vai trò/điều kiện ở bảng bên phải (bước điều kiện chọn trường từ danh sách của chính loại
+   dữ liệu, không phải gõ mã trường). Bấm **Lưu nháp** rồi F5 — bản nháp còn nguyên, và chip chuyển
+   sang "Có thay đổi chưa phát hành". **Bản nháp chỉ nằm ở trình duyệt này: mở lại định nghĩa qua API
+   sẽ thấy engine vẫn đang chạy đúng bản cũ.**
+5. Bấm **Phát hành phiên bản mới**: bảng lịch sử có v2, canvas đổi theo, và **lần chạy đang xử lý vẫn
+   ghi v1** — bất biến version chạy thật trên màn hình. Nút **Bỏ nháp** đưa sơ đồ về đúng bản engine
+   đang chạy.
+6. Sơ đồ sai thì có hai lớp nói ra: checklist bên cạnh canvas chỉ đúng chỗ còn thiếu bằng tiếng Việt
+   và giữ nút phát hành khoá (thiếu bước giao cho người, bước chưa gán vai trò, bước điều kiện chưa
+   chọn trường…); những gì nó không thấy — chu trình, bước không tới được, điều kiện sai kiểu — do
+   service từ chối kèm lý do cụ thể. Thử xoá bước giao cho người rồi xem cả hai.
+7. Muốn chạy thử: mở một bản ghi của loại dữ liệu tương ứng, chọn quy trình ở khung **Chạy quy
+   trình** rồi bấm chạy; lần chạy hiện ngay trong mục "Quy trình trên các bản ghi này" và việc đầu
+   tiên rơi vào hộp việc của vai trò tương ứng.
 
 ### Walkthrough màn hình Tasks (live)
 

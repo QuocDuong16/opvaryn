@@ -209,8 +209,13 @@ fi
 # Leftovers from earlier runs made the Data screen unreadable (118 objects after a day), so
 # every run tidies up first. Only smoke-tagged rows are removed: make clean-smoke-data does the
 # same thing by hand, and the pilot data never matches.
-sh "$root_dir/scripts/clean-smoke-data.sh" >/dev/null 2>&1 ||
-  echo "smoke: could not clean leftovers from earlier runs (is Postgres up?)"
+clean_log="$(mktemp -t opvaryn-clean.XXXXXX)"
+if ! bash "$root_dir/scripts/clean-smoke-data.sh" >"$clean_log" 2>&1; then
+  # Loud on purpose: a cleanup that fails silently is how the Data screen filled up.
+  echo "flows: could not clean leftovers from earlier runs — continuing anyway:" >&2
+  tail -n 5 "$clean_log" >&2
+fi
+rm -f "$clean_log"
 
 echo "flows: building the API"
 (cd "$api_dir" && go build -o bin/server ./cmd/server)
@@ -571,7 +576,7 @@ check_surface "/forms?object=$object_key" "forms" "Nhập" 'name="priority"'
 assert_contains "$tmp_dir/surface.html" "Nội dung" "the form names its fields"
 assert_not_contains "$tmp_dir/surface.html" ">title<" "the form does not print the field key"
 # The node catalogue is planning material for the administrator, so a department head sees
-# the list and the create form only (ADR 0015).
+# the list and the way into the create screen only (ADR 0015, ADR 0019).
 check_surface "/workflows" "workflows" "Tạo quy trình mới" "Đang dùng"
 # No process was started yet, so the live inbox is empty for this role — and it says so.
 check_surface "/tasks" "tasks" "Không có việc nào đang chờ bạn" "Đã có gì, còn thiếu gì"
@@ -641,7 +646,7 @@ status="$(web_post "/objects/$object_key" "$tmp_dir/published.html" \
   --form-string 'description=publish bởi scripts/smoke-demo-flows.sh' \
   --form-string "fields=$edit_schema")"
 assert_status "$status" "200" "definition publish"
-assert_contains "$tmp_dir/published.html" "Đã publish phiên bản v2" "definition publish"
+assert_contains "$tmp_dir/published.html" "Đã phát hành phiên bản v2" "definition publish"
 
 curl -sS -b "$cookie_jar" -o "$tmp_dir/versions.json" "$api_base/api/v1/business-objects/$object_key/versions"
 python3 - "$tmp_dir/versions.json" <<'PY' || fail "[F] the published version history is wrong"
@@ -730,7 +735,7 @@ echo "flows: [G] approving advances the process and evaluates the condition"
 status="$(web_post "/tasks/$instance_id" "$tmp_dir/approved.html" \
   "${decision_args[@]}" --form-string 'decision=approve')"
 assert_status "$status" "200" "approve decision"
-assert_contains "$tmp_dir/approved.html" "Đã duyệt — quy trình chuyển tới node" "the approve is confirmed"
+assert_contains "$tmp_dir/approved.html" "Đã duyệt — quy trình chuyển tới bước" "the approve is confirmed"
 assert_contains "$tmp_dir/approved.html" "việc tiếp theo thuộc role $director_role" "the next role is named"
 # The log reads in the words a person uses: the field's label and the operator, not the
 # stored keys (ADR 0018).
@@ -826,31 +831,39 @@ PY
 
 # ------------------------- flow H: the designer screen and running from a record ----
 
-echo "flows: [H] a definition is published from the web and run from a record"
+echo "flows: [H] a definition is drawn on the canvas and run from a record"
 
 web_flow_key="flow_design_$stamp"
 status="$(web_get "/workflows" "$tmp_dir/workflows.html")"
 assert_status "$status" "200" "workflows page"
-assert_contains "$tmp_dir/workflows.html" "Tạo quy trình mới" "workflows page"
+assert_contains "$tmp_dir/workflows.html" "Tạo quy trình mới" "the list offers the create screen"
 assert_contains "$tmp_dir/workflows.html" "$process_key" "the flow created in G is listed"
-# The role field suggests the roles that exist (GET /api/v1/roles), so a typo cannot
-# silently create a task nobody can decide.
-assert_contains "$tmp_dir/workflows.html" "value=\"$approver_role\"" "the role catalogue reaches the editor"
 
-# The create form carries its graph in one hidden input, whose SSR value must be
-# excluded: formData.get returns the first value of a name.
-mapfile -t create_flow_args < <(form_args "$tmp_dir/workflows.html" graph graph)
+# Creating a process happens on the canvas (ADR 0019): the screen opens on a template
+# graph the engine accepts, and the role question is a select over the roles that exist
+# (GET /api/v1/roles), so a typo cannot silently create a task nobody can decide.
+status="$(web_get "/workflows/new" "$tmp_dir/workflow-new.html")"
+assert_status "$status" "200" "create screen"
+assert_contains "$tmp_dir/workflow-new.html" "Quy trình này dùng cho việc gì?" "the create screen asks what the process is for"
+assert_contains "$tmp_dir/workflow-new.html" "value=\"$approver_role\"" "the role catalogue reaches the create screen"
+assert_contains "$tmp_dir/workflow-new.html" "Nhận yêu cầu" "the canvas opens on the template"
+assert_contains "$tmp_dir/workflow-new.html" "Tạo và phát hành" "the create screen offers to publish"
+
+# The graph travels in one hidden input, whose SSR value must be excluded: formData.get
+# returns the first value of a name.
+mapfile -t create_flow_args < <(form_args "$tmp_dir/workflow-new.html" graph graph)
 [[ ${#create_flow_args[@]} -ge 4 ]] || fail "[H] the create form has no server-action fields"
 
 flow_graph='{"nodes":[{"key":"start","type":"start","title":"Nhận yêu cầu"},{"key":"check","type":"human_task","title":"Kiểm tra yêu cầu","assigneeRole":"'"$approver_role"'"},{"key":"end","type":"end","title":"Kết thúc"}],"edges":[{"from":"start","to":"check"},{"from":"check","to":"end"}]}'
-status="$(web_post "/workflows" "$tmp_dir/workflow-created.html" \
+status="$(web_post "/workflows/new" "$tmp_dir/workflow-created.html" \
   "${create_flow_args[@]}" \
   --form-string "key=$web_flow_key" \
   --form-string 'name=Luồng thiết kế từ web' \
   --form-string "objectKey=$object_key" \
   --form-string "graph=$flow_graph")"
-assert_status "$status" "200" "definition create"
-assert_contains "$tmp_dir/workflow-created.html" "Đã publish" "definition create"
+# A created definition lands on its own screen, which is where it is drawn further; curl
+# does not follow redirects, so the redirect itself is the success signal.
+assert_status "$status" "303" "definition create"
 
 status="$(web_get "/workflows/$web_flow_key" "$tmp_dir/workflow-detail.html")"
 assert_status "$status" "200" "workflow detail page"
@@ -860,15 +873,15 @@ assert_contains "$tmp_dir/workflow-detail.html" "Kiểm tra yêu cầu" "the can
 # A role nobody has named is shown by its key — the screen never hides a role it cannot
 # name, and never invents a name for it (ADR 0016).
 assert_contains "$tmp_dir/workflow-detail.html" "$approver_role" "the node shows its role"
-assert_contains "$tmp_dir/workflow-detail.html" "Trùng bản đã publish" "a fresh editor reports nothing unpublished"
-assert_contains "$tmp_dir/workflow-detail.html" "Instance của quy trình này" "the instance section"
-assert_contains "$tmp_dir/workflow-detail.html" "Publish phiên bản mới" "the publish button"
+assert_contains "$tmp_dir/workflow-detail.html" "Đang trùng bản đã phát hành" "a fresh editor reports nothing unpublished"
+assert_contains "$tmp_dir/workflow-detail.html" "Các lần chạy của quy trình này" "the run section"
+assert_contains "$tmp_dir/workflow-detail.html" "Phát hành phiên bản mới" "the publish button"
 assert_contains "$tmp_dir/workflow-detail.html" "Chưa có quy trình nào đang chạy" "no instance yet"
 
 # A definition the service rejects: the graph has no human task, and the message
 # comes from the Go service, not from the browser.
 bad_graph='{"nodes":[{"key":"start","type":"start","title":"Bắt đầu"},{"key":"end","type":"end","title":"Kết thúc"}],"edges":[{"from":"start","to":"end"}]}'
-status="$(web_post "/workflows" "$tmp_dir/workflow-invalid.html" \
+status="$(web_post "/workflows/new" "$tmp_dir/workflow-invalid.html" \
   "${create_flow_args[@]}" \
   --form-string "key=${web_flow_key}_bad" \
   --form-string 'name=Luồng sai' \
@@ -912,7 +925,7 @@ status="$(web_post "/objects/$object_key" "$tmp_dir/instance-started.html" \
   --form-string "recordId=$record_id")"
 assert_status "$status" "200" "starting a run from the web"
 assert_contains "$tmp_dir/instance-started.html" "Đã chạy" "starting a run from the web"
-assert_contains "$tmp_dir/instance-started.html" "việc đầu tiên thuộc role $approver_role" "the run names the first role"
+assert_contains "$tmp_dir/instance-started.html" "việc đầu tiên thuộc $approver_role" "the run names the first role"
 
 status="$(web_get "/objects/$object_key" "$tmp_dir/object-instances.html")"
 assert_status "$status" "200" "object page after the run"
@@ -960,7 +973,7 @@ assert_contains "$tmp_dir/draft-saved.html" "Đã lưu bản nháp" "saving a dr
 
 status="$(web_get "/workflows/$web_flow_key" "$tmp_dir/draft-loaded.html")"
 assert_status "$status" "200" "the editor with a saved draft"
-assert_contains "$tmp_dir/draft-loaded.html" "Bản nháp khác bản đã publish" "the editor reports the draft"
+assert_contains "$tmp_dir/draft-loaded.html" "Có thay đổi chưa phát hành" "the editor reports the draft"
 assert_contains "$tmp_dir/draft-loaded.html" "Bước nháp chưa publish" "the draft's own node is on the canvas"
 assert_contains "$tmp_dir/draft-loaded.html" "có bản nháp đã lưu cho trình duyệt này" "the editor says a draft is stored"
 
@@ -986,7 +999,7 @@ assert_status "$status" "200" "discarding a draft"
 assert_contains "$tmp_dir/draft-discarded.html" "Đã bỏ bản nháp" "discarding a draft"
 
 status="$(web_get "/workflows/$web_flow_key" "$tmp_dir/draft-gone.html")"
-assert_contains "$tmp_dir/draft-gone.html" "Trùng bản đã publish" "discarding returns to the published graph"
+assert_contains "$tmp_dir/draft-gone.html" "Đang trùng bản đã phát hành" "discarding returns to the published graph"
 assert_not_contains "$tmp_dir/draft-gone.html" "Bước nháp chưa publish" "the discarded node is gone"
 
 echo "flows: [H] publishing v2 leaves the running instance on v1"
@@ -998,7 +1011,7 @@ status="$(web_post "/workflows/$web_flow_key" "$tmp_dir/workflow-published.html"
   --form-string 'name=Luồng thiết kế từ web (v2)' \
   --form-string "graph=$flow_graph_v2")"
 assert_status "$status" "200" "definition publish"
-assert_contains "$tmp_dir/workflow-published.html" "Đã publish phiên bản v2" "definition publish"
+assert_contains "$tmp_dir/workflow-published.html" "Đã phát hành phiên bản v2" "definition publish"
 
 status="$(web_get "/workflows/$web_flow_key" "$tmp_dir/workflow-v2.html")"
 assert_status "$status" "200" "workflow detail after the publish"

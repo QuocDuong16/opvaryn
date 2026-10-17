@@ -138,7 +138,7 @@ function formatLiteral(value: unknown): string {
 export function nodeSubtitle(node: ProcessNode): string {
   switch (node.type) {
     case 'human_task':
-      return node.assigneeRole ? `role ${node.assigneeRole}` : 'chưa gán role';
+      return node.assigneeRole ? `vai trò ${node.assigneeRole}` : 'chưa gán vai trò';
     case 'condition':
       return conditionSummary(node.condition);
     default:

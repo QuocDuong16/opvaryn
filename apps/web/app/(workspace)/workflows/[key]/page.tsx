@@ -2,6 +2,7 @@ import Link from 'next/link';
 import { notFound } from 'next/navigation';
 import {
   ApiError,
+  type FieldDefinition,
   type ProcessDefinition,
   type ProcessDefinitionVersion,
   type ProcessInstanceSummary,
@@ -48,6 +49,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
   let instanceTotal = 0;
   let roleCatalogue: RoleEntry[] = [];
   let objectName = '';
+  let objectFields: FieldDefinition[] = [];
   let labels: Record<string, string> = {};
   let error: string | null = null;
 
@@ -63,6 +65,9 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
       api.getBusinessObject(definition.objectKey).catch(() => null),
     ]);
     objectName = object?.name || definition.objectKey;
+    // `rows` fields cannot be used in a condition (the service rejects them), so the
+    // condition step is not offered them either.
+    objectFields = (object?.fields ?? []).filter((field) => field.type !== 'rows');
     versions = versionList;
     instances = instancePage.data;
     instanceTotal = instancePage.total;
@@ -152,7 +157,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
         title={definition.name}
         lead={
           definition.description ??
-          'Graph đã publish của quy trình này. Instance chạy đúng phiên bản này; publish phiên bản mới không đổi các instance đang xử lý.'
+          'Sơ đồ đang dùng của quy trình này. Mỗi lần chạy bám đúng phiên bản nó bắt đầu; phát hành phiên bản mới không đổi các lần chạy đang xử lý.'
         }
       />
 
@@ -170,7 +175,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
           {`phiên bản đang dùng v${definition.version}`}
         </span>
         <span className="rounded-full border border-border px-2.5 py-0.5 text-xs text-on-surface-muted">
-          {`${definition.nodes.length} node · ${definition.edges.length} đường chuyển`}
+          {`${definition.nodes.length} bước · ${definition.edges.length} đường nối`}
         </span>
       </p>
 
@@ -227,6 +232,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
                 initialDraft={savedDraft ?? publishedDraft}
                 hasSavedDraft={savedDraft !== null}
                 knownRoles={knownRoles}
+                conditionFields={objectFields}
                 canvasLabel={`${definition.name} v${definition.version}`}
               />
             </>
@@ -239,7 +245,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
                 roleLabels={roleNames}
               />
               <p className="mt-3 rounded-lg border border-warning/40 px-3 py-2 text-sm text-warning">
-                {`Đang xem v${shown.version} — bản đang dùng là v${definition.version}. Instance cũ vẫn chạy theo phiên bản này, nên bản cũ chỉ để xem: chọn v${definition.version} ở dải phiên bản để sửa.`}
+                {`Đang xem v${shown.version} — bản đang dùng là v${definition.version}. Các lần chạy cũ vẫn theo phiên bản này, nên bản cũ chỉ để xem: chọn v${definition.version} ở dải phiên bản để sửa.`}
               </p>
             </>
           )}
@@ -251,13 +257,13 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
           <section>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
               <h2 className="text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
-                {`Instance của quy trình này (${instanceTotal})`}
+                {`Các lần chạy của quy trình này (${instanceTotal})`}
               </h2>
               <StatusBadge kind="live" />
             </div>
             <p className="mb-3 text-xs text-on-surface-muted">
-              Đọc theo phạm vi của bạn: instance hiện khi bản ghi của nó hiện. Việc đang chờ nằm
-              trong inbox của role tương ứng.
+              Đọc theo phạm vi của bạn: một lần chạy hiện khi bản ghi của nó hiện. Việc đang chờ nằm
+              trong hộp việc của vai trò tương ứng.
             </p>
             <InstanceList
               instances={instances}
@@ -333,19 +339,16 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
           <Card>
             <CardTitle>Cách bản nháp hoạt động</CardTitle>
             <CardDescription>
-              Canvas ở trên sửa một <strong>bản nháp</strong>: kéo node, nối đường chuyển, thêm hoặc
-              xoá node — tất cả chỉ nằm trong trình duyệt này. Chỉ khi bấm
+              Sơ đồ ở trên sửa một <strong>bản nháp</strong>: kéo bước, nối các bước, thêm hoặc xoá
+              bước — tất cả chỉ nằm trong trình duyệt này. Chỉ khi bấm
               <strong> Publish phiên bản mới</strong> quy trình mới được kiểm tra và lưu thành phiên
               bản mới; phiên bản đã publish không đổi, và quy trình đang chạy giữ nguyên phiên bản
               của nó.
             </CardDescription>
             <ul className="mt-4 space-y-2 text-xs text-on-surface-muted">
               <li>Lưu nháp giữ bản đang sửa cho lần mở sau, chỉ trong trình duyệt này.</li>
-              <li>Bỏ nháp đưa canvas về đúng bản đã publish.</li>
-              <li>
-                Publish cần role <code className="font-mono">process_designer</code> hoặc{' '}
-                <code className="font-mono">admin</code>.
-              </li>
+              <li>Bỏ nháp đưa sơ đồ về đúng bản đã phát hành.</li>
+              <li>Phát hành cần vai trò thiết kế quy trình hoặc quản trị hệ thống.</li>
             </ul>
           </Card>
         </aside>

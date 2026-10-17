@@ -20,7 +20,7 @@ export const metadata = {
 const CAPABILITIES: readonly { title: string; body: string }[] = [
   {
     title: 'Dữ liệu do bạn định nghĩa',
-    body: 'Khai business object với field có kiểu, publish theo phiên bản bất biến. Bản ghi cũ giữ đúng schema lúc nó được tạo, nên đổi định nghĩa không phá dữ liệu đã có.',
+    body: 'Khai loại dữ liệu với các trường có kiểu, mỗi lần sửa là một phiên bản mới. Bản ghi cũ giữ đúng cấu trúc lúc nó được tạo, nên đổi định nghĩa không phá dữ liệu đã có.',
   },
   {
     title: 'Biểu mẫu sinh từ schema',
@@ -51,7 +51,7 @@ const TRUST: readonly { title: string; body: string }[] = [
   },
   {
     title: 'Định nghĩa bất biến theo phiên bản',
-    body: 'Sửa một định nghĩa là publish phiên bản mới. Quy trình đang chạy và bản ghi đã nhập giữ nguyên phiên bản chúng bắt đầu, nên thay đổi không làm sai lệch dữ liệu cũ.',
+    body: 'Sửa một định nghĩa là phát hành phiên bản mới. Quy trình đang chạy và bản ghi đã nhập giữ nguyên phiên bản chúng bắt đầu, nên thay đổi không làm sai lệch dữ liệu cũ.',
   },
   {
     title: 'Chạy trong hạ tầng của bạn',
