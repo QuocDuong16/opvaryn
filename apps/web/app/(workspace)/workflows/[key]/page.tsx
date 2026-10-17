@@ -220,7 +220,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
             <>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
-                  Trình soạn graph — bản nháp của bạn
+                  Sơ đồ quy trình — bản nháp của bạn
                 </h2>
                 <StatusBadge kind="live" />
               </div>
@@ -268,6 +268,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
             <InstanceList
               instances={instances}
               recordLabels={labels}
+              roleLabels={roleNames}
               definitionNames={{ [definition.key]: definition.name }}
               emptyHint="Chạy quy trình này từ màn hình của một bản ghi để thấy lần chạy ở đây."
             />
@@ -292,13 +293,13 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
                       Phiên bản
                     </th>
                     <th scope="col" className="px-4 py-3 font-medium">
-                      Publish lúc
+                      Phát hành lúc
                     </th>
                     <th scope="col" className="px-4 py-3 font-medium">
                       Bởi
                     </th>
                     <th scope="col" className="px-4 py-3 font-medium">
-                      Node
+                      Các bước
                     </th>
                   </tr>
                 </thead>
@@ -325,7 +326,9 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
                         {version.publishedBy}
                       </td>
                       <td className="px-4 py-3 text-xs text-on-surface-muted">
-                        {version.nodes.map((node) => node.key).join(', ')}
+                        {/* A step is read by its title; its key is what the graph compares
+                            (ADR 0016), and the title is what the designer typed. */}
+                        {version.nodes.map((node) => node.title).join(' · ')}
                       </td>
                     </tr>
                   ))}

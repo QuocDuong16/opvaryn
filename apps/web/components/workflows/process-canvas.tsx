@@ -7,6 +7,7 @@ import {
   NODE_HEIGHT,
   NODE_TYPE_LABELS,
   NODE_WIDTH,
+  clipTitle,
   conditionSummary,
   layoutGraph,
   nodeSubtitle,
@@ -145,7 +146,7 @@ export function ProcessCanvas({
                     )}
                   />
                   <text x={x + 12} y={y + 24} className="fill-on-surface text-[11px] font-medium">
-                    {node.title}
+                    {clipTitle(node.title)}
                   </text>
                   <text x={x + 12} y={y + 41} className="fill-on-surface-muted text-[10px]">
                     {nodeSubtitle(node)}
@@ -196,12 +197,12 @@ export function ProcessCanvas({
 
       <aside className="min-w-0">
         <div className="rounded-xl border border-border bg-surface-raised p-5">
-          <p className="font-mono text-[11px] tracking-widest text-on-surface-muted uppercase">
-            Node đang chọn
+          <p className="text-[11px] tracking-widest text-on-surface-muted uppercase">
+            Bước đang chọn
           </p>
           <h3 className="mt-2 text-base font-semibold tracking-tight">{selected.node.title}</h3>
-          <p className="mt-0.5 font-mono text-xs text-on-surface-muted">
-            {selected.node.key} · {NODE_TYPE_LABELS[selected.node.type]}
+          <p className="mt-0.5 text-xs text-on-surface-muted">
+            {NODE_TYPE_LABELS[selected.node.type]}
           </p>
 
           <dl className="mt-4 space-y-3">

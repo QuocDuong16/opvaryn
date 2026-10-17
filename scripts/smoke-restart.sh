@@ -189,4 +189,9 @@ if len(approvals) != 1:
 print("restart: the retry was refused and the audit log still has one approval")
 CHECK_RETRY
 
+# The run tidied up at the start; a run that passed tidies up after itself too, so a screen
+# someone opens next does not show this run's rows. A run that failed keeps its evidence.
+bash "$root_dir/scripts/clean-smoke-data.sh" >/dev/null 2>&1 ||
+  echo "restart: could not clean up after the run — run 'make clean-smoke-data' by hand"
+
 echo "restart: PASS — state survives a crash, and a retry cannot apply twice"

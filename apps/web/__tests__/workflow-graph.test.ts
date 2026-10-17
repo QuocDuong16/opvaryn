@@ -2,6 +2,8 @@ import { describe, expect, it } from 'vitest';
 import type { ProcessNode } from '@opvaryn/contracts';
 
 import {
+  NODE_TITLE_MAX,
+  clipTitle,
   conditionSummary,
   layoutGraph,
   nodeSubtitle,
@@ -110,6 +112,20 @@ describe('outgoingEdges', () => {
   it('labels a branch edge with its when value and an unconditional one as luôn', () => {
     expect(outgoingEdges(graph, 'start')).toEqual([{ edge: graph.edges[0], label: 'luôn' }]);
     expect(outgoingEdges(graph, 'gate').map((item) => item.label)).toEqual(['true', 'false']);
+  });
+});
+
+describe('clipTitle', () => {
+  it('leaves a title that fits alone', () => {
+    expect(clipTitle('Nhận đề nghị')).toBe('Nhận đề nghị');
+  });
+
+  it('shortens one that would spill out of the node box', () => {
+    const long = 'Kế toán xác nhận ngân sách cho đề nghị mua hàng';
+
+    expect(clipTitle(long)).toHaveLength(NODE_TITLE_MAX);
+    expect(clipTitle(long).endsWith('…')).toBe(true);
+    expect(long.startsWith(clipTitle(long).slice(0, -1))).toBe(true);
   });
 });
 

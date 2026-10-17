@@ -54,16 +54,35 @@
   `opvaryn.workflow_draft.<key>` behind `saveWorkflowDraftAction` (`lib/workflow-draft.ts`); publishing
   clears it. **Never** let a draft reach the engine: the API only knows published versions, and
   smoke-demo-flows flow H asserts the published definition is byte-identical while a draft exists.
-- `/workflows` **live**: lists definitions from the API and creates new ones (`CreateDefinitionForm`);
-  `/workflows/[key]` draws the published graph with `ProcessCanvas`, shows the version history
-  (`?version=n` inspects an older version), the instances of that definition, and publishes the next
-  version (`PublishDefinitionForm`). The fixture (`demo-definitions.ts`, `workflow-canvas.tsx`) is
-  gone. Pure, tested modules: `components/workflows/definition-layout.ts` (column layout by distance
-  from start, `conditionSummary`, `nodeSubtitle`, `outgoingEdges`) and `definition-draft.ts` (node/edge
-  rows ↔ API graph, condition literal typed by the bound object's field, `serializeGraph`/`parseGraph`
-  for the hidden input). Publishing stays the only write to a definition: an older version is rendered
-  read-only with `ProcessCanvas`, and every edit happens on the browser-local draft described above
-  (ADR 0013).
+- `/workflows` **live**: lists definitions from the API and links to the create screen. A new process
+  is **drawn on the canvas** (ADR 0019): `/workflows/new` asks three questions (name, the data it
+  reads, who receives the first step) and opens on the template graph from
+  `components/workflows/new-definition-template.ts` (`templateDraft`, `firstTaskKey` — the step the
+  form's role question is bound to). `CreateWorkflowEditor` publishes **v1 of exactly what was drawn**
+  through `createProcessDefinitionAction`, which derives the key from the name when the disclosure was
+  never opened and `redirect`s to `/workflows/<key>`. The row-based editor is deleted
+  (`definition-editor.tsx` and the row model in `definition-draft.ts` are gone; that module now only
+  holds `CONDITION_OPS` and `parseGraph`).
+- `components/workflows/graph-canvas.tsx` is the shared canvas + inspector, controlled by its parent
+  (`draft`, `onDraftChange` as an updater so a fast drag cannot lose a move, `knownRoles`,
+  `conditionFields` from the bound object, `canvasLabel`, `readiness`). `WorkflowEditor` (publish mode)
+  and `CreateWorkflowEditor` (create mode) both wrap it; the readiness panel's wording is the parent's,
+  because "nothing to compare against yet" is a create-mode fact.
+- `components/workflows/definition-preflight.ts` (pure, tested) is the **pre-publish checklist in
+  Vietnamese**: one start, at least one end and one human task, a role on every human task (and a role
+  that is a key), a field on every condition, the ways onward per step kind, both branches on a
+  condition, nothing after the end. Each rule is a *necessary* condition of a graph the service
+  accepts, so a clean checklist never blocks a valid definition; publish is disabled while something is
+  listed, and the Go service keeps the last word for cycles, unreachable steps and condition literal
+  types. Do not grow this into a second validator.
+- `/workflows/[key]` draws the published graph with `ProcessCanvas`, shows the version history
+  (`?version=n` inspects an older version), the runs of that definition, and publishes the next version
+  through the canvas. The fixture (`demo-definitions.ts`, `workflow-canvas.tsx`) is gone. Pure, tested
+  modules: `components/workflows/definition-layout.ts` (column layout by distance from start,
+  `conditionSummary`, `nodeSubtitle`, `outgoingEdges`, `clipTitle` — SVG text does not wrap, so a long
+  step title is clipped rather than left spilling over the node box). Publishing stays the only write to
+  a definition: an older version is rendered read-only with `ProcessCanvas`, and every edit happens on
+  the browser-local draft described above (ADR 0013).
 - `/objects/[key]` also carries `StartInstanceForm` (only definitions bound to that object are
   offered — conditions read its fields) and `InstanceList` for its records, backed by
   `listProcessInstances({objectKey})`; `/workflows/[key]` reuses `InstanceList` with
@@ -71,7 +90,9 @@
   `listBusinessObjectVersions`) so a row names the record it runs on — the label uses each record's
   own definition version (`components/objects/record-labels.ts`, `fieldsForVersionNumber`).
   `components/process/instance-list.tsx` is the shared row view (record, state, definition version ·
-  attempt, current node, who holds it up).
+  lần chạy, the waiting step, who holds it up). Both callers pass `roleLabels` — a role with no label
+  reads as its key, so a missing catalogue read must not take the screen down (the objects page wraps
+  `listRoles()` in `.catch(() => [])` for exactly that reason).
 - Roles in the designer come from `GET /api/v1/roles` (roles at least one user holds):
   `/workflows` feeds them to the editor's datalist, and `/workflows/[key]` warns when a definition
   names a role nobody holds — a valid definition whose instance would stop at that node and appear in

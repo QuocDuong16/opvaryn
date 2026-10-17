@@ -14,8 +14,8 @@ const INPUT_CLASS =
 
 const AGGREGATIONS = [
   { value: 'count', label: 'Đếm bản ghi' },
-  { value: 'sum', label: 'Tổng một field số' },
-  { value: 'avg', label: 'Trung bình một field số' },
+  { value: 'sum', label: 'Tổng một trường số' },
+  { value: 'avg', label: 'Trung bình một trường số' },
 ] as const;
 
 const OPERATORS = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte'] as const;

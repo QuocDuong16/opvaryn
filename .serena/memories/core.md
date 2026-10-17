@@ -26,7 +26,10 @@ open playbook decision), OIDC when the organisation has an IdP, and drag-and-dro
 - `scripts/` — quality gates (`check-docs.mjs`), `smoke-api.sh` (end-to-end API smoke test),
   `smoke-demo-flows.sh` (web flows: builds both servers, replays the demo forms),
   `seed-demo.sh` (idempotent demo dataset through the public API) and `playbook-rename.py`
-  (doc maintenance).
+  (doc maintenance). `clean-smoke-data.sh` removes what a smoke run left behind: the three smoke
+  scripts call it **before** a run (so a failed run's evidence stays) and after one that passed,
+  and `make clean-smoke-data` runs it by hand. It needs **bash**, not sh — its compose invocation
+  is an array, and a caller using `sh` gets a syntax error that a swallowed exit status hides.
 - `.github/` — CI (`workflows/`: quality gate, integration smoke, CodeQL, dependency review),
   `dependabot.yml`, `CODEOWNERS`, issue/PR templates; these templates are the Vietnamese/English
   forms users see, keep them honest.

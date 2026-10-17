@@ -214,8 +214,9 @@ export function CreateWorkflowEditor({
           Vẽ lại từ bản mẫu
         </button>
         <p className="text-xs text-on-surface-muted">
-          Tạo xong, quy trình chạy được ngay và bạn vẫn sửa tiếp được: mỗi lần sửa là một phiên bản
-          mới, các lần chạy đang xử lý vẫn giữ phiên bản cũ.
+          {problems.length > 0
+            ? 'Sửa các điểm ở khung bên cạnh rồi tạo.'
+            : 'Tạo xong, quy trình chạy được ngay và bạn vẫn sửa tiếp được: mỗi lần sửa là một phiên bản mới, các lần chạy đang xử lý vẫn giữ phiên bản cũ.'}
         </p>
       </div>
 

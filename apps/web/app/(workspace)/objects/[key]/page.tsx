@@ -21,6 +21,7 @@ import { ListSearch, Pagination, pageOffset } from '@/components/ui/list-control
 import { PageHeader } from '@/components/ui/page-header';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatTimestamp } from '@/lib/format';
+import { roleLabels } from '@/lib/names';
 
 interface PageProps {
   params: Promise<{ key: string }>;
@@ -52,11 +53,13 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
   let definitions: ProcessDefinition[] = [];
   let instances: ProcessInstanceSummary[] = [];
   let instanceTotal = 0;
+  // A role is shown by its name (ADR 0016); a role nobody has named stays its key.
+  let namedRoles: Map<string, string> = new Map();
   let error: string | null = null;
 
   try {
     object = await api.getBusinessObject(key);
-    const [versionList, recordPage, definitionPage, instancePage] = await Promise.all([
+    const [versionList, recordPage, definitionPage, instancePage, roles] = await Promise.all([
       api.listBusinessObjectVersions(key),
       api.listObjectRecords(key, { q: query || undefined, limit: RECORDS_PER_PAGE, offset }),
       api.listProcessDefinitions({ limit: 100 }),
@@ -64,6 +67,9 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
         { objectKey: key },
         { limit: INSTANCES_PER_PAGE, offset: instanceOffset },
       ),
+      // The role names are a nicety: a role nobody has named still reads as its key, so a
+      // failed read must not take the screen down with it.
+      api.listRoles().catch(() => []),
     ]);
     versions = versionList;
     records = recordPage.data;
@@ -71,6 +77,7 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
     definitions = definitionPage.data;
     instances = instancePage.data;
     instanceTotal = instancePage.total;
+    namedRoles = roleLabels(roles);
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'not_found') {
       notFound();
@@ -223,6 +230,7 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
             <InstanceList
               instances={instances}
               recordLabels={recordLabels(records, versions)}
+              roleLabels={Object.fromEntries(namedRoles)}
               definitionNames={Object.fromEntries(
                 definitions.map((definition) => [definition.key, definition.name]),
               )}

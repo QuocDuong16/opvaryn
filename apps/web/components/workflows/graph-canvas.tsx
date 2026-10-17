@@ -10,6 +10,7 @@ import {
   NODE_HEIGHT,
   NODE_TYPE_LABELS,
   NODE_WIDTH,
+  clipTitle,
   conditionSummary,
   outgoingEdges,
 } from '@/components/workflows/definition-layout';
@@ -361,7 +362,7 @@ export function GraphCanvas({
                         y={node.y + 24}
                         className="fill-on-surface text-[11px] font-medium"
                       >
-                        {node.title}
+                        {clipTitle(node.title)}
                       </text>
                       <text
                         x={node.x + 12}

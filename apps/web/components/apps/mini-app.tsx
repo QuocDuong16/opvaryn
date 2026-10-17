@@ -242,9 +242,9 @@ function KanbanView({ app, statusFieldKey }: { app: MiniAppData; statusFieldKey?
   if (!statusField || !statusField.options || statusField.options.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-border-strong px-5 py-10 text-center text-sm text-on-surface-muted">
-        Object <code className="font-mono text-xs">{app.object.key}</code> chưa có field kiểu lựa
-        chọn nên chưa gom cột được. Kanban cần một field trạng thái có options — thêm field select
-        trong schema để xem dạng xem này.
+        {`Loại dữ liệu ${app.object.name} chưa có trường kiểu lựa chọn nên chưa gom cột được. Bảng
+        kanban cần một trường trạng thái có danh sách lựa chọn — thêm một trường như vậy trong định
+        nghĩa dữ liệu để xem dạng xem này.`}
       </p>
     );
   }
@@ -268,8 +268,8 @@ function KanbanView({ app, statusFieldKey }: { app: MiniAppData; statusFieldKey?
   return (
     <div>
       <p className="mb-3 text-xs text-on-surface-muted">
-        Gom cột theo field <code className="font-mono">{statusField.key}</code> cho mục đích minh
-        hoạ — chính sách gom nhóm và kéo thả thuộc V2.
+        {`Gom cột theo trường ${statusField.label} cho mục đích minh hoạ — chính sách gom nhóm và
+        kéo thả thuộc V2.`}
       </p>
       <div className="grid gap-3 sm:grid-cols-3">
         {columns.map((column) => (
@@ -362,8 +362,8 @@ function ConfigView({ app, statusFieldKey }: { app: MiniAppData; statusFieldKey?
   const listColumns = app.object.fields.filter((field) => field.type !== 'file').slice(0, 3);
 
   const views: readonly { name: string; enabled: boolean; note: string }[] = [
-    { name: 'List', enabled: true, note: 'Cột lấy từ field schema, xem panel bên dưới.' },
-    { name: 'Detail', enabled: true, note: 'Hiển thị mọi field của bản ghi kèm metadata.' },
+    { name: 'List', enabled: true, note: 'Cột lấy từ định nghĩa dữ liệu, xem panel bên dưới.' },
+    { name: 'Detail', enabled: true, note: 'Hiển thị mọi trường của bản ghi kèm mô tả.' },
     {
       name: 'Form',
       enabled: app.object.fields.length > 0,
@@ -373,8 +373,8 @@ function ConfigView({ app, statusFieldKey }: { app: MiniAppData; statusFieldKey?
       name: 'Kanban',
       enabled: Boolean(statusField),
       note: statusField
-        ? `Gom cột theo field ${statusField.key}.`
-        : 'Cần một field kiểu select làm trạng thái.',
+        ? `Gom cột theo trường ${statusField.label}.`
+        : 'Cần một trường lựa chọn làm trạng thái.',
     },
   ];
 
@@ -407,15 +407,19 @@ function ConfigView({ app, statusFieldKey }: { app: MiniAppData; statusFieldKey?
           </ul>
         </ConfigPanel>
 
-        <ConfigPanel title="Cột trong danh sách" subtitle={`Lấy từ schema của ${app.object.key}`}>
+        <ConfigPanel
+          title="Cột trong danh sách"
+          subtitle={`Lấy từ định nghĩa của ${app.object.name}`}
+        >
           {listColumns.length === 0 ? (
-            <p className="text-xs text-on-surface-muted">Object chưa có field để hiển thị.</p>
+            <p className="text-xs text-on-surface-muted">
+              Loại dữ liệu chưa có trường để hiển thị.
+            </p>
           ) : (
             <ul className="space-y-2">
               {listColumns.map((field) => (
                 <li key={field.key} className="flex items-center gap-2.5">
                   <ConfigCheckbox checked label={field.label} />
-                  <span className="font-mono text-[11px] text-on-surface-muted">{field.key}</span>
                 </li>
               ))}
             </ul>
@@ -426,8 +430,8 @@ function ConfigView({ app, statusFieldKey }: { app: MiniAppData; statusFieldKey?
           title="Action theo trạng thái"
           subtitle={
             statusField
-              ? `Trạng thái lấy từ field ${statusField.key}`
-              : 'Cần một field select để có trạng thái'
+              ? `Trạng thái lấy từ trường ${statusField.label}`
+              : 'Cần một trường lựa chọn để có trạng thái'
           }
         >
           {statusField?.options && statusField.options.length > 0 ? (

@@ -1049,4 +1049,9 @@ assert_status "$status" "303" "signing out from the workspace"
 status="$(curl -sS -o /dev/null -w '%{http_code}' "${web_base}/overview" -b "$cookie_jar")"
 assert_status "$status" "307" "workspace after signing out"
 
+# The run tidied up at the start; a run that passed tidies up after itself too, so a screen
+# someone opens next does not show this run's rows. A run that failed keeps its evidence.
+bash "$root_dir/scripts/clean-smoke-data.sh" >/dev/null 2>&1 ||
+  echo "flows: could not clean up after the run — run 'make clean-smoke-data' by hand"
+
 echo "flows: PASS"

@@ -12,6 +12,19 @@ export interface ProcessGraph {
 
 export const NODE_WIDTH = 158;
 export const NODE_HEIGHT = 58;
+
+/** How many characters of a step title fit inside a node box. */
+export const NODE_TITLE_MAX = 20;
+
+/**
+ * clipTitle shortens a step title to what fits in a node box. SVG text does not wrap, so an
+ * unclipped title spills over the border and looks like a rendering fault; the full title is
+ * always readable in the inspector beside the canvas, and in the node's own accessible name.
+ */
+export function clipTitle(title: string): string {
+  const trimmed = title.trim();
+  return trimmed.length <= NODE_TITLE_MAX ? trimmed : `${trimmed.slice(0, NODE_TITLE_MAX - 1)}…`;
+}
 const GAP_X = 56;
 const GAP_Y = 22;
 const PADDING = 24;

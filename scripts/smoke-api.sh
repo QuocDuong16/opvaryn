@@ -734,4 +734,9 @@ status="$(request GET /api/v1/does-not-exist)"
 [[ "$status" == "404" ]] || fail "unknown route returned $status, expected 404"
 grep -q '"code":"not_found"' "$body_file" || fail "unknown route did not return the not_found error code"
 
+# The run tidied up at the start; a run that passed tidies up after itself too, so a screen
+# someone opens next does not show this run's rows. A run that failed keeps its evidence.
+bash "$root_dir/scripts/clean-smoke-data.sh" >/dev/null 2>&1 ||
+  echo "smoke: could not clean up after the run — run 'make clean-smoke-data' by hand"
+
 echo "smoke: PASS"
