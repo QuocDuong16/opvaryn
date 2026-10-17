@@ -69,11 +69,11 @@ Thứ tự gợi ý, kèm phần cần nói rõ để không trình bày quá:
 | --- | --- | --- | --- |
 | 1 | **Trang giới thiệu** `/` (công khai) → **Tổng quan** `/overview` (sau đăng nhập) | Trang bìa mô tả sản phẩm cho người chưa có tài khoản; sau khi đăng nhập là trạng thái API/database đọc trực tiếp (không phải ảnh chụp), các màn hình kèm nhãn và quy ước nhãn | live |
 | 2 | **Business Objects** `/objects` | Tạo object mới ngay tại chỗ: thêm vài field, một field `select` kèm danh sách lựa chọn | live |
-| 3 | **Object detail** `/objects/<key>` | Form nhập liệu sinh từ schema vừa tạo; lưu một bản ghi; thử để trống field bắt buộc để thấy server chặn và báo lỗi | live |
-| 3b | **Phát hành phiên bản** (cùng trang) | Sửa schema rồi **Phát hành phiên bản v2**: bản ghi cũ vẫn nằm ở nhóm "phiên bản cũ" với đúng schema cũ, bản ghi mới dùng schema mới. Đây là bất biến #1 của playbook chạy thật | live |
+| 3 | **Object detail** `/objects/<key>` | Ba phần, mở từng phần một: **Trường** (các trường của phiên bản đang dùng + lịch sử phiên bản + khung sửa định nghĩa), **Bản ghi** (bảng bản ghi + form nhập sinh từ định nghĩa; thử để trống trường bắt buộc để thấy server chặn), **Quy trình** (chạy một quy trình + các lần chạy). Mỗi dòng bản ghi có lối vào xem riêng các lần chạy của nó | live |
+| 3b | **Phát hành phiên bản** (phần Trường) | Sửa định nghĩa rồi **Phát hành phiên bản v2**: bản ghi cũ vẫn nằm ở nhóm "phiên bản cũ" với đúng định nghĩa cũ, bản ghi mới dùng định nghĩa mới. Đây là bất biến #1 của playbook chạy thật | live |
 | 4 | **Forms** `/forms` | Đổi schema, thấy form đổi theo; danh sách "chưa có trong V1" | live + concept |
 | 5 | **Workflows** `/workflows` | Danh sách định nghĩa đọc từ API và lối vào **Tạo quy trình mới** (`/workflows/new`): trả lời ba câu hỏi (tên, loại dữ liệu, ai nhận việc ở bước đầu) rồi **vẽ các bước trên canvas** ngay từ đầu — bản mẫu ba bước có sẵn, checklist bên cạnh nói còn gì phải sửa trước khi phát hành. Mở một định nghĩa để **kéo thả trên canvas** (kéo bước, kéo chấm tròn để nối, thêm/xoá, sửa vai trò/điều kiện), lưu nháp rồi **Phát hành phiên bản mới**; xem lại phiên bản cũ. Cần vai trò thiết kế quy trình hoặc quản trị hệ thống mới phát hành được | **live** |
-| 5b | **Chạy quy trình** (trang bản ghi) | Chọn quy trình + bản ghi rồi **Chạy quy trình**: instance xuất hiện ngay trong danh sách instance của bản ghi và trong inbox của role đầu tiên | **live** |
+| 5b | **Chạy quy trình** (phần Quy trình) | Chọn quy trình + bản ghi rồi **Chạy quy trình**: lần chạy xuất hiện ngay trong danh sách của loại dữ liệu đó và trong hộp việc của vai trò đầu tiên. Bấm **Xem các lần chạy** ở một dòng bản ghi để chỉ xem các lần chạy của bản ghi ấy | **live** |
 | 6 | **Tasks** `/tasks` | Inbox thật theo role của người đang đăng nhập; mở một việc để xem bản ghi, event log và **duyệt / trả về / từ chối**; thử bằng hai tài khoản khác role để thấy việc chuyển người | **live** |
 | 7 | **Analytics** `/analytics` | Metric thật trên dữ liệu thật: tạo metric từ field của object (đếm/tổng/trung bình, lọc, nhóm), thấy con số và phân rã ngay; kéo–thả sắp widget, **Lưu bố cục**, F5 để thấy còn nguyên | **live** |
 | 8 | **Applications** `/apps` | Danh sách và chi tiết đọc bản ghi thật; kanban; tab **Cấu hình** (các ô đều bị khoá); panel tích hợp | live + mock + concept |
@@ -101,6 +101,22 @@ con số trong dashboard là một truy vấn thật trên projection có kiểu
    7/30/90/365 ngày. Đây là read model cố định trên `process_instances`/`process_tasks` (ADR 0011),
    cũng theo phạm vi đọc của bạn. **SLA chưa có** và màn hình nói thẳng như vậy: engine chưa có chính
    sách thời gian làm việc (V1.x), nên không hiển thị hạn giả.
+
+### Walkthrough màn hình Dữ liệu (live)
+
+1. `/objects` liệt kê các loại dữ liệu đang dùng. Bấm một loại để mở trang của nó.
+2. Trang một loại dữ liệu có **ba phần**, mở từng phần một; phần đang mở nằm trong URL (`?tab=`),
+   nên gửi link cho người khác được, F5 giữ nguyên và nút Back hoạt động:
+   - **Trường** — các trường của phiên bản đang dùng, lịch sử phiên bản, và khung **Sửa định nghĩa —
+     phát hành phiên bản v2**.
+   - **Bản ghi** — bảng bản ghi (nhóm theo phiên bản) và form nhập ở khung bên phải. Mỗi dòng có
+     **Xem các lần chạy →**.
+   - **Quy trình** — khung **Chạy quy trình** và danh sách các lần chạy của loại dữ liệu đó.
+3. Bấm **Xem các lần chạy** ở một dòng bản ghi: phần Quy trình mở ra chỉ với các lần chạy của bản
+   ghi ấy, nói rõ đang xem bản ghi nào, và khung chạy quy trình chọn sẵn bản ghi đó. Nút **Bỏ lọc,
+   xem tất cả** đưa về danh sách đầy đủ — đây là câu trả lời cho "bản ghi này đã chạy quy trình nào".
+4. Bất biến #1 hiện ngay trên màn hình: sửa định nghĩa ở phần Trường rồi phát hành v2, quay lại phần
+   Bản ghi sẽ thấy bản ghi cũ nằm riêng ở nhóm "phiên bản cũ — bản ghi giữ nguyên schema".
 
 ### Walkthrough màn hình Workflows (live)
 

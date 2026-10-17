@@ -466,8 +466,8 @@ export interface paths {
          * @description Scoped exactly like the record each instance runs on (ADR 0008): an instance is
          *     listed only when its record is visible to the caller, and a caller who holds the
          *     role of an open task sees it through that task. Optional filters narrow the list
-         *     to one business object or one process definition; newest first, one page at a
-         *     time, with the total behind the page.
+         *     to one business object, one process definition or one record; newest first, one
+         *     page at a time, with the total behind the page.
          */
         get: operations["listProcessInstances"];
         put?: never;
@@ -1891,6 +1891,12 @@ export interface operations {
                 objectKey?: string;
                 /** @description Only instances of this process definition. */
                 definitionKey?: string;
+                /**
+                 * @description Only the runs of this one record, which is what a record's own screen asks
+                 *     for. The record is still subject to the visibility rule, so an invisible
+                 *     record answers an empty list rather than confirming that it exists.
+                 */
+                recordId?: string;
                 /** @description Rows per page (default 25, maximum 100). */
                 limit?: number;
                 /** @description Rows to skip. */

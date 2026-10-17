@@ -46,3 +46,4 @@
 - [0017 — Danh sách phân trang ở API; màn hình không bao giờ tải cả bảng](adr/0017-server-side-list-pagination.md)
 - [0018 — Màn hình chỉ hiện thứ người dùng cần, không hiện thứ chỉ hệ thống cần](adr/0018-screens-show-what-the-user-needs.md)
 - [0019 — Quy trình mới được vẽ trên canvas, checklist nói tiếng người trước khi service từ chối](adr/0019-the-canvas-is-how-a-process-is-created.md)
+- [0020 — Một loại dữ liệu có ba phần (Trường · Bản ghi · Quy trình), và một bản ghi xem được các lần chạy của nó](adr/0020-a-data-definition-has-three-parts.md)

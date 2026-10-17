@@ -267,6 +267,59 @@ func TestInstanceListRefusesAnonymousAndBadFilters(t *testing.T) {
 	if len(validation.Problems) != 1 || !strings.Contains(validation.Problems[0], "definition_key") {
 		t.Fatalf("expected one problem naming definition_key, got %+v", validation.Problems)
 	}
+
+	// A record filter is an id, not a key: anything that is not one is refused by name
+	// rather than quietly listing every instance of the object.
+	err = func() error {
+		_, err := runtime.List(context.Background(), ListInput{
+			RecordID:  "not-a-record",
+			Principal: managerPrincipal(),
+		})
+		return err
+	}()
+	if !errors.As(err, &validation) {
+		t.Fatalf("a malformed record id must be a validation error, got %v", err)
+	}
+	if len(validation.Problems) != 1 || !strings.Contains(validation.Problems[0], "record_id") {
+		t.Fatalf("expected one problem naming record_id, got %+v", validation.Problems)
+	}
+}
+
+func TestInstanceListCarriesTheRecordFilter(t *testing.T) {
+	t.Parallel()
+
+	store := newFakeRuntimeStore(t, nil)
+	runtime := NewProcessRuntime(store)
+	principal := managerPrincipal()
+
+	if _, err := runtime.Start(context.Background(), StartInput{
+		DefinitionKey: "purchase_approval",
+		RecordID:      store.record.ID,
+		Principal:     principal,
+	}); err != nil {
+		t.Fatalf("Start returned error: %v", err)
+	}
+
+	// One record's own screen asks for its runs: the filter must arrive at the store as
+	// that record, and the object filter alongside it stays untouched.
+	if _, err := runtime.List(context.Background(), ListInput{
+		ObjectKey: "purchase_request",
+		RecordID:  store.record.ID.String(),
+		Principal: principal,
+	}); err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if store.listFilter.RecordID == nil || *store.listFilter.RecordID != store.record.ID {
+		t.Fatalf("expected the record filter to reach the store, got %+v", store.listFilter.RecordID)
+	}
+
+	// No record filter means every record of the object.
+	if _, err := runtime.List(context.Background(), ListInput{Principal: principal}); err != nil {
+		t.Fatalf("List returned error: %v", err)
+	}
+	if store.listFilter.RecordID != nil {
+		t.Fatalf("expected no record filter, got %v", *store.listFilter.RecordID)
+	}
 }
 
 // fakeDefinitionObjects answers the lookup ProcessDefinitions performs.

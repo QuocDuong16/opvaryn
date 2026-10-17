@@ -183,11 +183,14 @@ type InboxItem struct {
 	Instance ProcessInstance
 }
 
-// ProcessInstanceFilter narrows a list of instances. Both fields are optional;
-// the caller passes one to ask for the instances of one object or one definition.
+// ProcessInstanceFilter narrows a list of instances. Every field is optional; the
+// caller passes one to ask for the instances of one object, one definition or one
+// record (which is what a record's own screen asks for).
 type ProcessInstanceFilter struct {
 	ObjectKey     string
 	DefinitionKey string
+	// RecordID is nil for "every record".
+	RecordID *uuid.UUID
 }
 
 // ProcessInstanceSummary is one instance as a list row: the instance itself plus

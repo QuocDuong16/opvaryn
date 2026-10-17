@@ -789,8 +789,8 @@ paths:
         Scoped exactly like the record each instance runs on (ADR 0008): an instance is
         listed only when its record is visible to the caller, and a caller who holds the
         role of an open task sees it through that task. Optional filters narrow the list
-        to one business object or one process definition; newest first, one page at a
-        time, with the total behind the page.
+        to one business object, one process definition or one record; newest first, one
+        page at a time, with the total behind the page.
       security:
         - sessionCookie: []
       parameters:
@@ -808,6 +808,17 @@ paths:
           schema:
             type: string
             example: purchase_approval
+        - name: recordId
+          in: query
+          required: false
+          description: |
+            Only the runs of this one record, which is what a record's own screen asks
+            for. The record is still subject to the visibility rule, so an invisible
+            record answers an empty list rather than confirming that it exists.
+          schema:
+            type: string
+            format: uuid
+            example: 6f1e0a5c-2f6a-4a1d-9c2b-2a0f1f2f3f40
         - name: limit
           in: query
           required: false

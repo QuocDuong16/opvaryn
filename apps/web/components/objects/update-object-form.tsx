@@ -26,10 +26,11 @@ export function UpdateObjectForm({ object }: { object: BusinessObject }) {
 
   return (
     <Card>
-      <CardTitle>Sửa schema — publish phiên bản v{object.version + 1}</CardTitle>
+      <CardTitle>Sửa định nghĩa — phát hành phiên bản v{object.version + 1}</CardTitle>
       <CardDescription>
-        Phiên bản đã publish là bất biến. Bản ghi cũ giữ nguyên schema cũ; bản ghi tạo sau khi
-        publish dùng schema này. Có thể thêm, đổi nhãn hoặc bỏ field mà không viết lại lịch sử.
+        Phiên bản đã phát hành là bất biến. Bản ghi cũ giữ nguyên định nghĩa cũ; bản ghi tạo sau khi
+        phát hành dùng định nghĩa này. Có thể thêm, đổi tên hoặc bỏ trường mà không viết lại lịch sử
+        dữ liệu.
       </CardDescription>
 
       <form

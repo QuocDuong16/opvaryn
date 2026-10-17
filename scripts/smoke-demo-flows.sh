@@ -312,21 +312,30 @@ status="$(web_get "/objects/$object_key" "$tmp_dir/detail.html")"
 assert_status "$status" "200" "object detail page"
 # React splits interpolated text into separate nodes, so page assertions use
 # literals only; version numbers are pinned through the API instead.
-assert_contains "$tmp_dir/detail.html" "Field schema — v" "object detail page"
+assert_contains "$tmp_dir/detail.html" "Các trường — phiên bản v" "object detail page"
 assert_contains "$tmp_dir/detail.html" "phiên bản đang dùng" "object detail page"
 for label in 'Nội dung' 'Số tiền' 'Hạn' 'Mức ưu tiên' 'Danh mục'; do
   assert_contains "$tmp_dir/detail.html" "$label" "object detail page (schema table)"
 done
-assert_contains "$tmp_dir/detail.html" 'name="title"' "object detail page"
-assert_contains "$tmp_dir/detail.html" 'name="priority"' "object detail page"
-assert_contains "$tmp_dir/detail.html" 'value="urgent"' "object detail page"
-assert_contains "$tmp_dir/detail.html" "Chưa có bản ghi nào" "empty records state"
+# The three parts of one data definition are tabs, and the open one lives in the URL.
+for part in 'Trường' 'Bản ghi' 'Quy trình'; do
+  assert_contains "$tmp_dir/detail.html" "$part" "the tab bar names the parts"
+done
+assert_contains "$tmp_dir/detail.html" 'aria-current="page"' "a tab is marked as the open one"
 
-mapfile -t record_args < <(form_args "$tmp_dir/detail.html" objectKey)
+status="$(web_get "/objects/$object_key?tab=records" "$tmp_dir/detail-records.html")"
+assert_status "$status" "200" "records tab"
+assert_contains "$tmp_dir/detail-records.html" 'name="title"' "records tab (entry form)"
+assert_contains "$tmp_dir/detail-records.html" 'name="priority"' "records tab (entry form)"
+assert_contains "$tmp_dir/detail-records.html" 'value="urgent"' "records tab (entry form)"
+assert_contains "$tmp_dir/detail-records.html" "Chưa có bản ghi nào" "empty records state"
+assert_contains "$tmp_dir/detail-records.html" "Nhập bản ghi" "the entry form is on the records tab"
+
+mapfile -t record_args < <(form_args "$tmp_dir/detail-records.html" objectKey)
 [[ ${#record_args[@]} -ge 4 ]] || fail "[A] the record form has no server-action fields"
 
 echo "flows: [A] submitting the form stores a validated record"
-status="$(web_post "/objects/$object_key" "$tmp_dir/record-created.html" \
+status="$(web_post "/objects/$object_key?tab=records" "$tmp_dir/record-created.html" \
   "${record_args[@]}" \
   --form-string 'title=  Kiểm thử luồng demo  ' \
   --form-string 'amount=1500000' \
@@ -358,21 +367,23 @@ for key, want in expected.items():
 print("flows: stored values verified (trimmed text, number, date, select, rows)")
 PY
 
-status="$(web_get "/objects/$object_key" "$tmp_dir/detail-after.html")"
-assert_status "$status" "200" "object detail page after the write"
+status="$(web_get "/objects/$object_key?tab=records" "$tmp_dir/detail-after.html")"
+assert_status "$status" "200" "records tab after the write"
 assert_contains "$tmp_dir/detail-after.html" "Kiểm thử luồng demo" "records table"
 assert_contains "$tmp_dir/detail-after.html" "Bản ghi đã lưu (" "records table"
+# The row is where a person asks what has run on that record.
+assert_contains "$tmp_dir/detail-after.html" "Xem các lần chạy" "a record row links to its runs"
 
 # ------------------------------------------- flow B: validation reaches the user ----
 
 echo "flows: [B] rejected input is reported and stores nothing"
-status="$(web_post "/objects/$object_key" "$tmp_dir/record-invalid.html" \
+status="$(web_post "/objects/$object_key?tab=records" "$tmp_dir/record-invalid.html" \
   "${record_args[@]}" --form-string 'title=Thiếu số tiền')"
 assert_status "$status" "200" "invalid record submission"
 assert_contains "$tmp_dir/record-invalid.html" 'role="alert"' "invalid record submission"
 assert_contains "$tmp_dir/record-invalid.html" "Dữ liệu chưa hợp lệ" "invalid record submission"
 
-status="$(web_post "/objects/$object_key" "$tmp_dir/record-tampered.html" \
+status="$(web_post "/objects/$object_key?tab=records" "$tmp_dir/record-tampered.html" \
   "${record_args[@]}" \
   --form-string 'title=Option không hợp lệ' \
   --form-string 'amount=1' \
@@ -623,6 +634,7 @@ status="$(web_get "/objects/$object_key" "$tmp_dir/detail-v1.html")"
 assert_status "$status" "200" "object detail page before the edit"
 assert_contains "$tmp_dir/detail-v1.html" "phiên bản đang dùng" "version badge before the edit"
 assert_contains "$tmp_dir/detail-v1.html" "Lịch sử phiên bản" "version history"
+assert_contains "$tmp_dir/detail-v1.html" "Sửa định nghĩa" "the schema editor is on the definition tab"
 
 curl -sS -b "$cookie_jar" -o "$tmp_dir/versions-before.json" "$api_base/api/v1/business-objects/$object_key/versions"
 python3 - "$tmp_dir/versions-before.json" <<'PY' || fail "[F] the object should start with exactly one published version"
@@ -667,8 +679,11 @@ status="$(web_get "/objects/$object_key" "$tmp_dir/detail-v2.html")"
 assert_status "$status" "200" "object detail page after the edit"
 assert_contains "$tmp_dir/detail-v2.html" "phiên bản đang dùng" "version badge after the edit"
 assert_contains "$tmp_dir/detail-v2.html" "Nội dung (v2)" "the new schema is rendered"
-assert_contains "$tmp_dir/detail-v2.html" "phiên bản cũ — bản ghi giữ nguyên schema" "old records keep their version"
-assert_contains "$tmp_dir/detail-v2.html" "Kiểm thử luồng demo" "the v1 record is still listed"
+
+status="$(web_get "/objects/$object_key?tab=records" "$tmp_dir/detail-v2-records.html")"
+assert_status "$status" "200" "records tab after the edit"
+assert_contains "$tmp_dir/detail-v2-records.html" "phiên bản cũ — bản ghi giữ nguyên schema" "old records keep their version"
+assert_contains "$tmp_dir/detail-v2-records.html" "Kiểm thử luồng demo" "the v1 record is still listed"
 
 # ------------------------------- flow G: the live inbox and its decisions ----
 
@@ -911,15 +926,15 @@ status="$(curl -sS -b "$cookie_jar" -o "$tmp_dir/other-flow.json" -w '%{http_cod
   "$api_base/api/v1/process-definitions" -H 'Content-Type: application/json' -d "$other_flow_body")"
 assert_status "$status" "201" "creating a definition for the other object"
 
-status="$(web_get "/objects/$object_key" "$tmp_dir/object-run.html")"
-assert_status "$status" "200" "object page with the run form"
+status="$(web_get "/objects/$object_key?tab=processes" "$tmp_dir/object-run.html")"
+assert_status "$status" "200" "processes tab with the run form"
 assert_contains "$tmp_dir/object-run.html" "Chạy quy trình" "the run form is offered"
 assert_contains "$tmp_dir/object-run.html" "$web_flow_key" "definitions of this object are offered"
 assert_not_contains "$tmp_dir/object-run.html" "$other_flow_key" "a definition of another object is not offered"
 
 mapfile -t start_args < <(form_args "$tmp_dir/object-run.html" definitionKey)
 [[ ${#start_args[@]} -ge 4 ]] || fail "[H] the run form has no server-action fields"
-status="$(web_post "/objects/$object_key" "$tmp_dir/instance-started.html" \
+status="$(web_post "/objects/$object_key?tab=processes" "$tmp_dir/instance-started.html" \
   "${start_args[@]}" \
   --form-string "definitionKey=$web_flow_key" \
   --form-string "recordId=$record_id")"
@@ -927,12 +942,65 @@ assert_status "$status" "200" "starting a run from the web"
 assert_contains "$tmp_dir/instance-started.html" "Đã chạy" "starting a run from the web"
 assert_contains "$tmp_dir/instance-started.html" "việc đầu tiên thuộc $approver_role" "the run names the first role"
 
-status="$(web_get "/objects/$object_key" "$tmp_dir/object-instances.html")"
-assert_status "$status" "200" "object page after the run"
-assert_contains "$tmp_dir/object-instances.html" "Quy trình trên các bản ghi này" "the instance section"
-assert_contains "$tmp_dir/object-instances.html" "Kiểm thử luồng demo" "the instance row names its record"
-assert_contains "$tmp_dir/object-instances.html" "phiên bản 1" "the instance is listed with its version"
+status="$(web_get "/objects/$object_key?tab=processes" "$tmp_dir/object-instances.html")"
+assert_status "$status" "200" "processes tab after the run"
+assert_contains "$tmp_dir/object-instances.html" "Quy trình trên các bản ghi này" "the run section"
+assert_contains "$tmp_dir/object-instances.html" "Kiểm thử luồng demo" "the run row names its record"
+assert_contains "$tmp_dir/object-instances.html" "phiên bản 1" "the run is listed with its version"
 assert_contains "$tmp_dir/object-instances.html" "Kiểm tra yêu cầu" "the list names the waiting task"
+
+echo "flows: [H] one record's own runs, filtered at the API and on the screen"
+# The filter is what makes "bản ghi này đã chạy quy trình nào" answerable, so it is checked
+# twice: the API narrows the list, and the screen a record row links to says so.
+# The record alone: this record runs two processes by now (flow G started one, this flow
+# started another), and every row must belong to it.
+curl -sS -b "$cookie_jar" -o "$tmp_dir/runs-of-record.json" \
+  "$api_base/api/v1/process-instances?recordId=$record_id"
+python3 - "$tmp_dir/runs-of-record.json" "$record_id" <<'PY' || fail "[H] the record filter must narrow the list"
+import json, sys
+
+body = json.load(open(sys.argv[1], encoding="utf-8"))
+record_id = sys.argv[2]
+if body["total"] < 2 or len(body["data"]) != body["total"]:
+    sys.exit(f"expected the runs of the record, got total={body['total']}")
+foreign = [row["instance"]["recordId"] for row in body["data"] if row["instance"]["recordId"] != record_id]
+if foreign:
+    sys.exit(f"the filter answered other records' runs: {foreign}")
+print(f"flows: the API narrows the run list to one record ({body['total']} runs)")
+PY
+
+# Both filters together: the record *and* the definition this flow published.
+curl -sS -b "$cookie_jar" -o "$tmp_dir/runs-of-record-flow.json" \
+  "$api_base/api/v1/process-instances?recordId=$record_id&definitionKey=$web_flow_key"
+python3 - "$tmp_dir/runs-of-record-flow.json" "$record_id" "$web_flow_key" <<'PY' || fail "[H] the two filters must compose"
+import json, sys
+
+body = json.load(open(sys.argv[1], encoding="utf-8"))
+record_id, definition_key = sys.argv[2], sys.argv[3]
+if body["total"] != 1 or len(body["data"]) != 1:
+    sys.exit(f"expected exactly one run of this process on this record, got total={body['total']}")
+row = body["data"][0]["instance"]
+if row["recordId"] != record_id or row["definitionKey"] != definition_key:
+    sys.exit(f"the filters answered {row['recordId']} / {row['definitionKey']}")
+print("flows: the record and definition filters compose")
+PY
+
+curl -sS -b "$cookie_jar" -o "$tmp_dir/runs-of-unknown-record.json" \
+  "$api_base/api/v1/process-instances?recordId=00000000-0000-4000-8000-000000000000"
+python3 - "$tmp_dir/runs-of-unknown-record.json" <<'PY' || fail "[H] a record with no runs must answer an empty list"
+import json, sys
+
+body = json.load(open(sys.argv[1], encoding="utf-8"))
+if body["total"] != 0 or body["data"]:
+    sys.exit(f"expected an empty list for a record with no runs, got {body}")
+print("flows: a record with no runs answers an empty list")
+PY
+
+status="$(web_get "/objects/$object_key?tab=processes&record=$record_id" "$tmp_dir/object-record-runs.html")"
+assert_status "$status" "200" "one record's runs"
+assert_contains "$tmp_dir/object-record-runs.html" "Quy trình đã chạy trên bản ghi này" "the filtered heading"
+assert_contains "$tmp_dir/object-record-runs.html" "Bỏ lọc, xem tất cả" "the filter can be dropped"
+assert_contains "$tmp_dir/object-record-runs.html" "Kiểm tra yêu cầu" "the filtered list names the waiting step"
 
 status="$(web_get "/workflows/$web_flow_key" "$tmp_dir/workflow-instances.html")"
 assert_status "$status" "200" "workflow detail after the run"

@@ -395,8 +395,10 @@ func (r *ProcessRuntime) Inbox(
 type ListInput struct {
 	ObjectKey     string
 	DefinitionKey string
-	Principal     domain.Principal
-	Page          domain.Page
+	// RecordID is the id of one record, or empty for every record of the object.
+	RecordID  string
+	Principal domain.Principal
+	Page      domain.Page
 }
 
 // List returns the instances the caller may see, newest first. Visibility is the
@@ -417,6 +419,16 @@ func (r *ProcessRuntime) List(
 	filter := domain.ProcessInstanceFilter{
 		ObjectKey:     strings.TrimSpace(in.ObjectKey),
 		DefinitionKey: strings.TrimSpace(in.DefinitionKey),
+	}
+	recordID := strings.TrimSpace(in.RecordID)
+	if recordID != "" {
+		parsed, parseErr := uuid.Parse(recordID)
+		if parseErr != nil {
+			return domain.Paged[domain.ProcessInstanceSummary]{}, &ValidationError{
+				Problems: []string{fmt.Sprintf("record_id: %q is not a record id", recordID)},
+			}
+		}
+		filter.RecordID = &parsed
 	}
 	filters := []struct {
 		label string

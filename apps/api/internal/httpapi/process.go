@@ -145,6 +145,7 @@ func handleListProcessInstances(runtime *service.ProcessRuntime, log *slog.Logge
 		summaries, err := runtime.List(r.Context(), service.ListInput{
 			ObjectKey:     r.URL.Query().Get("objectKey"),
 			DefinitionKey: r.URL.Query().Get("definitionKey"),
+			RecordID:      r.URL.Query().Get("recordId"),
 			Principal:     domain.NewPrincipal(user),
 			Page:          opts.Page,
 		})

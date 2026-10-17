@@ -145,7 +145,7 @@ export interface ApiClient {
   listWebhookDeliveries(limit?: number): Promise<WebhookDeliveryList>;
   getProcessInstance(instanceId: string): Promise<ProcessInstanceView>;
   listProcessInstances(
-    filter?: { objectKey?: string; definitionKey?: string },
+    filter?: { objectKey?: string; definitionKey?: string; recordId?: string },
     query?: PageQuery,
   ): Promise<Paged<ProcessInstanceSummary>>;
   startProcessInstance(input: StartProcessInstanceRequest): Promise<ProcessInstanceView>;
@@ -335,6 +335,9 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
       }
       if (filter.definitionKey) {
         params.set('definitionKey', filter.definitionKey);
+      }
+      if (filter.recordId) {
+        params.set('recordId', filter.recordId);
       }
       const suffix = params.size > 0 ? `?${params.toString()}` : '';
       return request<Paged<ProcessInstanceSummary>>(`/api/v1/process-instances${suffix}`);

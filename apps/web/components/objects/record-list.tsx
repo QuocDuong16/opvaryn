@@ -1,3 +1,4 @@
+import Link from 'next/link';
 import type { BusinessObjectVersion, ObjectRecord } from '@opvaryn/contracts';
 
 import { fieldsForVersion, groupRecordsByVersion } from '@/components/objects/record-grouping';
@@ -13,11 +14,17 @@ export function RecordList({
   versions,
   records,
   filtered = false,
+  runsHref,
 }: {
   versions: readonly BusinessObjectVersion[];
   records: ObjectRecord[];
   /** True when a search is narrowing the list, so the empty state can say so. */
   filtered?: boolean;
+  /**
+   * Where a row leads to see what has run on that record. A record's own screen has to
+   * answer "quy trình nào đã chạy trên bản ghi này", and the row is where a person asks.
+   */
+  runsHref?: (record: ObjectRecord) => string;
 }) {
   if (records.length === 0) {
     return (
@@ -78,6 +85,11 @@ export function RecordList({
                     <th scope="col" className="px-4 py-3 font-medium">
                       #
                     </th>
+                    {runsHref ? (
+                      <th scope="col" className="px-4 py-3 font-medium whitespace-nowrap">
+                        Quy trình
+                      </th>
+                    ) : null}
                     {fields.map((field) => (
                       <th
                         key={field.key}
@@ -98,6 +110,16 @@ export function RecordList({
                       <td className="px-4 py-3 font-mono text-xs text-on-surface-muted">
                         {group.records.length - index}
                       </td>
+                      {runsHref ? (
+                        <td className="px-4 py-3 text-xs whitespace-nowrap">
+                          <Link
+                            href={runsHref(record)}
+                            className="text-accent-strong hover:underline"
+                          >
+                            Xem các lần chạy →
+                          </Link>
+                        </td>
+                      ) : null}
                       {fields.map((field) => (
                         <td key={field.key} className="px-4 py-3 align-top">
                           {formatFieldValue(field, record.values[field.key])}

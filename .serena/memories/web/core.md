@@ -39,10 +39,18 @@
   that could not read the API carries no badge at all — an error is not simulated behaviour.
 - `/objects` **live**: definition list (`object-list.tsx`, rows link to the detail page) and the
   create form with the schema editor.
-- `/objects/[key]` **live**: version badge, field schema table, version history table, records
-  grouped by definition version and the generated entry form, plus `UpdateObjectForm` which
-  publishes the next version (schema editor prefilled with the current fields). `params` is a
-  Promise; a missing key calls `notFound()` (custom `not-found.tsx` in that segment).
+- `/objects/[key]` **live**: one data definition in **three tabs** (ADR 0020) — Trường (fields of
+  the version in use, version history, `UpdateObjectForm` which publishes the next version from a
+  schema editor prefilled with the current fields), Bản ghi (records grouped by definition version
+  + the generated entry form), Quy trình (`StartInstanceForm` + `InstanceList`). The open tab is
+  `?tab=` in the URL and `components/objects/object-tabs.ts` (pure, tested) resolves it, falling
+  back to `fields` for anything unknown; `components/ui/tabs.tsx` is the shared tab bar and each
+  tab loads only what it shows (the counts on the bar come from two `limit: 1` reads). Each record
+  row carries **Xem các lần chạy →** (`RecordList`'s `runsHref`, the column sits right after `#`
+  because a wide schema scrolls sideways) to `?tab=processes&record=<id>`, where the run list is
+  filtered by that record, names it when it is among the loaded records, and offers "Bỏ lọc, xem
+  tất cả"; the run form preselects it. `params` is a Promise; a missing key calls `notFound()`
+  (custom `not-found.tsx` in that segment).
 - `/forms` **live** + concept list: object picker via `?object=key` (defaults to the first
   object), the same entry form as a preview, schema table, and the not-yet-built capabilities.
 - `/workflows/[key]` is a **drag-and-drop canvas editor** over a browser-local draft (ADR 0013):
@@ -190,7 +198,9 @@
   then `@theme inline` mapping them to Tailwind color utilities. Dark is the default. Add tokens
   there; never hard-code hex in components.
 - **Pagination rule** (ADR 0017): list endpoints take `limit`/`offset` (+ `q`) and answer
-  `{data, total}`; the API slices, never the browser. `components/ui/list-controls.tsx` holds
+  `{data, total}`; the API slices, never the browser. The instance list also takes `recordId`
+  alongside `objectKey`/`definitionKey` (ADR 0020), and the filters compose — that is what answers
+  "bản ghi này đã chạy quy trình nào" without a client-side filter over a sample. `components/ui/list-controls.tsx` holds
   `ListSearch` (a GET form, so the term lives in the URL), `Pagination` (`offsetParam` when a
   screen paginates two lists, e.g. records `offset` vs instances `ioffset`) and `pageOffset`.
   Screens that need a sample ask for one (`{limit: RECENT_LIMIT}` in the dashboard, `RECORDS_PER_APP`

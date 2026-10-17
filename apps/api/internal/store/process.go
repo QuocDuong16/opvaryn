@@ -495,8 +495,10 @@ func (s *Store) ListVisibleProcessInstances(
 		   JOIN process_definitions d ON d.id = i.definition_id
 		  WHERE `+recordVisibleToScope+`
 		    AND ($1::text = '' OR i.object_key = $1)
-		    AND ($5::text = '' OR d.key = $5)`,
-		filter.ObjectKey, scope.All, scope.DepartmentKey, scope.UserID, filter.DefinitionKey).Scan(&total); err != nil {
+		    AND ($5::text = '' OR d.key = $5)
+		    AND ($6::uuid IS NULL OR i.record_id = $6)`,
+		filter.ObjectKey, scope.All, scope.DepartmentKey, scope.UserID, filter.DefinitionKey,
+		filter.RecordID).Scan(&total); err != nil {
 		return domain.Paged[domain.ProcessInstanceSummary]{}, classify(fmt.Errorf("count process instances: %w", err))
 	}
 
@@ -505,10 +507,11 @@ func (s *Store) ListVisibleProcessInstances(
 		 WHERE `+recordVisibleToScope+`
 		   AND ($1::text = '' OR i.object_key = $1)
 		   AND ($5::text = '' OR d.key = $5)
+		   AND ($8::uuid IS NULL OR i.record_id = $8)
 		 ORDER BY i.started_at DESC, i.id
 		 LIMIT $6 OFFSET $7`,
 		filter.ObjectKey, scope.All, scope.DepartmentKey, scope.UserID, filter.DefinitionKey,
-		page.Limit, page.Offset)
+		page.Limit, page.Offset, filter.RecordID)
 	if err != nil {
 		return domain.Paged[domain.ProcessInstanceSummary]{}, classify(fmt.Errorf("query process instances: %w", err))
 	}

@@ -1042,6 +1042,11 @@ type ListProcessInstancesParams struct {
 	// DefinitionKey Only instances of this process definition.
 	DefinitionKey *string `form:"definitionKey,omitempty" json:"definitionKey,omitempty"`
 
+	// RecordId Only the runs of this one record, which is what a record's own screen asks
+	// for. The record is still subject to the visibility rule, so an invisible
+	// record answers an empty list rather than confirming that it exists.
+	RecordId *openapi_types.UUID `form:"recordId,omitempty" json:"recordId,omitempty"`
+
 	// Limit Rows per page (default 25, maximum 100).
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 

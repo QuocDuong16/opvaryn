@@ -22,11 +22,14 @@ export function StartInstanceForm({
   definitions,
   records,
   fields,
+  recordId,
 }: {
   definitions: readonly { key: string; name: string }[];
   records: readonly ObjectRecord[];
   /** The definition fields used to label a record in the picker. */
   fields: Parameters<typeof primaryFieldValue>[0];
+  /** The record to preselect: the screen arrived from that record's own row. */
+  recordId?: string;
 }) {
   const [state, formAction] = useActionState(
     startProcessInstanceAction,
@@ -67,7 +70,14 @@ export function StartInstanceForm({
           <label htmlFor="start-record" className="text-xs font-medium tracking-wide uppercase">
             Bản ghi
           </label>
-          <select id="start-record" name="recordId" className={SELECT_CLASS}>
+          <select
+            id="start-record"
+            name="recordId"
+            defaultValue={
+              recordId && records.some((record) => record.id === recordId) ? recordId : undefined
+            }
+            className={SELECT_CLASS}
+          >
             {records.map((record) => (
               <option key={record.id} value={record.id}>
                 {primaryFieldValue(fields, record)}
