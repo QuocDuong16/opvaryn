@@ -8,8 +8,8 @@ export default function ProcessDefinitionNotFound() {
       </p>
       <h1 className="mt-3 text-xl font-semibold tracking-tight">Quy trình không tồn tại</h1>
       <p className="mx-auto mt-2 max-w-md text-sm text-on-surface-muted">
-        Key có thể bị gõ sai hoặc định nghĩa chưa được publish trong môi trường này. Danh sách quy
-        trình hiện có nằm ở trang Workflows.
+        Có thể địa chỉ bị gõ sai, hoặc quy trình này chưa được phát hành trong môi trường hiện tại.
+        Danh sách quy trình hiện có nằm ở trang Workflows.
       </p>
       <Link
         href="/workflows"

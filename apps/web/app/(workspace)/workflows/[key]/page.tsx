@@ -358,8 +358,8 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
               <CardDescription>
                 Sơ đồ ở trên sửa một <strong>bản nháp</strong>: kéo bước, nối các bước, thêm hoặc
                 xoá bước — tất cả chỉ nằm trong trình duyệt này. Chỉ khi bấm
-                <strong> Publish phiên bản mới</strong> quy trình mới được kiểm tra và lưu thành
-                phiên bản mới; phiên bản đã publish không đổi, và quy trình đang chạy giữ nguyên
+                <strong> Phát hành phiên bản mới</strong> quy trình mới được kiểm tra và lưu thành
+                phiên bản mới; phiên bản đã phát hành không đổi, và quy trình đang chạy giữ nguyên
                 phiên bản của nó.
               </CardDescription>
               <ul className="mt-4 space-y-2 text-xs text-on-surface-muted">

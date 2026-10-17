@@ -57,7 +57,7 @@ export function RecordList({
                 <>
                   <span className="font-mono">v{group.version.version}</span>
                   <span>
-                    publish {formatTimestamp(group.version.publishedAt)} bởi{' '}
+                    phát hành {formatTimestamp(group.version.publishedAt)} bởi{' '}
                     {group.version.publishedBy}
                   </span>
                   {isLatest ? (

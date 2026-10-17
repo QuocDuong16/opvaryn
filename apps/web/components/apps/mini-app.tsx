@@ -362,8 +362,12 @@ function ConfigView({ app, statusFieldKey }: { app: MiniAppData; statusFieldKey?
   const listColumns = app.object.fields.filter((field) => field.type !== 'file').slice(0, 3);
 
   const views: readonly { name: string; enabled: boolean; note: string }[] = [
-    { name: 'List', enabled: true, note: 'Cột lấy từ định nghĩa dữ liệu, xem panel bên dưới.' },
-    { name: 'Detail', enabled: true, note: 'Hiển thị mọi trường của bản ghi kèm mô tả.' },
+    {
+      name: 'Danh sách',
+      enabled: true,
+      note: 'Cột lấy từ định nghĩa dữ liệu, xem panel bên dưới.',
+    },
+    { name: 'Chi tiết', enabled: true, note: 'Hiển thị mọi trường của bản ghi kèm mô tả.' },
     {
       name: 'Form',
       enabled: app.object.fields.length > 0,

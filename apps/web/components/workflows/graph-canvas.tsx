@@ -112,11 +112,18 @@ export function GraphCanvas({
 
   function startDrag(event: PointerEvent, node: DraftNode) {
     event.stopPropagation();
-    event.currentTarget.setPointerCapture(event.pointerId);
-    const point = toCanvas(event);
+    // Selecting the step comes first and must not depend on the pointer: capturing can fail
+    // (a synthetic or already-released pointer), and a step that cannot be selected is a step
+    // that cannot be edited. Dragging is the extra, not the point.
     setSelectedKey(node.key);
-    setDragging({ key: node.key, dx: point.x - node.x, dy: point.y - node.y });
     setLinkingFrom(null);
+    try {
+      event.currentTarget.setPointerCapture(event.pointerId);
+    } catch {
+      // Without the capture the step still selects; it just will not follow the pointer.
+    }
+    const point = toCanvas(event);
+    setDragging({ key: node.key, dx: point.x - node.x, dy: point.y - node.y });
   }
 
   function continueDrag(event: PointerEvent) {
@@ -162,6 +169,14 @@ export function GraphCanvas({
       case 'ArrowDown':
         event.preventDefault();
         onDraftChange((current) => nudgeNode(current, node.key, 0, DRAFT_NUDGE));
+        break;
+      // A step is a button to assistive technology, so it must be operable as one: Enter or
+      // space selects it, and the inspector beside the canvas is then reachable.
+      case 'Enter':
+      case ' ':
+        event.preventDefault();
+        setSelectedKey(node.key);
+        setLinkingFrom(null);
         break;
       case 'Delete':
       case 'Backspace':
@@ -341,6 +356,11 @@ export function GraphCanvas({
                       aria-label={stepLabel(node)}
                       onPointerDown={(event) => startDrag(event, node)}
                       onPointerUp={(event) => finishLink(event, node.key)}
+                      // The click must not reach the canvas behind: clicking a step selects it,
+                      // and only a click on empty space clears the selection. Without this the
+                      // selection was made on pointer-down and cleared again on click, so the
+                      // inspector never showed the step a person had just clicked.
+                      onClick={(event) => event.stopPropagation()}
                       onKeyDown={(event) => handleKeyDown(event, node)}
                       className={cn('cursor-grab', dragging?.key === node.key && 'cursor-grabbing')}
                     >
