@@ -4,13 +4,14 @@ import { ApiError, type BusinessObject, type ProcessDefinition } from '@opvaryn/
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { ListSearch, Pagination, pageOffset } from '@/components/ui/list-controls';
 import { PageHeader } from '@/components/ui/page-header';
+import { DesignerNotice } from '@/components/ui/role-notice';
 import { StatusBadge } from '@/components/ui/status-badge';
-import { isAdmin } from '@/lib/access';
+import { canDesign, isAdmin } from '@/lib/access';
 import { advancedVisible } from '@/lib/advanced';
 import { getAdvancedMode } from '@/lib/advanced-server';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatTimestamp } from '@/lib/format';
-import { labelOrKey } from '@/lib/names';
+import { designerRoleName, labelOrKey } from '@/lib/names';
 
 export const metadata = { title: 'Quy trình' };
 
@@ -75,17 +76,23 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
   let definitions: ProcessDefinition[] = [];
   let definitionTotal = 0;
   let objects: BusinessObject[] = [];
+  let mayDesign = false;
+  let roleName = 'vai trò thiết kế quy trình';
   let error: string | null = null;
   let needsSignIn = false;
 
   try {
-    const [definitionPage, objectPage] = await Promise.all([
+    const [definitionPage, objectPage, me, catalogue] = await Promise.all([
       api.listProcessDefinitions({ q: query || undefined, limit: PER_PAGE, offset }),
       api.listBusinessObjects({ limit: 100 }),
+      api.getMe(),
+      api.listRoles().catch(() => []),
     ]);
     definitions = definitionPage.data;
     definitionTotal = definitionPage.total;
     objects = objectPage.data;
+    mayDesign = canDesign(me.roles);
+    roleName = designerRoleName(catalogue);
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'unauthorized') {
       needsSignIn = true;
@@ -104,7 +111,11 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
       <PageHeader
         eyebrow="04 / Quy trình"
         title="Quy trình"
-        lead="Thiết kế quy trình phê duyệt: vẽ các bước, giao việc theo vai trò và đặt điều kiện rẽ nhánh. Sửa một định nghĩa là phát hành phiên bản mới; quy trình đang chạy vẫn giữ phiên bản cũ."
+        lead={
+          mayDesign
+            ? 'Thiết kế quy trình phê duyệt: vẽ các bước, giao việc theo vai trò và đặt điều kiện rẽ nhánh. Sửa một định nghĩa là phát hành phiên bản mới; quy trình đang chạy vẫn giữ phiên bản cũ.'
+            : 'Các quy trình đang dùng: ai duyệt gì, theo thứ tự nào. Mở một quy trình để xem sơ đồ, các lần chạy và việc đang chờ ai.'
+        }
       />
 
       {needsSignIn ? (
@@ -147,12 +158,14 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
               placeholder="Tìm theo tên quy trình"
               label="Tìm quy trình"
             />
-            <Link
-              href="/workflows/new"
-              className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:opacity-90"
-            >
-              Tạo quy trình mới
-            </Link>
+            {mayDesign ? (
+              <Link
+                href="/workflows/new"
+                className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:opacity-90"
+              >
+                Tạo quy trình mới
+              </Link>
+            ) : null}
           </div>
         </div>
 
@@ -164,7 +177,9 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
             <p className="mx-auto mt-1 max-w-lg text-sm text-on-surface-muted">
               {query
                 ? 'Thử từ khoá khác, hoặc xoá lọc để xem tất cả.'
-                : 'Bắt đầu bằng một quy trình mới, hoặc chạy bộ dữ liệu mẫu để xem ba quy trình pilot có sẵn.'}
+                : mayDesign
+                  ? 'Bắt đầu bằng một quy trình mới, hoặc chạy bộ dữ liệu mẫu để xem ba quy trình pilot có sẵn.'
+                  : 'Chưa có quy trình nào được phát hành. Việc tạo quy trình thuộc về người thiết kế quy trình.'}
             </p>
           </div>
         ) : null}
@@ -271,6 +286,12 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
             </table>
           </div>
         </section>
+      ) : null}
+
+      {!mayDesign ? (
+        <div className="mb-8">
+          <DesignerNotice roleName={roleName} what="tạo quy trình" />
+        </div>
       ) : null}
 
       {showAdvanced ? (

@@ -18,9 +18,12 @@ import {
 } from '@/components/analytics/process-metrics';
 import { fieldNames, labelOrKey } from '@/lib/names';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
+import { DesignerNotice } from '@/components/ui/role-notice';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { canDesign } from '@/lib/access';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
+import { designerRoleName } from '@/lib/names';
 import { getDashboardWidgets } from '@/lib/dashboard';
 
 export const metadata = { title: 'Báo cáo' };
@@ -64,18 +67,24 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
   let metrics: MetricDefinition[] = [];
   let objects: BusinessObject[] = [];
   let definitions: ProcessDefinition[] = [];
+  let mayDesign = false;
+  let roleName = 'vai trò thiết kế quy trình';
   let error: string | null = null;
   let needsSignIn = false;
 
   try {
-    const [metricList, objectList, definitionList] = await Promise.all([
+    const [metricList, objectList, definitionList, me, catalogue] = await Promise.all([
       api.listMetrics(),
       api.listBusinessObjects({ limit: 100 }),
       api.listProcessDefinitions({ limit: 100 }),
+      api.getMe(),
+      api.listRoles().catch(() => []),
     ]);
     metrics = metricList;
     objects = objectList.data;
     definitions = definitionList.data;
+    mayDesign = canDesign(me.roles);
+    roleName = designerRoleName(catalogue);
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'unauthorized') {
       needsSignIn = true;
@@ -180,15 +189,19 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
 
           <section className="mb-8">
             <h2 className="mb-3 text-lg font-semibold tracking-tight">Tạo chỉ số</h2>
-            <Card>
-              <CardDescription>
-                Chọn loại dữ liệu, cách tính và bộ lọc; con số chạy trên đúng những bản ghi bạn được
-                đọc. Sửa metric cần quyền thiết kế quy trình.
-              </CardDescription>
-              <div className="mt-5">
-                <CreateMetricForm objects={objects} />
-              </div>
-            </Card>
+            {mayDesign ? (
+              <Card>
+                <CardDescription>
+                  Chọn loại dữ liệu, cách tính và bộ lọc; con số chạy trên đúng những bản ghi bạn
+                  được đọc.
+                </CardDescription>
+                <div className="mt-5">
+                  <CreateMetricForm objects={objects} />
+                </div>
+              </Card>
+            ) : (
+              <DesignerNotice roleName={roleName} what="tạo chỉ số báo cáo" />
+            )}
           </section>
 
           <section className="mb-8">

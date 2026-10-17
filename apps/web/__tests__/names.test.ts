@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  designerRoleName,
   fieldNames,
   joinLabels,
   keyFromLabel,
@@ -58,6 +59,21 @@ describe('fieldNames', () => {
 
     expect(names.get('estimated_amount')).toBe('Giá trị dự kiến (VND)');
     expect(labelOrKey(names.get('nope'), 'nope')).toBe('nope');
+  });
+});
+
+describe('designerRoleName', () => {
+  it('uses the name the catalogue has for the role', () => {
+    expect(designerRoleName([{ key: 'process_designer', label: 'Người thiết kế quy trình' }])).toBe(
+      'Người thiết kế quy trình',
+    );
+  });
+
+  it('reads as prose, never as a key, when nobody has named the role', () => {
+    expect(designerRoleName([])).toBe('vai trò thiết kế quy trình');
+    expect(designerRoleName([{ key: 'process_designer', label: '' }])).toBe(
+      'vai trò thiết kế quy trình',
+    );
   });
 });
 

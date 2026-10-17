@@ -20,10 +20,12 @@ import { UpdateObjectForm } from '@/components/objects/update-object-form';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { ListSearch, Pagination, pageOffset } from '@/components/ui/list-controls';
 import { PageHeader } from '@/components/ui/page-header';
+import { DesignerNotice } from '@/components/ui/role-notice';
 import { Tabs } from '@/components/ui/tabs';
+import { canDesign } from '@/lib/access';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatTimestamp } from '@/lib/format';
-import { roleLabels } from '@/lib/names';
+import { designerRoleName, roleLabels } from '@/lib/names';
 
 interface PageProps {
   params: Promise<{ key: string }>;
@@ -73,6 +75,8 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
   let object: BusinessObject | null = null;
   let versions: BusinessObjectVersion[] = [];
   let namedRoles: Map<string, string> = new Map();
+  let mayDesign = false;
+  let roleName = 'vai trò thiết kế quy trình';
   let error: string | null = null;
 
   // What each tab needs, and nothing else: the tab bar's counts come from two one-row
@@ -88,16 +92,19 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
 
   try {
     object = await api.getBusinessObject(key);
-    const [versionList, roles, recordCountPage, instanceCountPage] = await Promise.all([
+    const [versionList, roles, me, recordCountPage, instanceCountPage] = await Promise.all([
       api.listBusinessObjectVersions(key),
       // The role names are a nicety: a role nobody has named still reads as its key, so a
       // failed read must not take the screen down with it.
       api.listRoles().catch(() => []),
+      api.getMe().catch(() => null),
       api.listObjectRecords(key, { limit: 1 }),
       api.listProcessInstances({ objectKey: key }, { limit: 1 }),
     ]);
     versions = versionList;
     namedRoles = roleLabels(roles);
+    mayDesign = canDesign(me?.roles);
+    roleName = designerRoleName(roles);
     recordCount = recordCountPage.total;
     instanceCount = instanceCountPage.total;
 
@@ -289,7 +296,11 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
           </div>
 
           <aside className="space-y-6 lg:sticky lg:top-20 lg:self-start">
-            <UpdateObjectForm object={object} />
+            {mayDesign ? (
+              <UpdateObjectForm object={object} />
+            ) : (
+              <DesignerNotice roleName={roleName} what="sửa định nghĩa dữ liệu" />
+            )}
           </aside>
         </div>
       ) : null}

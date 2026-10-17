@@ -186,9 +186,11 @@ make useradm ARGS="-list"
 
 Hai điều cần biết khi trình diễn phần này:
 
-- **Màn hình tạo/publish định nghĩa cần role `process_designer`** (hoặc `admin`). Tài khoản
-  `lan@opvaryn.local` đã có sẵn role đó; nếu bạn tự tạo tài khoản khác thì gán thêm bằng
-  `make useradm ARGS="-add-role -email <email> -roles process_designer"`.
+- **Tạo và sửa định nghĩa, quy trình, chỉ số cần role `process_designer`** (hoặc `admin`). Tài
+  khoản `lan@opvaryn.local` đã có sẵn role đó; nếu bạn tự tạo tài khoản khác thì gán thêm bằng
+  `make useradm ARGS="-add-role -email <email> -roles process_designer"`. Người **không** giữ vai
+  trò đó không thấy các nút tạo/sửa (kể cả trình soạn quy trình — họ chỉ đọc sơ đồ), và mỗi màn
+  nói rõ việc đó cần vai trò gì; API vẫn là nơi từ chối thật (ADR 0021).
 - **Bản ghi được lọc theo bộ phận**: đăng nhập `lan@opvaryn.local` (Kỹ thuật) sẽ thấy đề nghị của
   Kỹ thuật, `bao@opvaryn.local` (Kế toán) thấy 0, còn `seed@opvaryn.local` (admin) thấy tất cả. Đó
   là D09b chạy thật, không phải ẩn trên giao diện. Muốn nạp dữ liệu mẫu đúng bộ phận: `make seed-demo`.

@@ -5,7 +5,10 @@ import { ObjectList } from '@/components/objects/object-list';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { ListSearch, Pagination, pageOffset } from '@/components/ui/list-controls';
 import { PageHeader } from '@/components/ui/page-header';
+import { DesignerNotice } from '@/components/ui/role-notice';
+import { canDesign } from '@/lib/access';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
+import { designerRoleName } from '@/lib/names';
 
 export const metadata = { title: 'Dữ liệu' };
 
@@ -23,16 +26,21 @@ export default async function ObjectsPage({ searchParams }: PageProps) {
 
   let objects: BusinessObject[] = [];
   let total = 0;
+  let mayDesign = false;
+  let roleName = 'vai trò thiết kế quy trình';
   let error: string | null = null;
 
+  const api = createServerApiClient();
   try {
-    const page = await createServerApiClient().listBusinessObjects({
-      q: query || undefined,
-      limit: PER_PAGE,
-      offset,
-    });
+    const [page, me, roles] = await Promise.all([
+      api.listBusinessObjects({ q: query || undefined, limit: PER_PAGE, offset }),
+      api.getMe(),
+      api.listRoles().catch(() => []),
+    ]);
     objects = page.data;
     total = page.total;
+    mayDesign = canDesign(me.roles);
+    roleName = designerRoleName(roles);
   } catch (cause) {
     error = describeApiError(cause);
   }
@@ -78,14 +86,18 @@ export default async function ObjectsPage({ searchParams }: PageProps) {
         />
       </section>
 
-      <details className="rounded-xl border border-border bg-surface-raised/40 px-5 py-4">
-        <summary className="cursor-pointer text-sm font-semibold tracking-tight">
-          Tạo định nghĩa dữ liệu mới
-        </summary>
-        <div className="mt-4 max-w-2xl">
-          <CreateObjectForm />
-        </div>
-      </details>
+      {mayDesign ? (
+        <details className="rounded-xl border border-border bg-surface-raised/40 px-5 py-4">
+          <summary className="cursor-pointer text-sm font-semibold tracking-tight">
+            Tạo định nghĩa dữ liệu mới
+          </summary>
+          <div className="mt-4 max-w-2xl">
+            <CreateObjectForm />
+          </div>
+        </details>
+      ) : (
+        <DesignerNotice roleName={roleName} what="tạo và sửa định nghĩa dữ liệu" />
+      )}
     </>
   );
 }

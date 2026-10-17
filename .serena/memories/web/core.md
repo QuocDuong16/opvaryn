@@ -223,6 +223,15 @@
   label as option text, the value stays the key). Role labels are data: table `role_labels`
   (migration 0009), set with `useradm -set-role-label` by an administrator, seeded by
   `scripts/seed-demo.sh`.
+- **Permission rule** (ADR 0021): the interface never renders a control the person has no
+  permission for. `canDesign(roles)` (`lib/access.ts`: `process_designer` or `admin`, the same rule
+  as the service's `requireDesigner`) decides the definition/process/metric controls, and the empty
+  place is `components/ui/role-notice.tsx` (`DesignerNotice`, with the role named by
+  `designerRoleName(catalogue)` from `role_labels`, prose when nobody named it). Gated today:
+  `/objects` (create form), `/objects/<key>` (schema editor), `/workflows` (create button),
+  `/workflows/<key>` (the canvas renders read-only `ProcessCanvas` for a non-designer instead of
+  `WorkflowEditor`), `/analytics` (metric form). Screens are still *not* hidden by role — everyone
+  reads definitions, processes, records and metrics; only the admin's build/ops screens differ.
 - **Audience rule** (ADR 0015): the workspace is built for the person using it. Everyone signed in
   sees the product screens (nav labels are Vietnamese: Dữ liệu, Nhập liệu, Quy trình, Việc của tôi,
   Báo cáo, Ứng dụng); `/settings` (Vận hành) and `/roadmap` (Lộ trình) are `audience: 'admin'` and

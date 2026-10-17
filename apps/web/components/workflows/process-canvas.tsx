@@ -230,43 +230,53 @@ export function ProcessCanvas({
             ) : null}
             <div>
               <dt className="text-[11px] tracking-wide text-on-surface-muted uppercase">
-                Đường chuyển tiếp
+                Đi tiếp tới
               </dt>
               <dd className="mt-1 space-y-1">
-                {outgoingEdges(graph, selected.node.key).map(({ edge, label: branch }) => (
-                  <p key={`${edge.from}-${edge.to}-${branch}`} className="text-sm">
-                    <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-on-surface-muted">
-                      {branch}
-                    </span>
-                    <span className="ml-2 font-mono text-xs">{edge.to}</span>
-                  </p>
-                ))}
+                {outgoingEdges(graph, selected.node.key).map(({ edge, label: branch }) => {
+                  const target = graph.nodes.find((node) => node.key === edge.to);
+                  return (
+                    <p key={`${edge.from}-${edge.to}-${branch}`} className="text-sm">
+                      <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-on-surface-muted">
+                        {branch === 'luôn' ? 'luôn' : branch === 'true' ? 'khi đúng' : 'khi sai'}
+                      </span>
+                      <span className="ml-2">
+                        {target ? target.title : edge.to}
+                        <span className="text-on-surface-muted">
+                          {` · ${target ? NODE_TYPE_LABELS[target.type] : ''}`}
+                        </span>
+                      </span>
+                    </p>
+                  );
+                })}
                 {outgoingEdges(graph, selected.node.key).length === 0 ? (
-                  <span className="text-sm text-on-surface-muted">Không có (node kết thúc)</span>
+                  <span className="text-sm text-on-surface-muted">
+                    Không nối đi đâu (bước kết thúc)
+                  </span>
                 ) : null}
               </dd>
             </div>
           </dl>
 
           <div className="mt-5 border-t border-border pt-4">
-            <p className="font-mono text-[11px] tracking-widest text-on-surface-muted uppercase">
+            <p className="text-[11px] tracking-widest text-on-surface-muted uppercase">
               Phiên bản đang xem
             </p>
             <dl className="mt-2 space-y-2 text-sm">
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-on-surface-muted">Definition</dt>
-                <dd className="font-mono text-xs">{label}</dd>
+                <dt className="text-on-surface-muted">Quy trình</dt>
+                <dd className="text-right">{label}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-on-surface-muted">Version</dt>
-                <dd className="font-mono text-xs">v{version}</dd>
+                <dt className="text-on-surface-muted">Phiên bản</dt>
+                <dd>{`v${version}`}</dd>
               </div>
             </dl>
           </div>
 
           <p className="mt-5 rounded-lg border border-dashed border-border-strong px-3 py-2 text-xs leading-relaxed text-on-surface-muted">
-            Chỉ xem: version đã publish là bất biến. Sửa graph bằng biểu mẫu publish version mới ở
-            cột bên phải; instance đang chạy giữ version của nó.
+            Sơ đồ này chỉ để xem: phiên bản đã phát hành là bất biến, và các lần chạy đang xử lý vẫn
+            giữ phiên bản của chúng.
           </p>
         </div>
       </aside>

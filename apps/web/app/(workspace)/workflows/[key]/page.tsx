@@ -17,10 +17,12 @@ import { draftFromGraph } from '@/components/workflows/definition-draft-model';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { Pagination, pageOffset } from '@/components/ui/list-controls';
 import { PageHeader } from '@/components/ui/page-header';
+import { DesignerNotice } from '@/components/ui/role-notice';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { canDesign } from '@/lib/access';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatTimestamp } from '@/lib/format';
-import { labelOrKey, roleLabels } from '@/lib/names';
+import { designerRoleName, labelOrKey, roleLabels } from '@/lib/names';
 import { getWorkflowDraft } from '@/lib/workflow-draft';
 import { cn } from '@/lib/utils';
 
@@ -51,11 +53,13 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
   let objectName = '';
   let objectFields: FieldDefinition[] = [];
   let labels: Record<string, string> = {};
+  let mayDesign = false;
+  let roleName = 'vai trò thiết kế quy trình';
   let error: string | null = null;
 
   try {
     definition = await api.getProcessDefinition(key);
-    const [versionList, instancePage, roles, object] = await Promise.all([
+    const [versionList, instancePage, roles, object, me] = await Promise.all([
       api.listProcessDefinitionVersions(key),
       api.listProcessInstances(
         { definitionKey: key },
@@ -63,7 +67,10 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
       ),
       api.listRoles(),
       api.getBusinessObject(definition.objectKey).catch(() => null),
+      api.getMe().catch(() => null),
     ]);
+    mayDesign = canDesign(me?.roles);
+    roleName = designerRoleName(roles);
     objectName = object?.name || definition.objectKey;
     // `rows` fields cannot be used in a condition (the service rejects them), so the
     // condition step is not offered them either.
@@ -216,7 +223,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
 
       {shown ? (
         <div className="mb-8">
-          {isNewest ? (
+          {isNewest && mayDesign ? (
             <>
               <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
@@ -244,9 +251,15 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
                 label={`${definition.name} v${shown.version}`}
                 roleLabels={roleNames}
               />
-              <p className="mt-3 rounded-lg border border-warning/40 px-3 py-2 text-sm text-warning">
-                {`Đang xem v${shown.version} — bản đang dùng là v${definition.version}. Các lần chạy cũ vẫn theo phiên bản này, nên bản cũ chỉ để xem: chọn v${definition.version} ở dải phiên bản để sửa.`}
-              </p>
+              {isNewest ? (
+                <div className="mt-3">
+                  <DesignerNotice roleName={roleName} what="thiết kế quy trình" />
+                </div>
+              ) : (
+                <p className="mt-3 rounded-lg border border-warning/40 px-3 py-2 text-sm text-warning">
+                  {`Đang xem v${shown.version} — bản đang dùng là v${definition.version}. Các lần chạy cũ vẫn theo phiên bản này, nên bản cũ chỉ để xem: chọn v${definition.version} ở dải phiên bản để sửa.`}
+                </p>
+              )}
             </>
           )}
         </div>
@@ -339,21 +352,30 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
         </div>
 
         <aside className="min-w-0">
-          <Card>
-            <CardTitle>Cách bản nháp hoạt động</CardTitle>
-            <CardDescription>
-              Sơ đồ ở trên sửa một <strong>bản nháp</strong>: kéo bước, nối các bước, thêm hoặc xoá
-              bước — tất cả chỉ nằm trong trình duyệt này. Chỉ khi bấm
-              <strong> Publish phiên bản mới</strong> quy trình mới được kiểm tra và lưu thành phiên
-              bản mới; phiên bản đã publish không đổi, và quy trình đang chạy giữ nguyên phiên bản
-              của nó.
-            </CardDescription>
-            <ul className="mt-4 space-y-2 text-xs text-on-surface-muted">
-              <li>Lưu nháp giữ bản đang sửa cho lần mở sau, chỉ trong trình duyệt này.</li>
-              <li>Bỏ nháp đưa sơ đồ về đúng bản đã phát hành.</li>
-              <li>Phát hành cần vai trò thiết kế quy trình hoặc quản trị hệ thống.</li>
-            </ul>
-          </Card>
+          {mayDesign ? (
+            <Card>
+              <CardTitle>Cách bản nháp hoạt động</CardTitle>
+              <CardDescription>
+                Sơ đồ ở trên sửa một <strong>bản nháp</strong>: kéo bước, nối các bước, thêm hoặc
+                xoá bước — tất cả chỉ nằm trong trình duyệt này. Chỉ khi bấm
+                <strong> Publish phiên bản mới</strong> quy trình mới được kiểm tra và lưu thành
+                phiên bản mới; phiên bản đã publish không đổi, và quy trình đang chạy giữ nguyên
+                phiên bản của nó.
+              </CardDescription>
+              <ul className="mt-4 space-y-2 text-xs text-on-surface-muted">
+                <li>Lưu nháp giữ bản đang sửa cho lần mở sau, chỉ trong trình duyệt này.</li>
+                <li>Bỏ nháp đưa sơ đồ về đúng bản đã phát hành.</li>
+                <li>Phát hành cần vai trò thiết kế quy trình hoặc quản trị hệ thống.</li>
+              </ul>
+            </Card>
+          ) : (
+            <Card>
+              <CardTitle>Quy trình này do người thiết kế sửa</CardTitle>
+              <CardDescription>
+                {`Mỗi lần sửa là một phiên bản mới, và việc đó cần ${roleName} hoặc quyền quản trị hệ thống. Phiên bản đã phát hành là bất biến, nên quy trình bạn đang xem đây là đúng cái đang chạy.`}
+              </CardDescription>
+            </Card>
+          )}
         </aside>
       </div>
     </>

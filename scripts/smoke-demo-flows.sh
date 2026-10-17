@@ -1002,6 +1002,31 @@ assert_contains "$tmp_dir/object-record-runs.html" "Quy trình đã chạy trên
 assert_contains "$tmp_dir/object-record-runs.html" "Bỏ lọc, xem tất cả" "the filter can be dropped"
 assert_contains "$tmp_dir/object-record-runs.html" "Kiểm tra yêu cầu" "the filtered list names the waiting step"
 
+echo "flows: [H] a person without the designer role is not offered the designer's controls"
+# The interface does not offer an action the API refuses (ADR 0021). The director holds one
+# approval role and nothing else, so the graph is readable and the editor is not there.
+status="$(web_get_as "$director_jar" "/workflows/$web_flow_key" "$tmp_dir/designer-denied.html")"
+assert_status "$status" "200" "definition page as a non-designer"
+assert_contains "$tmp_dir/designer-denied.html" "Bạn chưa có quyền thiết kế quy trình" "the page says what the action needs"
+assert_not_contains "$tmp_dir/designer-denied.html" "Phát hành phiên bản mới" "no publish button without the role"
+assert_not_contains "$tmp_dir/designer-denied.html" "Lưu nháp" "no draft controls without the role"
+assert_contains "$tmp_dir/designer-denied.html" "Bước đang chọn" "the graph is still readable"
+
+status="$(web_get_as "$director_jar" "/workflows" "$tmp_dir/workflows-denied.html")"
+assert_status "$status" "200" "process list as a non-designer"
+assert_not_contains "$tmp_dir/workflows-denied.html" "Tạo quy trình mới" "no create button without the role"
+assert_contains "$tmp_dir/workflows-denied.html" "Bạn chưa có quyền tạo quy trình" "the list says what it needs"
+
+status="$(web_get_as "$director_jar" "/objects" "$tmp_dir/objects-denied.html")"
+assert_status "$status" "200" "data list as a non-designer"
+assert_not_contains "$tmp_dir/objects-denied.html" "Tạo định nghĩa dữ liệu mới" "no definition builder without the role"
+assert_contains "$tmp_dir/objects-denied.html" "Bạn chưa có quyền tạo và sửa định nghĩa dữ liệu" "the data screen says what it needs"
+
+status="$(web_get_as "$director_jar" "/analytics" "$tmp_dir/analytics-denied.html")"
+assert_status "$status" "200" "reports as a non-designer"
+assert_not_contains "$tmp_dir/analytics-denied.html" "Tạo chỉ số đầu tiên" "no metric form without the role"
+assert_contains "$tmp_dir/analytics-denied.html" "Bạn chưa có quyền tạo chỉ số báo cáo" "the reports screen says what it needs"
+
 status="$(web_get "/workflows/$web_flow_key" "$tmp_dir/workflow-instances.html")"
 assert_status "$status" "200" "workflow detail after the run"
 assert_contains "$tmp_dir/workflow-instances.html" "Kiểm tra yêu cầu" "the definition lists its instance"

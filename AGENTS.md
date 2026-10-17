@@ -150,6 +150,10 @@ Working agreement for agents and contributors in this repository.
 - Never build interactivity that does nothing. A control that cannot work yet is rendered
   disabled with an explanation (the Application Builder configuration tab, ADR 0004); toggles,
   drag handles or forms that silently discard input are not acceptable.
+- Never render a control the person has no permission for: the interface does not invite work the
+  API will refuse (ADR 0021). `canDesign(roles)` decides the definition/process/metric controls,
+  and the empty place says what the action needs (`components/ui/role-notice.tsx`). The API stays
+  the authority — the screen only stops asking.
 - User configuration that needs no new entity goes in a cookie behind an httpOnly server action
   (`opvaryn.theme`, `opvaryn.dashboard`) and is validated on write by a pure module, never stored
   loosely in the browser.

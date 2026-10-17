@@ -64,3 +64,15 @@ export function keyFromLabel(label: string): string {
   const withLetter = /^[a-z]/.test(slug) ? slug : `k_${slug}`;
   return withLetter.length >= 2 ? withLetter : `${withLetter}_1`;
 }
+
+/**
+ * designerRoleName is what the interface calls the role that may change definitions. The name is
+ * data (`role_labels`); when nobody has named it, the sentence reads as prose rather than as a
+ * key (ADR 0016).
+ */
+export function designerRoleName(catalogue: readonly RoleEntry[]): string {
+  return labelOrKey(
+    catalogue.find((entry) => entry.key === 'process_designer')?.label,
+    'vai trò thiết kế quy trình',
+  );
+}

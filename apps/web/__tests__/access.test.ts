@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { isAdmin } from '@/lib/access';
+import { canDesign, isAdmin } from '@/lib/access';
 import { advancedVisible, parseAdvanced, toggleAdvanced } from '@/lib/advanced';
 
 describe('isAdmin', () => {
@@ -13,6 +13,20 @@ describe('isAdmin', () => {
     expect(isAdmin(['process_designer', 'truong_bo_phan'])).toBe(false);
     expect(isAdmin([])).toBe(false);
     expect(isAdmin(undefined)).toBe(false);
+  });
+});
+
+describe('canDesign', () => {
+  it('is true for the designer role and for an administrator', () => {
+    expect(canDesign(['process_designer'])).toBe(true);
+    expect(canDesign(['nhan_vien', 'process_designer'])).toBe(true);
+    expect(canDesign(['admin'])).toBe(true);
+  });
+
+  it('is false for everyone else, so no screen offers a control the API would refuse', () => {
+    expect(canDesign(['truong_bo_phan', 'giam_doc'])).toBe(false);
+    expect(canDesign([])).toBe(false);
+    expect(canDesign(undefined)).toBe(false);
   });
 });
 
