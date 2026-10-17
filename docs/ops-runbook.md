@@ -152,7 +152,7 @@ Phục hồi thật (khi database hỏng):
 ```bash
 make pilot-down
 # đổi POSTGRES_DB sang tên mới trong .env nếu muốn giữ bản cũ để đối chiếu
-docker compose -f deployments/docker-compose.yml up -d postgres
+docker compose -f deployments/docker-compose.yml --project-directory . up -d postgres
 docker compose -f deployments/docker-compose.yml exec -T postgres \
   pg_restore --no-owner --no-privileges --exit-on-error -U opvaryn -d opvaryn \
   < deployments/backups/opvaryn-<stamp>.dump
