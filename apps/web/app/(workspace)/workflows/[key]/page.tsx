@@ -263,7 +263,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
               instances={instances}
               recordLabels={labels}
               definitionNames={{ [definition.key]: definition.name }}
-              emptyHint="Chạy quy trình này từ màn hình bản ghi của business object để thấy một lần chạy ở đây."
+              emptyHint="Chạy quy trình này từ màn hình của một bản ghi để thấy lần chạy ở đây."
             />
             <Pagination
               total={instanceTotal}

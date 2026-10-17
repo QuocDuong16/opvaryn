@@ -290,7 +290,7 @@ assert_contains "$tmp_dir/home.html" "Người thiết kế quy trình" "the hom
 echo "flows: [A] the record form is generated from the definition"
 status="$(web_get "/objects/$object_key" "$tmp_dir/missing.html")"
 assert_status "$status" "404" "unknown object page"
-assert_contains "$tmp_dir/missing.html" "Business object không tồn tại" "unknown object page"
+assert_contains "$tmp_dir/missing.html" "Không có loại dữ liệu này" "unknown object page"
 
 schema='{"key":"'"$object_key"'","name":"Luồng demo","description":"created by scripts/smoke-demo-flows.sh","fields":[
   {"key":"title","label":"Nội dung","type":"text","required":true},

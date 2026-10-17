@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { fieldNames, joinLabels, labelOrKey, nameLabels, roleLabels } from '@/lib/names';
+import {
+  fieldNames,
+  joinLabels,
+  keyFromLabel,
+  labelOrKey,
+  nameLabels,
+  roleLabels,
+} from '@/lib/names';
 
 describe('labelOrKey', () => {
   it('prefers the name and falls back to the key', () => {
@@ -51,5 +58,19 @@ describe('fieldNames', () => {
 
     expect(names.get('estimated_amount')).toBe('Giá trị dự kiến (VND)');
     expect(labelOrKey(names.get('nope'), 'nope')).toBe('nope');
+  });
+});
+
+describe('keyFromLabel', () => {
+  it('turns a Vietnamese label into the key the system stores', () => {
+    expect(keyFromLabel('Họ tên nhân viên')).toBe('ho_ten_nhan_vien');
+    expect(keyFromLabel('Giá trị dự kiến (VND)')).toBe('gia_tri_du_kien_vnd');
+    expect(keyFromLabel('Đề nghị mua hàng')).toBe('de_nghi_mua_hang');
+  });
+
+  it('keeps the result usable as a key: letters first, no leading or repeated separators', () => {
+    expect(keyFromLabel('  Nhiều   khoảng trắng  ')).toBe('nhieu_khoang_trang');
+    expect(keyFromLabel('2026 kế hoạch')).toBe('k_2026_ke_hoach');
+    expect(keyFromLabel('!!!')).toBe('');
   });
 });

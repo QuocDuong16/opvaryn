@@ -1,12 +1,13 @@
 'use client';
 
 import Link from 'next/link';
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 
 import { createBusinessObjectAction } from '@/app/(workspace)/objects/actions';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { FieldEditor } from '@/components/objects/field-editor';
+import { keyFromLabel } from '@/lib/names';
 import { INITIAL_CREATE_OBJECT_STATE } from '@/components/objects/create-object-state';
 
 const INPUT_CLASS =
@@ -19,42 +20,53 @@ export function CreateObjectForm() {
     createBusinessObjectAction,
     INITIAL_CREATE_OBJECT_STATE,
   );
+  // The key follows the name until the designer edits it: nobody should have to know what
+  // snake_case means (ADR 0018).
+  const [name, setName] = useState('');
+  const [key, setKey] = useState('');
+  const derived = keyFromLabel(name);
+  const effectiveKey = key === '' ? derived : key;
 
   return (
     <Card>
-      <CardTitle>Tạo business object</CardTitle>
+      <CardTitle>Tạo loại dữ liệu</CardTitle>
       <CardDescription>
-        Key không đổi sau khi tạo: form, workflow và báo cáo về sau đều tham chiếu theo key.
+        Đặt tên cho loại dữ liệu và mô tả ai sẽ nhập nó. Hệ thống tự sinh mã bên trong; mã đó không
+        đổi về sau vì biểu mẫu, quy trình và báo cáo đều tham chiếu theo nó.
       </CardDescription>
 
       <form action={formAction} className="mt-4 space-y-4">
         <div>
           <label htmlFor="object-key" className="text-xs font-medium tracking-wide uppercase">
-            Key
+            Mã (tự sinh, sửa được)
           </label>
           <input
             id="object-key"
             name="key"
             required
             pattern="[a-z][a-z0-9_]{1,63}"
+            value={effectiveKey}
+            onChange={(event) => setKey(event.target.value)}
             placeholder="purchase_request"
             autoComplete="off"
             className={`${INPUT_CLASS} font-mono`}
           />
           <p className="mt-1 text-xs text-on-surface-muted">
-            Chữ thường, snake_case, 2–64 ký tự, bắt đầu bằng chữ cái.
+            {`Mã hiển thị cho hệ thống, sinh từ tên: ${keyFromLabel(name) || 'ho_ten_nhan_vien'}.`}
           </p>
         </div>
 
         <div>
           <label htmlFor="object-name" className="text-xs font-medium tracking-wide uppercase">
-            Tên hiển thị
+            Tên
           </label>
           <input
             id="object-name"
             name="name"
             required
             maxLength={120}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
             placeholder="Đề nghị mua hàng"
             className={INPUT_CLASS}
           />
@@ -119,7 +131,7 @@ function SubmitButton() {
       disabled={pending}
       className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-opacity hover:opacity-90 disabled:opacity-60"
     >
-      {pending ? 'Đang lưu…' : 'Tạo business object'}
+      {pending ? 'Đang lưu…' : 'Tạo loại dữ liệu'}
     </button>
   );
 }

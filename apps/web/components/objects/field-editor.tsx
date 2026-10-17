@@ -10,6 +10,7 @@ import {
   type FieldDraft,
 } from '@/components/objects/field-draft';
 import { FIELD_TYPE_LABELS } from '@/lib/format';
+import { keyFromLabel } from '@/lib/names';
 
 const FIELD_TYPES = Object.keys(FIELD_TYPE_LABELS) as FieldType[];
 
@@ -42,7 +43,20 @@ export function FieldEditor({
   }
 
   function updateRow(id: string, patch: Partial<FieldDraft>) {
-    setRows((current) => current.map((row) => (row.id === id ? { ...row, ...patch } : row)));
+    setRows((current) =>
+      current.map((row) => {
+        if (row.id !== id) {
+          return row;
+        }
+        const next = { ...row, ...patch };
+        // The key follows the name while the designer has not typed one of their own:
+        // nobody should have to know what snake_case means (ADR 0018).
+        if (patch.label !== undefined && (row.key === '' || row.key === keyFromLabel(row.label))) {
+          next.key = keyFromLabel(patch.label);
+        }
+        return next;
+      }),
+    );
   }
 
   function removeRow(id: string) {
@@ -54,13 +68,13 @@ export function FieldEditor({
   return (
     <fieldset>
       <div className="flex items-center justify-between gap-3">
-        <legend className="text-xs font-medium tracking-wide uppercase">Field schema</legend>
+        <legend className="text-xs font-medium tracking-wide uppercase">Các trường dữ liệu</legend>
         <button
           type="button"
           onClick={addRow}
           className="rounded-lg border border-border px-2.5 py-1 text-xs font-medium hover:bg-surface-overlay"
         >
-          + Thêm field
+          + Thêm trường
         </button>
       </div>
 
@@ -74,7 +88,7 @@ export function FieldEditor({
           {rows.map((row, index) => (
             <li key={row.id} className="rounded-lg border border-border bg-surface/40 p-3">
               <div className="flex items-center justify-between gap-2">
-                <span className="font-mono text-[11px] text-on-surface-muted">fields[{index}]</span>
+                <span className="text-[11px] text-on-surface-muted">{`Trường ${index + 1}`}</span>
                 <button
                   type="button"
                   onClick={() => removeRow(row.id)}
@@ -86,21 +100,21 @@ export function FieldEditor({
 
               <div className="mt-2 grid gap-2 sm:grid-cols-2">
                 <label className="block">
-                  <span className="text-[11px] text-on-surface-muted">Key (snake_case)</span>
+                  <span className="text-[11px] text-on-surface-muted">Mã trường</span>
                   <input
                     value={row.key}
                     onChange={(event) => updateRow(row.id, { key: event.target.value })}
-                    placeholder="estimated_amount"
+                    placeholder="gia_tri_du_kien"
                     autoComplete="off"
                     className={`${INPUT_CLASS} mt-0.5 font-mono`}
                   />
                 </label>
                 <label className="block">
-                  <span className="text-[11px] text-on-surface-muted">Nhãn hiển thị</span>
+                  <span className="text-[11px] text-on-surface-muted">Tên hiển thị</span>
                   <input
                     value={row.label}
                     onChange={(event) => updateRow(row.id, { label: event.target.value })}
-                    placeholder="Số tiền dự kiến"
+                    placeholder="Giá trị dự kiến (VND)"
                     className={`${INPUT_CLASS} mt-0.5`}
                   />
                 </label>
@@ -134,7 +148,7 @@ export function FieldEditor({
               {row.type === 'select' ? (
                 <label className="mt-2 block">
                   <span className="text-[11px] text-on-surface-muted">
-                    Lựa chọn — mỗi dòng một mục, dạng <code>value = Nhãn</code>
+                    Lựa chọn — mỗi dòng một mục, dạng <code>mã = Tên</code>
                   </span>
                   <textarea
                     value={row.options}

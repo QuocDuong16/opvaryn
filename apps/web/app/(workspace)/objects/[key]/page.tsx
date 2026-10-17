@@ -151,10 +151,10 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
                       Bởi
                     </th>
                     <th scope="col" className="px-4 py-3 font-medium">
-                      Fields
+                      Số trường
                     </th>
                     <th scope="col" className="px-4 py-3 font-medium">
-                      Lựa chọn
+                      Các trường trong phiên bản này
                     </th>
                   </tr>
                 </thead>
@@ -176,8 +176,8 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
                         {version.publishedBy}
                       </td>
                       <td className="px-4 py-3 text-on-surface-muted">{version.fields.length}</td>
-                      <td className="px-4 py-3 font-mono text-[11px] text-on-surface-muted">
-                        {version.fields.map((field) => field.key).join(', ') || '—'}
+                      <td className="px-4 py-3 text-[11px] text-on-surface-muted">
+                        {version.fields.map((field) => field.label).join(' · ') || '—'}
                       </td>
                     </tr>
                   ))}

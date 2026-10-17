@@ -80,7 +80,7 @@ export function StartInstanceForm({
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <SubmitButton />
         <p className="text-xs text-on-surface-muted">
-          Instance gắn với phiên bản định nghĩa đang dùng; publish phiên bản mới không đổi nó.
+          Lần chạy gắn với phiên bản đang dùng; phát hành phiên bản mới không đổi nó.
         </p>
       </div>
 

@@ -36,3 +36,31 @@ export function fieldNames(object: {
 export function joinLabels(keys: readonly string[], labels: ReadonlyMap<string, string>): string {
   return keys.map((key) => labelOrKey(labels.get(key), key)).join(', ');
 }
+
+/**
+ * keyFromLabel turns a human label into the key the system stores — "Họ tên nhân viên" becomes
+ * ho_ten_nhan_vien. A designer types a name; nobody should have to know what snake_case means
+ * (ADR 0018). The result is a suggestion: it is written into the form's key field, where it can
+ * still be edited before saving.
+ */
+export function keyFromLabel(label: string): string {
+  const ascii = label
+    .normalize('NFD')
+    // Combining marks carry the Vietnamese tones; the base letters stay.
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/đ/g, 'd')
+    .replace(/Đ/g, 'D')
+    .toLowerCase();
+
+  const slug = ascii
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
+    .slice(0, 64);
+
+  if (slug === '') {
+    return '';
+  }
+  // A key must start with a letter and be at least two characters long.
+  const withLetter = /^[a-z]/.test(slug) ? slug : `k_${slug}`;
+  return withLetter.length >= 2 ? withLetter : `${withLetter}_1`;
+}

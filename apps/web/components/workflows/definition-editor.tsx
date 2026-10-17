@@ -13,7 +13,7 @@ import {
   createProcessDefinitionAction,
   publishProcessDefinitionAction,
 } from '@/app/(workspace)/workflows/actions';
-import { labelOrKey } from '@/lib/names';
+import { keyFromLabel, labelOrKey } from '@/lib/names';
 import {
   CONDITION_OPS,
   NODE_TYPE_OPTIONS,
@@ -61,6 +61,11 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
     definition ? edgesToDrafts(definition.edges) : [blankEdgeDraft()],
   );
   const [objectKey, setObjectKey] = useState(definition?.objectKey ?? objects[0]?.key ?? '');
+  // The process key follows its name while the designer has not typed one (ADR 0018).
+  const [name, setName] = useState(definition?.name ?? '');
+  const [typedKey, setTypedKey] = useState('');
+  const key = typedKey === '' ? keyFromLabel(name) : typedKey;
+  const setKey = setTypedKey;
 
   const [createState, createAction] = useActionState(
     createProcessDefinitionAction,
@@ -106,10 +111,12 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
       <div className="grid gap-3 sm:grid-cols-2">
         {definition === undefined ? (
           <label className="text-xs">
-            <span className="font-medium tracking-wide uppercase">Mã quy trình</span>
+            <span className="font-medium tracking-wide uppercase">Mã quy trình (tự sinh)</span>
             <input
               name="key"
               required
+              value={key}
+              onChange={(event) => setKey(event.target.value)}
               placeholder="purchase_approval"
               className={cn(INPUT_CLASS, 'mt-1.5 font-mono')}
             />
@@ -120,7 +127,8 @@ function GraphEditor({ objects, knownRoles, definition }: GraphEditorProps) {
           <input
             name="name"
             required
-            defaultValue={definition?.name}
+            value={name}
+            onChange={(event) => setName(event.target.value)}
             placeholder="Duyệt đề nghị mua hàng"
             className={cn(INPUT_CLASS, 'mt-1.5')}
           />
