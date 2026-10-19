@@ -104,7 +104,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
 
       {needsSignIn ? (
         <Card className="mb-6 border-warning/40">
-          <CardTitle className="text-warning">Cần đăng nhập để đọc inbox</CardTitle>
+          <CardTitle className="text-warning">Cần đăng nhập để xem việc của mình</CardTitle>
           <CardDescription>
             Mỗi người chỉ thấy việc thuộc role mình giữ. Đăng nhập rồi quay lại trang này.
           </CardDescription>
@@ -119,7 +119,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
 
       {error ? (
         <Card className="mb-6 border-warning/40">
-          <CardTitle className="text-warning">Không đọc được inbox</CardTitle>
+          <CardTitle className="text-warning">Không đọc được hộp việc</CardTitle>
           <CardDescription>{error}</CardDescription>
           <p className="mt-4 text-sm text-on-surface-muted">
             Thử lại sau ít phút. Nếu vẫn không được, báo cho người quản trị hệ thống.

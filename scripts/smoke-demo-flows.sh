@@ -751,6 +751,16 @@ assert_not_contains "$tmp_dir/instance-page.html" "Instance" "a run is not calle
 assert_not_contains "$tmp_dir/instance-page.html" "attempt" "an attempt is a lần"
 assert_contains "$tmp_dir/instance-page.html" "Lý do (bắt buộc khi trả về hoặc từ chối)" "the decision form is offered"
 
+# The not-found boundary ships inside every render of this route, so its copy is part of
+# what the assertion above sees — and it is what a mistyped link shows a person.
+status="$(web_get "/tasks/00000000-0000-4000-8000-000000000000" "$tmp_dir/instance-missing.html")"
+case "$status" in
+  200 | 404) ;;
+  *) fail "[G] a link to an unknown task answered $status" ;;
+esac
+assert_contains "$tmp_dir/instance-missing.html" "Không tìm thấy việc này" "an unknown task answers in words"
+assert_not_contains "$tmp_dir/instance-missing.html" "Instance" "an unknown task is not called an instance"
+
 mapfile -t decision_args < <(form_args "$tmp_dir/instance-page.html" decision)
 [[ ${#decision_args[@]} -ge 4 ]] || fail "[G] the decision form has no server-action fields"
 

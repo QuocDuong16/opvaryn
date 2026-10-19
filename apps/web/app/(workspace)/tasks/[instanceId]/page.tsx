@@ -109,7 +109,7 @@ export default async function ProcessInstancePage({ params }: PageProps) {
             href="/tasks"
             className="mt-4 inline-block text-sm font-medium text-accent-strong hover:underline"
           >
-            ← Về inbox
+            ← Về hộp việc
           </Link>
         </Card>
       </>
@@ -139,7 +139,7 @@ export default async function ProcessInstancePage({ params }: PageProps) {
 
       <p className="mb-6 flex flex-wrap items-center gap-3 text-sm">
         <Link href="/tasks" className="text-on-surface-muted hover:text-on-surface">
-          ← Về inbox
+          ← Về hộp việc
         </Link>
         {recordContext.record ? (
           <Link
