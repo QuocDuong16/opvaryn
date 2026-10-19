@@ -112,7 +112,7 @@ export function CreateObjectForm() {
                 href={`/objects/${state.createdKey}`}
                 className="mt-1 inline-block font-medium underline underline-offset-2"
               >
-                Mở object và nhập bản ghi →
+                Mở loại dữ liệu và nhập bản ghi →
               </Link>
             ) : null}
           </div>

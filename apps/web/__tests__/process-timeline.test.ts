@@ -113,7 +113,7 @@ describe('describeEvent', () => {
   it('describes an attempt reset with the numbers it moved between', () => {
     const entry = describeEvent(event('instance_returned', { attempt: 2, previousAttempt: 1 }));
 
-    expect(entry.label).toBe('Reset về điểm bắt đầu (attempt mới)');
+    expect(entry.label).toBe('Quay lại điểm bắt đầu (lần mới)');
     expect(entry.detail).toBe('lần 1 → lần 2');
   });
 });

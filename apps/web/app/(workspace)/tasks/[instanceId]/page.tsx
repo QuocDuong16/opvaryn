@@ -98,12 +98,12 @@ export default async function ProcessInstancePage({ params }: PageProps) {
     return (
       <>
         <PageHeader
-          eyebrow="05 / Task inbox"
-          title="Không đọc được quy trình"
+          eyebrow="05 / Việc của tôi"
+          title="Không mở được việc này"
           lead="Không tải được lần chạy này. Thử lại sau ít phút."
         />
         <Card className="border-warning/40">
-          <CardTitle className="text-warning">Lỗi khi đọc instance</CardTitle>
+          <CardTitle className="text-warning">Không tải được lần chạy này</CardTitle>
           <CardDescription>{describeApiError(cause)}</CardDescription>
           <Link
             href="/tasks"
@@ -133,7 +133,7 @@ export default async function ProcessInstancePage({ params }: PageProps) {
     <>
       <PageHeader
         eyebrow={`05 / Việc của tôi · ${definitionName} v${instance.definitionVersion}`}
-        title={recordContext.record ? 'Chi tiết công việc' : `Lần chạy ${instance.id.slice(0, 8)}…`}
+        title="Chi tiết công việc"
         lead={`Chạy trên ${recordContext.record ? 'bản ghi bên dưới' : 'một bản ghi bạn không đọc được'} theo ${definitionName} phiên bản ${instance.definitionVersion}. Mọi quyết định bên dưới đều được ghi lại.`}
       />
 
@@ -243,10 +243,10 @@ export default async function ProcessInstancePage({ params }: PageProps) {
 
           <section>
             <h2 className="mb-3 text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
-              {`Event log (${timeline.length})`}
+              {`Nhật ký (${timeline.length})`}
             </h2>
             <p className="mb-3 text-xs text-on-surface-muted">
-              Append-only, cũ nhất trước. Không có bước nào thay đổi state mà không đi qua đây.
+              Cũ nhất trước. Mọi thay đổi của quy trình đều được ghi lại ở đây và không sửa được.
             </p>
             <ol className="space-y-2">
               {timeline.map((entry) => (
@@ -254,7 +254,9 @@ export default async function ProcessInstancePage({ params }: PageProps) {
                   key={entry.id}
                   className="flex flex-wrap gap-3 rounded-lg border border-border bg-surface-raised/40 px-3 py-2 text-xs"
                 >
-                  <span className="w-36 shrink-0 font-mono text-on-surface-muted">{entry.at}</span>
+                  <span className="w-36 shrink-0 text-on-surface-muted">
+                    {formatTimestamp(entry.at)}
+                  </span>
                   <span className="min-w-0">
                     <span className="font-medium">{entry.label}</span>{' '}
                     <span className="text-on-surface-muted">{`bởi ${entry.actor}`}</span>
@@ -315,7 +317,7 @@ export default async function ProcessInstancePage({ params }: PageProps) {
           </Card>
 
           <Card>
-            <CardTitle>Instance</CardTitle>
+            <CardTitle>Lần chạy này</CardTitle>
             <dl className="mt-4 space-y-2 text-sm">
               <div className="flex justify-between gap-2">
                 <dt className="text-on-surface-muted">Định nghĩa</dt>

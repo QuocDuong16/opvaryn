@@ -211,12 +211,10 @@ function DetailView({ app, record }: { app: MiniAppData; record: ObjectRecord | 
       </div>
       <aside className="space-y-4">
         <div className="rounded-xl border border-border bg-surface-raised p-4 text-xs">
-          <p className="font-mono tracking-widest text-on-surface-muted uppercase">Metadata</p>
+          <p className="font-mono tracking-widest text-on-surface-muted uppercase">
+            Thông tin bản ghi
+          </p>
           <dl className="mt-3 space-y-2">
-            <div className="flex items-center justify-between gap-3">
-              <dt className="text-on-surface-muted">Record id</dt>
-              <dd className="font-mono">{record.id.slice(0, 8)}…</dd>
-            </div>
             <div className="flex items-center justify-between gap-3">
               <dt className="text-on-surface-muted">Tạo lúc</dt>
               <dd>{formatTimestamp(record.createdAt)}</dd>

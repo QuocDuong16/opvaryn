@@ -741,6 +741,14 @@ assert_status "$status" "200" "instance page"
 assert_contains "$tmp_dir/instance-page.html" "Kiểm thử luồng demo" "the record is rendered"
 assert_contains "$tmp_dir/instance-page.html" "Mức ưu tiên" "the record uses its v1 schema, not the newest"
 assert_contains "$tmp_dir/instance-page.html" "Khởi tạo quy trình" "the event log is shown"
+assert_contains "$tmp_dir/instance-page.html" "Nhật ký (" "the log is named in the reader's words"
+assert_contains "$tmp_dir/instance-page.html" "Lần chạy này" "the run card is named in the reader's words"
+# No internal vocabulary on the screen a person works in (ADR 0018): the log is a
+# "nhật ký", a run is a "lần chạy", and a reset is a new "lần" — never the engine's words.
+assert_not_contains "$tmp_dir/instance-page.html" "Event log" "the log is not called an event log"
+assert_not_contains "$tmp_dir/instance-page.html" "Append-only" "the log does not explain itself in English"
+assert_not_contains "$tmp_dir/instance-page.html" "Instance" "a run is not called an instance"
+assert_not_contains "$tmp_dir/instance-page.html" "attempt" "an attempt is a lần"
 assert_contains "$tmp_dir/instance-page.html" "Lý do (bắt buộc khi trả về hoặc từ chối)" "the decision form is offered"
 
 mapfile -t decision_args < <(form_args "$tmp_dir/instance-page.html" decision)
@@ -820,7 +828,7 @@ status="$(web_get "/tasks/$instance_id" "$tmp_dir/instance-attempt2.html")"
 assert_status "$status" "200" "instance page after the return"
 assert_contains "$tmp_dir/instance-attempt2.html" "Bổ sung báo giá của hai nhà cung cấp" \
   "the reason reaches the first approver"
-assert_contains "$tmp_dir/instance-attempt2.html" "Reset về điểm bắt đầu" "the reset is in the event log"
+assert_contains "$tmp_dir/instance-attempt2.html" "Quay lại điểm bắt đầu" "the reset is in the event log"
 assert_contains "$tmp_dir/instance-attempt2.html" 'name="decision"' "the first approver can decide again"
 
 curl -sS -b "$cookie_jar" -o "$tmp_dir/instance-attempt2.json" "$api_base/api/v1/process-instances/$instance_id"

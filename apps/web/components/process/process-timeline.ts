@@ -32,7 +32,7 @@ export const EVENT_LABELS: Record<string, string> = {
   task_returned: 'Trả về chỉnh sửa',
   task_rejected: 'Từ chối',
   task_cancelled: 'Huỷ việc đang mở',
-  instance_returned: 'Reset về điểm bắt đầu (attempt mới)',
+  instance_returned: 'Quay lại điểm bắt đầu (lần mới)',
   condition_evaluated: 'Đánh giá điều kiện',
   instance_completed: 'Kết thúc quy trình',
   instance_rejected: 'Kết thúc: bị từ chối',
