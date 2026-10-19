@@ -16,7 +16,7 @@ import {
   formatRate,
   reworkedLabel,
 } from '@/components/analytics/process-metrics';
-import { fieldNames, labelOrKey } from '@/lib/names';
+import { fieldNames, labelOrKey, optionValueNames } from '@/lib/names';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { DesignerNotice } from '@/components/ui/role-notice';
 import { PageHeader } from '@/components/ui/page-header';
@@ -183,6 +183,17 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               initialWidgets={widgets}
               fieldNames={Object.fromEntries(
                 objects.map((object) => [object.key, Object.fromEntries(fieldNames(object))]),
+              )}
+              optionNames={Object.fromEntries(
+                objects.map((object) => [
+                  object.key,
+                  Object.fromEntries(
+                    [...optionValueNames(object)].map(([field, values]) => [
+                      field,
+                      Object.fromEntries(values),
+                    ]),
+                  ),
+                ]),
               )}
             />
           </section>

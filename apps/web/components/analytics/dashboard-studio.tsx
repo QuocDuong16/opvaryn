@@ -54,6 +54,7 @@ export function DashboardStudio({
   results,
   initialWidgets,
   fieldNames,
+  optionNames,
 }: {
   metrics: readonly MetricDefinition[];
   /** One answered metric per key, computed server-side for this signed-in user. */
@@ -61,6 +62,8 @@ export function DashboardStudio({
   initialWidgets: readonly DashboardWidget[];
   /** Field key to label, per object, so a widget says what it measures (ADR 0018). */
   fieldNames: Record<string, Record<string, string>>;
+  /** Select value to label, per object and field, so a breakdown names its groups (ADR 0016). */
+  optionNames: Record<string, Record<string, Record<string, string>>>;
 }) {
   const allowed = metrics.map((metric) => metric.key);
   const namesFor = (objectKey: string): Map<string, string> =>
@@ -205,10 +208,15 @@ export function DashboardStudio({
                   {result.buckets.map((bucket) => {
                     const widest = result.buckets[0]?.value || 1;
                     const width = Math.max(4, Math.round((bucket.value / widest) * 100));
+                    const groupLabels = metric.groupBy
+                      ? optionNames[metric.objectKey]?.[metric.groupBy.key]
+                      : undefined;
                     return (
                       <li key={bucket.key} className="text-xs">
                         <div className="flex items-center justify-between gap-2">
-                          <span className="font-mono text-[11px]">{bucket.key || '—'}</span>
+                          <span className="text-[11px]">
+                            {labelOrKey(groupLabels?.[bucket.key], bucket.key) || '—'}
+                          </span>
                           <span>{formatMetricValue(metric, bucket.value)}</span>
                         </div>
                         <div className="mt-1 h-1.5 rounded-full bg-surface-overlay">

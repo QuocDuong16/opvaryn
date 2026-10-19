@@ -7,6 +7,7 @@ import {
   keyFromLabel,
   labelOrKey,
   nameLabels,
+  optionValueNames,
   roleLabels,
 } from '@/lib/names';
 
@@ -59,6 +60,32 @@ describe('fieldNames', () => {
 
     expect(names.get('estimated_amount')).toBe('Giá trị dự kiến (VND)');
     expect(labelOrKey(names.get('nope'), 'nope')).toBe('nope');
+  });
+});
+
+describe('optionValueNames', () => {
+  it('names the value a select field stores, so a breakdown reads in words', () => {
+    const names = optionValueNames({
+      fields: [
+        {
+          key: 'department',
+          type: 'select',
+          options: [
+            { value: 'ky_thuat', label: 'Kỹ thuật' },
+            { value: 'ke_toan', label: '' },
+          ],
+        },
+        { key: 'title', type: 'text' },
+        { key: 'severity', type: 'select', options: [] },
+      ],
+    });
+
+    const department = names.get('department');
+    expect(labelOrKey(department?.get('ky_thuat'), 'ky_thuat')).toBe('Kỹ thuật');
+    // An option nobody has named keeps its value instead of disappearing.
+    expect(labelOrKey(department?.get('ke_toan'), 'ke_toan')).toBe('ke_toan');
+    expect(names.has('title')).toBe(false);
+    expect(names.has('severity')).toBe(false);
   });
 });
 

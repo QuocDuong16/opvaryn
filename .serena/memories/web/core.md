@@ -215,7 +215,8 @@
 - **Names, never keys** (ADR 0016): a department, a role, a definition and a record are shown by
   their human name. `lib/names.ts` holds the pure, tested rule — `labelOrKey(label, key)` returns
   the name when there is one and the key otherwise (never an invented name); `roleLabels(entries)`,
-  `nameLabels(items)` and `joinLabels(keys, map)` build the lookups. Sources: `me.departmentName`
+  `nameLabels(items)`, `joinLabels(keys, map)` and `optionValueNames(object)` (select value →
+  option label, for metric breakdowns) build the lookups. Sources: `me.departmentName`
   and `me.roleLabels` (a map, only for the roles the person holds), `GET /api/v1/roles` which now
   returns `[{key, label}]` (RoleEntry), `listProcessDefinitions()` for definition names, and
   `recordLabels()` from each record's own version. Keys are acceptable only on the operator screen
@@ -274,7 +275,13 @@
   serialization and round trip), `dashboard-layout.test.ts` (lenient read vs strict write
   validation, every transition), `record-grouping.test.ts` (per-version grouping, orphan buckets).
   Vitest aliases `@` → app root and sets `environment: 'jsdom'`; coverage has no thresholds yet.
-- There is no browser backend in this environment, so interactive flows are verified by
+- A real Chromium is available for interactive verification through the Playwright install at
+  `/home/niand/Workspace/nian-id/node_modules/playwright` (`node -e "require(...)"`); the demo video
+  scripts in `~/Videos/opvaryn-demo-*/quay-demo.cjs` are built on it. Verify UI interaction against
+  the **production build** (`pnpm build && pnpm start`): with `next dev` (Turbopack) in this
+  environment the workflow page's client components rendered but did not hydrate — clicks on the
+  canvas changed nothing while the same page under `pnpm start` worked.
+- Without a running web server, interactive flows are also verified by
   `make smoke-demo-flows` (`scripts/smoke-demo-flows.sh`): it builds and starts both servers,
   renders a page, replays the form's progressive-enhancement POST and checks the result through
   the API and the re-rendered page. Four gotchas that script encodes: the page has more than one

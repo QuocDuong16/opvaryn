@@ -32,6 +32,27 @@ export function fieldNames(object: {
   return new Map(object.fields.map((field) => [field.key, field.label]));
 }
 
+/**
+ * optionValueNames maps, for every select field of a definition, the value it stores to the
+ * label a person reads. A breakdown groups by `ky_thuat`; the screen must say "Kỹ thuật".
+ */
+export function optionValueNames(object: {
+  fields: readonly {
+    key: string;
+    type: string;
+    options?: readonly { value: string; label: string }[];
+  }[];
+}): Map<string, Map<string, string>> {
+  const byField = new Map<string, Map<string, string>>();
+  for (const field of object.fields) {
+    if (field.type !== 'select' || !field.options || field.options.length === 0) {
+      continue;
+    }
+    byField.set(field.key, new Map(field.options.map((option) => [option.value, option.label])));
+  }
+  return byField;
+}
+
 /** joinLabels renders several keys as one line, each replaced by its name when it has one. */
 export function joinLabels(keys: readonly string[], labels: ReadonlyMap<string, string>): string {
   return keys.map((key) => labelOrKey(labels.get(key), key)).join(', ');
