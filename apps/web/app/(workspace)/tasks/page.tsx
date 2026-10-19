@@ -6,6 +6,9 @@ import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { ListSearch, Pagination, pageOffset } from '@/components/ui/list-controls';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge } from '@/components/ui/status-badge';
+import { isAdmin } from '@/lib/access';
+import { advancedVisible } from '@/lib/advanced';
+import { getAdvancedMode } from '@/lib/advanced-server';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 import { formatTimestamp } from '@/lib/format';
 import { labelOrKey } from '@/lib/names';
@@ -15,7 +18,7 @@ export const metadata = { title: 'Việc của tôi' };
 const RUNTIME_GAPS: readonly { title: string; body: string }[] = [
   {
     title: 'Đã có',
-    body: 'Việc giao theo role; hai người quyết cùng lúc thì người sau được báo là việc đã được xử lý; mọi quyết định đều ghi lại kèm người thực hiện và lý do; từ chối là kết thúc, còn trả về thì mở lại từ đầu.',
+    body: 'Việc giao theo vai trò; hai người quyết cùng lúc thì người sau được báo là việc đã được xử lý; mọi quyết định đều ghi lại kèm người thực hiện và lý do; từ chối là kết thúc, còn trả về thì mở lại từ đầu.',
   },
   {
     title: 'Chưa có: song song và join',
@@ -94,6 +97,10 @@ export default async function TasksPage({ searchParams }: PageProps) {
     }
   }
 
+  // "Đã có gì, còn thiếu gì" is build status: it belongs to the administrator in advanced
+  // mode, next to the endpoint table and the platform status (ADR 0015/0018).
+  const showAdvanced = advancedVisible(isAdmin(me?.roles ?? []), await getAdvancedMode());
+
   return (
     <>
       <PageHeader
@@ -106,7 +113,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
         <Card className="mb-6 border-warning/40">
           <CardTitle className="text-warning">Cần đăng nhập để xem việc của mình</CardTitle>
           <CardDescription>
-            Mỗi người chỉ thấy việc thuộc role mình giữ. Đăng nhập rồi quay lại trang này.
+            Mỗi người chỉ thấy việc thuộc vai trò mình giữ. Đăng nhập rồi quay lại trang này.
           </CardDescription>
           <Link
             href="/login"
@@ -229,7 +236,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
         params={{ q: query || undefined }}
       />
 
-      {me ? (
+      {showAdvanced ? (
         <section className="mt-8">
           <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
             <h2 className="text-lg font-semibold tracking-tight">Đã có gì, còn thiếu gì</h2>

@@ -75,7 +75,7 @@ describe('finishedCount and reworkedLabel', () => {
   });
 
   it('turns the rework rate back into a numerator a reader can check', () => {
-    expect(reworkedLabel(overview())).toBe('3 trên 10 instance phải chạy lại');
+    expect(reworkedLabel(overview())).toBe('3 trên 10 lần chạy phải chạy lại');
   });
 
   it('reads as zero when the rate is absent', () => {
@@ -86,6 +86,6 @@ describe('finishedCount and reworkedLabel', () => {
           instances: { started: 0, completed: 0, rejected: 0, running: 0 },
         }),
       ),
-    ).toBe('0 trên 0 instance phải chạy lại');
+    ).toBe('0 trên 0 lần chạy phải chạy lại');
   });
 });

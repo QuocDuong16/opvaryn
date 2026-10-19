@@ -80,8 +80,8 @@ export function FieldEditor({
 
       {rows.length === 0 ? (
         <p className="mt-2 rounded-lg border border-dashed border-border-strong px-3 py-2 text-xs leading-relaxed text-on-surface-muted">
-          Chưa có field nào. Có thể tạo object trước rồi bổ sung field sau; form nhập liệu được sinh
-          từ chính schema này.
+          Chưa có trường nào. Có thể tạo loại dữ liệu trước rồi bổ sung trường sau; màn nhập liệu
+          được sinh từ chính định nghĩa này.
         </p>
       ) : (
         <ul className="mt-3 space-y-3">

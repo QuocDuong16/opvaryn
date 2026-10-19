@@ -54,5 +54,5 @@ export function finishedCount(overview: ProcessMetricsOverview): number {
 /** reworkedLabel explains the rework rate in words, because a share needs a numerator. */
 export function reworkedLabel(overview: ProcessMetricsOverview): string {
   const reworked = Math.round((overview.reworkRate ?? 0) * overview.instances.started);
-  return `${reworked} trên ${overview.instances.started} instance phải chạy lại`;
+  return `${reworked} trên ${overview.instances.started} lần chạy phải chạy lại`;
 }

@@ -225,7 +225,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                   <thead className="bg-surface-raised text-left text-xs tracking-wide text-on-surface-muted uppercase">
                     <tr>
                       <th scope="col" className="px-4 py-3 font-medium">
-                        Metric
+                        Chỉ số
                       </th>
                       <th scope="col" className="px-4 py-3 font-medium">
                         Cách tính
@@ -345,7 +345,7 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
 
             <dl className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               {[
-                { label: 'Instance đã chạy', value: String(overview.instances.started) },
+                { label: 'Tổng lần chạy', value: String(overview.instances.started) },
                 { label: 'Hoàn tất', value: String(overview.instances.completed) },
                 { label: 'Bị từ chối', value: String(overview.instances.rejected) },
                 { label: 'Đang chạy', value: String(overview.instances.running) },
@@ -362,11 +362,11 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
             <dl className="mt-4 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
               <Card>
                 <dt className="text-xs tracking-wide text-on-surface-muted uppercase">
-                  Cycle time
+                  Thời gian một vòng
                 </dt>
                 <dd className="mt-1 text-sm">{durationLabel(overview.cycleTime)}</dd>
                 <p className="mt-1 text-xs text-on-surface-muted">
-                  {`từ lúc start tới lúc kết thúc · ${finishedCount(overview)} instance đã kết thúc`}
+                  {`từ lúc bắt đầu tới lúc kết thúc · ${finishedCount(overview)} lần chạy đã kết thúc`}
                 </p>
               </Card>
               <Card>
