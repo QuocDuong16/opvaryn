@@ -36,7 +36,7 @@ const CAPABILITIES: readonly { title: string; body: string }[] = [
   },
   {
     title: 'Báo cáo không cần SQL',
-    body: 'Metric tự định nghĩa trên field của bản ghi (đếm, tổng, trung bình, lọc, nhóm) cùng số liệu vận hành của quy trình: thời gian một vòng, tỉ lệ duyệt, tỉ lệ làm lại. Con số luôn theo phạm vi dữ liệu người đọc được.',
+    body: 'Chỉ số tự định nghĩa trên trường của bản ghi (đếm, tổng, trung bình, lọc, nhóm) cùng số liệu vận hành của quy trình: thời gian một vòng, tỉ lệ duyệt, tỉ lệ làm lại. Con số luôn theo phạm vi dữ liệu người đọc được.',
   },
   {
     title: 'Nối ra hệ thống khác',
@@ -66,7 +66,7 @@ const TRUST: readonly { title: string; body: string }[] = [
 const STATUS: readonly { title: string; body: string }[] = [
   {
     title: 'Đang chạy (MVP V1)',
-    body: 'Business object và bản ghi, biểu mẫu sinh từ định nghĩa, quy trình phê duyệt với hộp việc, phân quyền theo vai trò và bộ phận, metric tự định nghĩa cùng số liệu vận hành, gửi sự kiện ra hệ thống ngoài, và triển khai một host có sao lưu.',
+    body: 'Loại dữ liệu và bản ghi, biểu mẫu sinh từ định nghĩa, quy trình phê duyệt với hộp việc, phân quyền theo vai trò và bộ phận, chỉ số tự định nghĩa cùng số liệu vận hành, gửi sự kiện ra hệ thống ngoài, và triển khai một host có sao lưu.',
   },
   {
     title: 'Chưa có',

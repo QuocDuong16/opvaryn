@@ -50,7 +50,7 @@ export default async function ObjectsPage({ searchParams }: PageProps) {
       <PageHeader
         eyebrow="02 / Dữ liệu"
         title="Dữ liệu"
-        lead="Định nghĩa dữ liệu nghiệp vụ: các field có kiểu rõ ràng và khoá ổn định. Sửa định nghĩa là phát hành phiên bản mới; bản ghi cũ giữ nguyên định nghĩa lúc được tạo. Mở một định nghĩa để nhập bản ghi."
+        lead="Định nghĩa dữ liệu nghiệp vụ: các trường có kiểu rõ ràng và khoá ổn định. Sửa định nghĩa là phát hành phiên bản mới; bản ghi cũ giữ nguyên định nghĩa lúc được tạo. Mở một định nghĩa để nhập bản ghi."
       />
 
       {error ? (
@@ -71,7 +71,7 @@ export default async function ObjectsPage({ searchParams }: PageProps) {
           <ListSearch
             basePath="/objects"
             value={query}
-            placeholder="Tìm theo tên hoặc key"
+            placeholder="Tìm theo tên hoặc khoá"
             label="Tìm định nghĩa dữ liệu"
           />
         </div>

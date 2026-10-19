@@ -8,8 +8,8 @@ export default function ObjectNotFound() {
       </p>
       <h1 className="mt-3 text-xl font-semibold tracking-tight">Không có loại dữ liệu này</h1>
       <p className="mx-auto mt-2 max-w-md text-sm text-on-surface-muted">
-        Key có thể bị gõ sai hoặc chưa được tạo trong môi trường này. Danh sách định nghĩa hiện có
-        nằm ở trang Business Objects.
+        Đường dẫn có thể bị gõ sai hoặc loại dữ liệu chưa được tạo trong môi trường này. Danh sách
+        định nghĩa hiện có nằm ở trang Dữ liệu.
       </p>
       <Link
         href="/objects"

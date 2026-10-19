@@ -77,7 +77,7 @@ export default async function FormsPage({ searchParams }: PageProps) {
 
       {error ? (
         <Card className="mb-6 border-warning/40">
-          <CardTitle className="text-warning">Không đọc được business object</CardTitle>
+          <CardTitle className="text-warning">Không đọc được loại dữ liệu</CardTitle>
           <CardDescription>{error}</CardDescription>
           <p className="mt-4 text-sm text-on-surface-muted">
             Thử lại sau ít phút. Nếu vẫn không được, báo cho người quản trị hệ thống.
@@ -87,16 +87,16 @@ export default async function FormsPage({ searchParams }: PageProps) {
 
       {!error && objects.length === 0 ? (
         <Card>
-          <CardTitle>Chưa có schema để dựng form</CardTitle>
+          <CardTitle>Chưa có định nghĩa nào để dựng màn nhập liệu</CardTitle>
           <CardDescription>
-            Form Builder cần ít nhất một business object. Tạo định nghĩa ở trang Business Objects
-            Chưa có định nghĩa nào để dựng form.
+            Màn nhập liệu sinh từ định nghĩa dữ liệu. Tạo định nghĩa đầu tiên ở trang Dữ liệu rồi
+            quay lại đây.
           </CardDescription>
           <Link
             href="/objects"
             className="mt-4 inline-block rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:opacity-90"
           >
-            Tạo business object
+            Tạo loại dữ liệu
           </Link>
         </Card>
       ) : null}

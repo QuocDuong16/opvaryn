@@ -143,7 +143,7 @@ function ListView({ app, onOpen }: { app: MiniAppData; onOpen: (recordId: string
   if (app.records.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-border-strong px-5 py-10 text-center text-sm text-on-surface-muted">
-        Chưa có bản ghi nào để hiển thị. Nhập dữ liệu ở trang Business Objects.
+        Chưa có bản ghi nào để hiển thị. Nhập dữ liệu ở trang Dữ liệu.
       </p>
     );
   }
@@ -226,8 +226,8 @@ function DetailView({ app, record }: { app: MiniAppData; record: ObjectRecord | 
           </dl>
         </div>
         <p className="rounded-lg border border-dashed border-border-strong px-3 py-2 text-xs leading-relaxed text-on-surface-muted">
-          Actions theo role/trạng thái, activity feed và liên kết đối tượng là phần tiếp theo của
-          Application Builder (V2) — chưa có trong demo.
+          Thao tác theo vai trò và trạng thái, dòng hoạt động và liên kết giữa các bản ghi là phần
+          sẽ làm ở bản sau — chưa có trong bản này.
         </p>
       </aside>
     </div>
@@ -267,7 +267,7 @@ function KanbanView({ app, statusFieldKey }: { app: MiniAppData; statusFieldKey?
     <div>
       <p className="mb-3 text-xs text-on-surface-muted">
         {`Gom cột theo trường ${statusField.label} cho mục đích minh hoạ — chính sách gom nhóm và
-        kéo thả thuộc V2.`}
+        kéo thả sẽ làm ở bản sau.`}
       </p>
       <div className="grid gap-3 sm:grid-cols-3">
         {columns.map((column) => (
