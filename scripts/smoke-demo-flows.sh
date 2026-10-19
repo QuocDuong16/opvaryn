@@ -506,7 +506,7 @@ echo "flows: [D] a metric created through the web form answers immediately"
 web_metric_key="flow_metric_$stamp"
 status="$(web_get "/analytics" "$tmp_dir/analytics-form.html")"
 assert_status "$status" "200" "analytics page with the create form"
-assert_contains "$tmp_dir/analytics-form.html" "Tạo metric" "the create form is offered"
+assert_contains "$tmp_dir/analytics-form.html" "Tạo chỉ số" "the create form is offered"
 mapfile -t metric_args < <(form_args "$tmp_dir/analytics-form.html" key aggregation)
 [[ ${#metric_args[@]} -ge 4 ]] || fail "[D] the metric form has no server-action fields"
 status="$(web_post "/analytics" "$tmp_dir/metric-created.html" \
@@ -519,7 +519,7 @@ status="$(web_post "/analytics" "$tmp_dir/metric-created.html" \
   --form-string 'filterOp=gte' \
   --form-string 'filterValue=1000000')"
 assert_status "$status" "200" "creating a metric through the web form"
-assert_contains "$tmp_dir/metric-created.html" "Đã tạo metric" "creating a metric through the web form"
+assert_contains "$tmp_dir/metric-created.html" "Đã tạo chỉ số" "creating a metric through the web form"
 
 curl -sS -b "$cookie_jar" -o "$tmp_dir/web-metric-result.json" \
   "$api_base/api/v1/metrics/$web_metric_key/result"
@@ -581,7 +581,7 @@ check_surface "/overview" "overview" "Việc đang chờ bạn" "Lần chạy g�
 # A department head sees the product, never the plumbing: no build status, no endpoint table.
 assert_not_contains "$tmp_dir/surface.html" "Thông tin hệ thống" "overview for a non-admin"
 # The Data screen leads with the definitions in use and offers the search that goes with it.
-check_surface "/objects" "objects" "Đang dùng" "Tìm theo tên hoặc key"
+check_surface "/objects" "objects" "Đang dùng" "Tìm theo tên hoặc khoá"
 check_surface "/forms?object=$object_key" "forms" "Nhập" 'name="priority"'
 # A person entering data sees the field's name and its rule, never the column key (ADR 0016).
 assert_contains "$tmp_dir/surface.html" "Nội dung" "the form names its fields"
@@ -769,7 +769,12 @@ status="$(web_post "/tasks/$instance_id" "$tmp_dir/approved.html" \
   "${decision_args[@]}" --form-string 'decision=approve')"
 assert_status "$status" "200" "approve decision"
 assert_contains "$tmp_dir/approved.html" "Đã duyệt — quy trình chuyển tới bước" "the approve is confirmed"
-assert_contains "$tmp_dir/approved.html" "việc tiếp theo thuộc role $director_role" "the next role is named"
+# The confirmation names the next step and its role the way the screen does: the step's
+# title and the role's label, and this run's role has no label so its key is the truth
+# that is left (ADR 0018). Never "role <key>" and never the node key.
+assert_contains "$tmp_dir/approved.html" "việc tiếp theo thuộc $director_role" "the next role is named"
+assert_not_contains "$tmp_dir/approved.html" "thuộc role " "the confirmation does not say role <key>"
+assert_not_contains "$tmp_dir/approved.html" "tới bước “escalate”" "the confirmation does not print the node key"
 # The log reads in the words a person uses: the field's label and the operator, not the
 # stored keys (ADR 0018).
 assert_contains "$tmp_dir/approved.html" "Số tiền từ 1000000" "what the condition saw is in the log"

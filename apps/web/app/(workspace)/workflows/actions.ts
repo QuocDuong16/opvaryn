@@ -33,7 +33,7 @@ export async function saveWorkflowDraftAction(
   const key = String(formData.get('key') ?? '').trim();
   const raw = String(formData.get('draft') ?? '');
   if (key === '') {
-    return { status: 'error', message: 'Thiếu key của quy trình.' };
+    return { status: 'error', message: 'Thiếu mã của quy trình.' };
   }
 
   const store = await cookies();

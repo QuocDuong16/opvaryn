@@ -6,6 +6,7 @@ import type { ProcessInstanceView } from '@opvaryn/contracts';
 
 import { type DecisionState } from '@/components/tasks/decision-state';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
+import { labelOrKey, roleLabels } from '@/lib/names';
 
 const DECISIONS = ['approve', 'return', 'reject'] as const;
 type Decision = (typeof DECISIONS)[number];
@@ -44,7 +45,20 @@ export async function decideProcessTaskAction(
 
   revalidatePath('/tasks');
   revalidatePath(`/tasks/${instanceId}`);
-  return { status: 'success', decided: decision, message: describeOutcome(view, decision) };
+
+  // The sentence names the next step and its role the way the screen does — the step's own
+  // title and the role's label, never the engine's keys (ADR 0016/0018). A missing
+  // catalogue only means the key is shown instead.
+  const labels = await loadRoleLabels();
+  return { status: 'success', decided: decision, message: describeOutcome(view, decision, labels) };
+}
+
+async function loadRoleLabels(): Promise<ReadonlyMap<string, string>> {
+  try {
+    return roleLabels(await createServerApiClient().listRoles());
+  } catch {
+    return new Map();
+  }
 }
 
 function isDecision(value: string): value is Decision {
@@ -52,26 +66,36 @@ function isDecision(value: string): value is Decision {
 }
 
 /** describeOutcome says what the engine did, read from the instance it returned. */
-function describeOutcome(view: ProcessInstanceView, decision: Decision): string {
-  const { state, currentNode, attempt } = view.instance;
+function describeOutcome(
+  view: ProcessInstanceView,
+  decision: Decision,
+  roles: ReadonlyMap<string, string>,
+): string {
+  const { state, attempt } = view.instance;
   const waiting = view.tasks.filter((task) => task.status === 'open');
 
   if (decision === 'reject' || state === 'rejected') {
-    return 'Đã từ chối — quy trình kết thúc (từ chối là terminal, D08a). Người đề nghị đọc được lý do trong timeline.';
+    return 'Đã từ chối — quy trình kết thúc. Người đề nghị đọc được lý do trong nhật ký.';
   }
   if (state === 'completed') {
-    return 'Đã duyệt — quy trình hoàn tất. Sự kiện đã ghi vào event log append-only.';
+    return 'Đã duyệt — quy trình hoàn tất. Diễn biến đã được ghi vào nhật ký.';
   }
   if (decision === 'return') {
-    return `Đã trả về người đề nghị — quy trình chạy lại từ đầu với lần ${attempt}${nextStepLabel(waiting)}.`;
+    return `Đã trả về người đề nghị — quy trình chạy lại từ đầu với lần ${attempt}${nextStepLabel(waiting, roles)}.`;
   }
-  return `Đã duyệt — quy trình chuyển tới bước “${currentNode}”${nextStepLabel(waiting)}.`;
+  const next = waiting[0]?.title ?? 'bước tiếp theo';
+  return `Đã duyệt — quy trình chuyển tới bước “${next}”${nextStepLabel(waiting, roles)}.`;
 }
 
-function nextStepLabel(waiting: ProcessInstanceView['tasks']): string {
+function nextStepLabel(
+  waiting: ProcessInstanceView['tasks'],
+  roles: ReadonlyMap<string, string>,
+): string {
   if (waiting.length === 0) {
     return '';
   }
-  const roles = [...new Set(waiting.map((task) => task.assigneeRole))].join(', ');
-  return `, việc tiếp theo thuộc role ${roles}`;
+  const names = [
+    ...new Set(waiting.map((task) => labelOrKey(roles.get(task.assigneeRole), task.assigneeRole))),
+  ].join(', ');
+  return `, việc tiếp theo thuộc ${names}`;
 }

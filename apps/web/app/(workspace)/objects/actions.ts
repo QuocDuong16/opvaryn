@@ -29,7 +29,7 @@ export async function createBusinessObjectAction(
   if (fields === null) {
     return {
       status: 'error',
-      message: 'Không đọc được danh sách field. Tải lại trang rồi nhập lại schema.',
+      message: 'Không đọc được danh sách trường. Tải lại trang rồi nhập lại định nghĩa.',
     };
   }
 
@@ -43,7 +43,7 @@ export async function createBusinessObjectAction(
     revalidatePath('/objects');
     return {
       status: 'success',
-      message: `Đã tạo "${created.name}" — key ${created.key} với ${created.fields.length} field.`,
+      message: `Đã tạo "${created.name}" — mã ${created.key} với ${created.fields.length} trường.`,
       createdKey: created.key,
     };
   } catch (cause) {
@@ -81,7 +81,7 @@ export async function updateBusinessObjectAction(
   if (fields === null) {
     return {
       status: 'error',
-      message: 'Không đọc được danh sách field. Tải lại trang rồi nhập lại schema.',
+      message: 'Không đọc được danh sách trường. Tải lại trang rồi nhập lại định nghĩa.',
     };
   }
 
@@ -134,7 +134,7 @@ export async function createObjectRecordAction(
     revalidatePath('/apps');
     return {
       status: 'success',
-      message: `Đã lưu bản ghi ${created.id.slice(0, 8)}… vào ${object.name}.`,
+      message: `Đã lưu bản ghi vào ${object.name}.`,
       recordId: created.id,
     };
   } catch (cause) {

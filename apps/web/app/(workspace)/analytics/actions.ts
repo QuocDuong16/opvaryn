@@ -107,7 +107,7 @@ export async function createMetricAction(
     revalidatePath('/analytics');
     return {
       status: 'success',
-      message: `Đã tạo metric "${created.name}" (${created.key}). Nó xuất hiện trong dashboard ngay.`,
+      message: `Đã tạo chỉ số "${created.name}" (${created.key}). Nó xuất hiện trong bảng số liệu ngay.`,
       createdKey: created.key,
     };
   } catch (cause) {
