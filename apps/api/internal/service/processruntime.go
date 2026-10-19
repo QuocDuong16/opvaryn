@@ -369,7 +369,10 @@ func (r *ProcessRuntime) Decide(ctx context.Context, in DecideInput) (InstanceVi
 	if err := r.store.CompleteProcessTask(ctx, write); err != nil {
 		return InstanceView{}, err
 	}
-	return r.Get(ctx, instance.ID, in.Principal)
+	// The decision is committed; the answer is the instance it was made on. Reading it
+	// back through the record scope would answer 404 to an approver from another
+	// department the moment their task closed, reporting a successful decision as lost.
+	return r.readInstanceView(ctx, instance.ID)
 }
 
 // Inbox returns the open tasks of the signed-in user: the tasks of every role they
@@ -458,12 +461,26 @@ func (r *ProcessRuntime) Get(ctx context.Context, id uuid.UUID, principal domain
 	if err := requireAuthenticated(principal); err != nil {
 		return InstanceView{}, err
 	}
-	instance, found, err := r.store.FindVisibleProcessInstance(ctx, id, domain.RecordScopeFor(principal))
+	_, found, err := r.store.FindVisibleProcessInstance(ctx, id, domain.RecordScopeFor(principal))
 	if err != nil {
 		return InstanceView{}, fmt.Errorf("look up process instance %s: %w", id, err)
 	}
 	if !found {
 		return InstanceView{}, fmt.Errorf("%w: process instance %s", ErrNotFound, id)
+	}
+	return r.readInstanceView(ctx, id)
+}
+
+// readInstanceView assembles the tasks, the log and the instance row itself, without
+// asking the record scope again. It answers a decision: the actor has just been
+// authorized to act on this instance, and applying the read scope afterwards hid the
+// instance from a person whose last task it closed on another department's record —
+// a committed approval came back as 404 (ADR 0008 governs reads, not the outcome of
+// an action the caller was allowed to take).
+func (r *ProcessRuntime) readInstanceView(ctx context.Context, id uuid.UUID) (InstanceView, error) {
+	instance, err := r.store.GetProcessInstance(ctx, id)
+	if err != nil {
+		return InstanceView{}, fmt.Errorf("look up process instance %s: %w", id, err)
 	}
 	tasks, err := r.store.ListProcessTasks(ctx, id)
 	if err != nil {

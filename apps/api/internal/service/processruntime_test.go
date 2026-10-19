@@ -698,6 +698,38 @@ func TestRejectIsTerminal(t *testing.T) {
 	})
 }
 
+// An approval belongs to the role it was assigned to, and the actor need not keep
+// reading rights on the record afterwards: approving another department's request
+// closes the actor's last task there, so the record leaves their scope. Re-reading the
+// instance through the record scope for the answer turned that committed approval into
+// a 404 ("Không tìm thấy dữ liệu được yêu cầu") on the task screen.
+func TestApproveAnswersWhenTheActorCanNoLongerSeeTheInstance(t *testing.T) {
+	t.Parallel()
+
+	store := newFakeRuntimeStore(t, map[string]any{"estimated_amount": float64(3_200_000)})
+	runtime := NewProcessRuntime(store)
+	view := startInstance(t, runtime, store)
+	// From here the scoped read answers "not visible", which is what the record scope
+	// does once the instance runs on another department's record and no task is open.
+	store.hidden = true
+
+	view, err := runtime.Decide(context.Background(), DecideInput{
+		InstanceID: view.Instance.ID,
+		TaskID:     openTaskFor(t, store, "manager_approval").ID,
+		Decision:   DecisionApprove,
+		Principal:  approverPrincipal(),
+	})
+	if err != nil {
+		t.Fatalf("Decide returned error: %v", err)
+	}
+	if view.Instance.State != domain.ProcessCompleted {
+		t.Fatalf("expected a completed instance, got %s", view.Instance.State)
+	}
+	if len(view.Tasks) == 0 || len(view.Events) == 0 {
+		t.Fatalf("the answer must carry the tasks and the log, got %+v", view)
+	}
+}
+
 func TestDecideGuards(t *testing.T) {
 	t.Parallel()
 
