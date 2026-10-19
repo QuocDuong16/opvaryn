@@ -285,7 +285,7 @@ export function DashboardStudio({
         </button>
         <span className="text-xs text-on-surface-muted">
           {isDefaultWidgets(widgets, allowed)
-            ? 'Đang dùng bố cục mặc định (metric đầu tiên, theo thứ tự).'
+            ? 'Đang dùng bố cục mặc định (chỉ số đầu tiên, theo thứ tự).'
             : 'Bố cục đang khác mặc định — lưu để giữ cho trình duyệt này.'}
         </span>
 

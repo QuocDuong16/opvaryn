@@ -61,7 +61,7 @@ export function CreateMetricForm({ objects }: { objects: readonly BusinessObject
       key={state.createdKey ?? 'initial'}
       action={formAction}
       className="space-y-3"
-      aria-label="Tạo metric mới"
+      aria-label="Tạo chỉ số mới"
     >
       <div className="grid gap-3 sm:grid-cols-2">
         <label className="text-xs">
@@ -222,7 +222,7 @@ function SubmitButton() {
       disabled={pending}
       className="rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent hover:opacity-90 disabled:opacity-60"
     >
-      {pending ? 'Đang tạo…' : 'Tạo metric'}
+      {pending ? 'Đang tạo…' : 'Tạo chỉ số'}
     </button>
   );
 }
