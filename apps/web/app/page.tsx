@@ -23,8 +23,8 @@ const CAPABILITIES: readonly { title: string; body: string }[] = [
     body: 'Khai loại dữ liệu với các trường có kiểu, mỗi lần sửa là một phiên bản mới. Bản ghi cũ giữ đúng cấu trúc lúc nó được tạo, nên đổi định nghĩa không phá dữ liệu đã có.',
   },
   {
-    title: 'Biểu mẫu sinh từ schema',
-    body: 'Mỗi định nghĩa có ngay màn hình nhập liệu tương ứng, không phải viết code cho từng form. Kiểm tra dữ liệu nằm ở server, theo đúng phiên bản định nghĩa của bản ghi.',
+    title: 'Biểu mẫu sinh từ định nghĩa',
+    body: 'Mỗi định nghĩa có ngay màn hình nhập liệu tương ứng, không phải viết code cho từng biểu mẫu. Kiểm tra dữ liệu nằm ở máy chủ, theo đúng phiên bản định nghĩa của bản ghi.',
   },
   {
     title: 'Quy trình phê duyệt chạy thật',
@@ -46,7 +46,7 @@ const CAPABILITIES: readonly { title: string; body: string }[] = [
 
 const TRUST: readonly { title: string; body: string }[] = [
   {
-    title: 'Phân quyền kiểm tra ở server',
+    title: 'Phân quyền kiểm tra ở máy chủ',
     body: 'Quyền theo vai trò và bộ phận được kiểm tra ở máy chủ cho mọi lần đọc và ghi. Bản ghi ngoài phạm vi trả về "không tồn tại" thay vì tiết lộ rằng nó có ở đó.',
   },
   {
@@ -55,7 +55,7 @@ const TRUST: readonly { title: string; body: string }[] = [
   },
   {
     title: 'Chạy trong hạ tầng của bạn',
-    body: 'Một host nội bộ bằng Docker Compose: TLS, job sao lưu định kỳ và quy trình diễn tập phục hồi có kiểm chứng. Không phải SaaS nhiều tổ chức, dữ liệu không đi ra ngoài.',
+    body: 'Một máy chủ nội bộ bằng Docker Compose: TLS, job sao lưu định kỳ và quy trình diễn tập phục hồi có kiểm chứng. Không phải SaaS nhiều tổ chức, dữ liệu không đi ra ngoài.',
   },
   {
     title: 'Nhãn trạng thái trung thực',
@@ -66,11 +66,11 @@ const TRUST: readonly { title: string; body: string }[] = [
 const STATUS: readonly { title: string; body: string }[] = [
   {
     title: 'Đang chạy (MVP V1)',
-    body: 'Loại dữ liệu và bản ghi, biểu mẫu sinh từ định nghĩa, quy trình phê duyệt với hộp việc, phân quyền theo vai trò và bộ phận, chỉ số tự định nghĩa cùng số liệu vận hành, gửi sự kiện ra hệ thống ngoài, và triển khai một host có sao lưu.',
+    body: 'Loại dữ liệu và bản ghi, biểu mẫu sinh từ định nghĩa, quy trình phê duyệt với hộp việc, phân quyền theo vai trò và bộ phận, chỉ số tự định nghĩa cùng số liệu vận hành, gửi sự kiện ra hệ thống ngoài, và triển khai trên một máy chủ có sao lưu.',
   },
   {
     title: 'Chưa có',
-    body: 'Đăng nhập qua OIDC/SSO (chờ IdP của tổ chức), SLA và tự động chuyển cấp (cần chính sách thời gian làm việc), adapter hai chiều với hệ thống ngoài, và các dạng xem kanban/connector đang ở mức minh hoạ.',
+    body: 'Đăng nhập qua OIDC/SSO (chờ IdP của tổ chức), SLA và tự động chuyển cấp (cần chính sách thời gian làm việc), kết nối hai chiều với hệ thống ngoài, và các dạng xem kanban/connector đang ở mức minh hoạ.',
   },
 ];
 
@@ -188,7 +188,7 @@ export default async function LandingPage() {
             <div>
               <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Triển khai</dt>
               <dd className="mt-1 text-sm">
-                Một host nội bộ, TLS, sao lưu định kỳ và diễn tập phục hồi có kiểm chứng.
+                Một máy chủ nội bộ, TLS, sao lưu định kỳ và diễn tập phục hồi có kiểm chứng.
               </dd>
             </div>
           </dl>
