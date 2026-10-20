@@ -25,7 +25,16 @@ const INPUT_CLASS =
  * Pass `record` to edit an existing record: the fields come from the version that record
  * was created under, and the values are prefilled from it.
  */
-export function ObjectForm({ object, record }: { object: BusinessObject; record?: ObjectRecord }) {
+export function ObjectForm({
+  object,
+  record,
+  lookupOptions = {},
+}: {
+  object: BusinessObject;
+  record?: ObjectRecord;
+  /** The options a field takes from an external catalogue (ADR 0034). */
+  lookupOptions?: Record<string, { value: string; label: string }[]>;
+}) {
   const [state, formAction] = useActionState(
     record ? updateObjectRecordAction : createObjectRecordAction,
     INITIAL_CREATE_RECORD_STATE,
@@ -54,6 +63,7 @@ export function ObjectForm({ object, record }: { object: BusinessObject; record?
           defaultValue={record?.values[field.key]}
           attachmentNames={record?.attachmentNames}
           visible={evaluateCondition(field.visibleWhen, values)}
+          lookupOptions={lookupOptions[field.key]}
           onValueChange={(value) => setValues((current) => ({ ...current, [field.key]: value }))}
         />
       ))}
@@ -96,6 +106,7 @@ function FieldControl({
   defaultValue,
   attachmentNames,
   visible,
+  lookupOptions,
   onValueChange,
 }: {
   field: FieldDefinition;
@@ -104,6 +115,8 @@ function FieldControl({
   attachmentNames?: Record<string, string>;
   /** False when the field's condition does not hold (ADR 0032). */
   visible: boolean;
+  /** The options from an external catalogue, when the field takes them from there. */
+  lookupOptions?: { value: string; label: string }[];
   onValueChange: (value: unknown) => void;
 }) {
   const controlId = `field-${field.key}`;
@@ -158,7 +171,7 @@ function FieldControl({
           />
         </div>
       ) : (
-        renderControl(field, controlId, describedBy, defaultValue)
+        renderControl(field, controlId, describedBy, defaultValue, lookupOptions)
       )}
 
       {/* The key stays in the API payload; a person filling the form needs the rule, not
@@ -227,6 +240,7 @@ function renderControl(
   controlId: string,
   describedBy: string,
   defaultValue?: unknown,
+  lookupOptions?: { value: string; label: string }[],
 ) {
   const initial = defaultValueFor(field, defaultValue);
 
@@ -256,7 +270,16 @@ function renderControl(
         />
       );
 
-    case 'select':
+    case 'select': {
+      // A field that takes its options from an external catalogue uses those options
+      // (ADR 0034); otherwise it uses the ones the definition declares.
+      const options =
+        lookupOptions && lookupOptions.length > 0
+          ? lookupOptions
+          : (field.options ?? []).map((option) => ({
+              value: option.value,
+              label: option.label,
+            }));
       return (
         <select
           id={controlId}
@@ -266,13 +289,14 @@ function renderControl(
           className={INPUT_CLASS}
         >
           <option value="">— Chọn —</option>
-          {(field.options ?? []).map((option) => (
+          {options.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
           ))}
         </select>
       );
+    }
 
     case 'rows':
       return (

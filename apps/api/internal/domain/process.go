@@ -165,6 +165,20 @@ type ProcessTask struct {
 	Priority string
 }
 
+// LookupSource is where a select field takes its options from (ADR 0034).
+type LookupSource struct {
+	ObjectKey string
+	FieldKey  string
+	URL       string
+	UpdatedAt time.Time
+}
+
+// LookupOption is one option of an external catalogue.
+type LookupOption struct {
+	Value string `json:"value"`
+	Label string `json:"label"`
+}
+
 // WorkPolicy is the policy of one kind of work (ADR 0035): the default deadline, the
 // default priority, and the role that takes an overdue step over.
 type WorkPolicy struct {

@@ -20,20 +20,8 @@ interface PageProps {
 
 const PLANNED_CAPABILITIES: readonly { title: string; body: string }[] = [
   {
-    title: 'Điều kiện hiển thị theo dữ liệu đã nhập',
-    body: 'Field chỉ hiện khi một lựa chọn trước đó thoả điều kiện. Sẽ làm cùng lúc với điều kiện rẽ nhánh trong quy trình.',
-  },
-  {
-    title: 'Calculated field',
-    body: 'Giá trị tính từ field khác (ví dụ tổng tiền theo danh mục). Cần khai báo biểu thức và kiểm tra kiểu dữ liệu.',
-  },
-  {
-    title: 'External lookup khi tích hợp',
-    body: 'Gợi ý dữ liệu từ hệ thống ngoài (danh mục nhà cung cấp, mã nhân viên) thuộc phạm vi Integration Hub.',
-  },
-  {
-    title: 'Dòng lặp dạng bảng',
-    body: 'Mỗi mục của trường danh sách hiện nhập một dòng. Bảng có nút thêm và xoá dòng sẽ làm ở phiên bản sau.',
+    title: 'Ghi ngược lại hệ thống ngoài',
+    body: 'Tra cứu đã kéo được dữ liệu của hệ thống khác vào; việc ghi ngược lại thuộc về tích hợp hai chiều.',
   },
 ];
 
@@ -62,6 +50,17 @@ export default async function FormsPage({ searchParams }: PageProps) {
   const selected =
     objects.find((object) => object.key === requestedKey) ??
     (objects.length > 0 ? objects[0] : null);
+
+  // The options a field takes from an external catalogue (ADR 0034).
+  const lookupOptions: Record<string, { value: string; label: string }[]> = {};
+  if (selected) {
+    const lookups = await api.listLookups(selected.key).catch(() => ({ data: [] }));
+    for (const lookup of lookups.data) {
+      if (!lookup.error && lookup.options.length > 0) {
+        lookupOptions[lookup.fieldKey] = lookup.options;
+      }
+    }
+  }
 
   // Build status ("chưa có trong V1") is for the administrator in advanced mode (ADR 0015).
   const [roles, advanced] = await Promise.all([loadRoles(), getAdvancedMode()]);
@@ -136,7 +135,7 @@ export default async function FormsPage({ searchParams }: PageProps) {
                 </div>
               </div>
               <div className="mt-5">
-                <ObjectForm object={selected} />
+                <ObjectForm object={selected} lookupOptions={lookupOptions} />
               </div>
             </Card>
 

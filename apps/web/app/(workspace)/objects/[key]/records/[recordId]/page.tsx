@@ -41,12 +41,20 @@ export default async function ObjectRecordPage({
   let object: BusinessObject;
   let record: ObjectRecord;
   let versions: BusinessObjectVersion[];
+  // The options a field takes from an external catalogue (ADR 0034).
+  const lookupOptions: Record<string, { value: string; label: string }[]> = {};
   try {
     [object, record, versions] = await Promise.all([
       api.getBusinessObject(key),
       api.getObjectRecord(key, recordId),
       api.listBusinessObjectVersions(key),
     ]);
+    const lookups = await api.listLookups(key).catch(() => ({ data: [] }));
+    for (const lookup of lookups.data) {
+      if (!lookup.error && lookup.options.length > 0) {
+        lookupOptions[lookup.fieldKey] = lookup.options;
+      }
+    }
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'not_found') {
       notFound();
@@ -123,7 +131,7 @@ export default async function ObjectRecordPage({
           </CardDescription>
           {record.canEdit ? (
             <div className="mt-4">
-              <ObjectForm object={definition} record={record} />
+              <ObjectForm object={definition} record={record} lookupOptions={lookupOptions} />
             </div>
           ) : (
             <RecordValues fields={version.fields} record={record} />

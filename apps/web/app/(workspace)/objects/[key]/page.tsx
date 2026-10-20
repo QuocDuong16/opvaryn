@@ -94,6 +94,7 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
   let records: ObjectRecord[] = [];
   let recordTotal = 0;
   let pickerRecords: ObjectRecord[] = [];
+  const lookupOptions: Record<string, { value: string; label: string }[]> = {};
   let pickerTotal = 0;
   let definitions: ProcessDefinition[] = [];
   let instances: ProcessInstanceSummary[] = [];
@@ -114,6 +115,13 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
       api.listProcessInstances({ objectKey: key }, { limit: 1 }),
     ]);
     versions = versionList;
+    // The options a field takes from an external catalogue (ADR 0034).
+    const lookupFields = await api.listLookups(key).catch(() => ({ data: [] }));
+    for (const lookup of lookupFields.data) {
+      if (!lookup.error && lookup.options.length > 0) {
+        lookupOptions[lookup.fieldKey] = lookup.options;
+      }
+    }
     namedRoles = roleLabels(roles);
     mayDesign = canDesign(me?.roles);
     roleName = designerRoleName(roles);
@@ -388,7 +396,7 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
                 {`Màn nhập sinh từ phiên bản v${object.version}; dữ liệu được kiểm tra ở server theo đúng định nghĩa trước khi lưu.`}
               </CardDescription>
               <div className="mt-4">
-                <ObjectForm object={object} />
+                <ObjectForm object={object} lookupOptions={lookupOptions} />
               </div>
             </Card>
 

@@ -5,6 +5,7 @@ import { redirect } from 'next/navigation';
 
 import type { AdminActionState } from '@/components/admin/admin-state';
 import type { WorkPolicyState } from '@/components/admin/work-policy-state';
+import type { LookupState } from '@/components/admin/lookup-state';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 
 /**
@@ -120,6 +121,28 @@ export async function unlockAdminUserAction(
   // confirmation therefore travels in the address, where the next render can show it.
   revalidatePath('/admin/users');
   redirect(`/admin/users/${userId}?unlocked=1`);
+}
+
+// ------------------------------------------------------- lookups ----
+
+export async function saveLookupSourceAction(
+  _previous: LookupState,
+  formData: FormData,
+): Promise<LookupState> {
+  const objectKey = field(formData, 'objectKey');
+  try {
+    // The form carries one address per field, named `url-<field key>`, and the field keys
+    // in `field-objectKey`.
+    const fieldKeys = formData.getAll('field-objectKey').map((value) => String(value));
+    for (const fieldKey of fieldKeys) {
+      const url = field(formData, `url-${fieldKey}`);
+      await createServerApiClient().saveLookupSource(objectKey, fieldKey, url);
+    }
+    revalidatePath('/admin/lookups');
+    return { status: 'success', message: 'Đã lưu nguồn tra cứu.' };
+  } catch (cause) {
+    return failure(cause);
+  }
 }
 
 // ------------------------------------------------------- work policies ----

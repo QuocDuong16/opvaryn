@@ -107,6 +107,7 @@ func run() error {
 			WorkingHours:   workingHours,
 			AppConfigs:     service.NewAppConfigs(st),
 			WorkPolicies:   service.NewWorkPolicies(st),
+			Lookups:        service.NewLookups(st),
 			TwoFactor:      twoFactor,
 			Admin:          service.NewAdmin(st),
 			Attachments:    service.NewAttachments(st),

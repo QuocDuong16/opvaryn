@@ -103,6 +103,16 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
   },
   {
     method: 'GET',
+    path: '/api/v1/lookups/{key}',
+    purpose: 'Các lựa chọn lấy từ hệ thống ngoài cho những trường của loại dữ liệu này',
+  },
+  {
+    method: 'PUT',
+    path: '/api/v1/admin/lookups/{key}/{fieldKey}',
+    purpose: 'Gắn một trường vào danh mục của hệ thống khác',
+  },
+  {
+    method: 'GET',
     path: '/api/v1/admin/work-policies/{key}',
     purpose: 'Chính sách của một loại việc: hạn mặc định, ưu tiên, vai trò nhận việc khi quá hạn',
   },

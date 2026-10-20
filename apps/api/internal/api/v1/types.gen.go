@@ -910,6 +910,21 @@ type LoginRequest struct {
 	Password string `json:"password"`
 }
 
+// LookupField defines model for LookupField.
+type LookupField struct {
+	// Error Why the source could not be read; the field then offers no options.
+	Error    *string        `json:"error,omitempty"`
+	FieldKey string         `json:"fieldKey"`
+	Options  []LookupOption `json:"options"`
+	Url      string         `json:"url"`
+}
+
+// LookupOption defines model for LookupOption.
+type LookupOption struct {
+	Label string `json:"label"`
+	Value string `json:"value"`
+}
+
 // Me defines model for Me.
 type Me struct {
 	// Department Department key (D09b scoping). Keys are for the engine, not for screens.
@@ -1648,6 +1663,12 @@ type ListAdminDepartmentsParams struct {
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
+// SaveLookupSourceJSONBody defines parameters for SaveLookupSource.
+type SaveLookupSourceJSONBody struct {
+	// Url The address of the catalogue; empty removes the source.
+	Url string `json:"url"`
+}
+
 // ListAdminRolesParams defines parameters for ListAdminRoles.
 type ListAdminRolesParams struct {
 	// Q Search term matched against the key and the display name.
@@ -1818,6 +1839,9 @@ type CreateAdminDepartmentJSONRequestBody = CreateAdminDepartmentRequest
 
 // UpdateAdminDepartmentJSONRequestBody defines body for UpdateAdminDepartment for application/json ContentType.
 type UpdateAdminDepartmentJSONRequestBody = UpdateAdminDepartmentRequest
+
+// SaveLookupSourceJSONRequestBody defines body for SaveLookupSource for application/json ContentType.
+type SaveLookupSourceJSONRequestBody SaveLookupSourceJSONBody
 
 // CreateAdminRoleJSONRequestBody defines body for CreateAdminRole for application/json ContentType.
 type CreateAdminRoleJSONRequestBody = CreateAdminRoleRequest
