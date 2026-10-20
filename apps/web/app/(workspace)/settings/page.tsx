@@ -93,13 +93,23 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
   },
   {
     method: 'GET',
-    path: '/api/v1/app-configs/{objectKey}',
+    path: '/api/v1/app-configs/{key}',
     purpose: 'Cấu hình của màn ứng dụng: tên, trường gom cột kanban, các cột của danh sách',
   },
   {
     method: 'PUT',
-    path: '/api/v1/app-configs/{objectKey}',
+    path: '/api/v1/app-configs/{key}',
     purpose: 'Lưu cấu hình của màn ứng dụng',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/admin/work-policies/{key}',
+    purpose: 'Chính sách của một loại việc: hạn mặc định, ưu tiên, vai trò nhận việc khi quá hạn',
+  },
+  {
+    method: 'PUT',
+    path: '/api/v1/admin/work-policies/{key}',
+    purpose: 'Đặt chính sách của một loại việc',
   },
   {
     method: 'GET',

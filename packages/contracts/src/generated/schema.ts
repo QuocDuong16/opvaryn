@@ -779,7 +779,30 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
-    "/api/v1/app-configs/{objectKey}": {
+    "/api/v1/admin/work-policies/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The policy of one kind of work
+         * @description The default deadline (in working hours), the default priority, and the role that takes
+         *     an overdue step over (ADR 0035). A step of a process may declare its own deadline and
+         *     priority, which win over the policy.
+         */
+        get: operations["getWorkPolicy"];
+        /** Set the policy of one kind of work */
+        put: operations["saveWorkPolicy"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/app-configs/{key}": {
         parameters: {
             query?: never;
             header?: never;
@@ -1483,6 +1506,11 @@ export interface components {
             dueAt?: string;
             /** @description Whether the step was already taken over once (ADR 0031). */
             escalated?: boolean;
+            /**
+             * @description How urgent the task is (ADR 0035).
+             * @enum {string}
+             */
+            priority?: "low" | "normal" | "high" | "urgent";
         };
         ProcessEvent: {
             /** Format: int64 */
@@ -1817,6 +1845,24 @@ export interface components {
             op: "eq" | "ne" | "gt" | "gte" | "lt" | "lte";
             /** @description The literal to compare against, typed by the field. */
             value: unknown;
+        };
+        WorkPolicy: {
+            objectKey: string;
+            /**
+             * @description The deadline of a step that does not declare one, in working hours.
+             * @example 8
+             */
+            defaultDueHours: number;
+            /** @enum {string} */
+            defaultPriority: "low" | "normal" | "high" | "urgent";
+            /** @description The role that takes an overdue step over; empty means nobody does. */
+            escalationRole: string;
+        };
+        WorkPolicyRequest: {
+            defaultDueHours: number;
+            /** @enum {string} */
+            defaultPriority: "low" | "normal" | "high" | "urgent";
+            escalationRole: string;
         };
         AppConfig: {
             objectKey: string;
@@ -3410,12 +3456,69 @@ export interface operations {
             503: components["responses"]["ServiceUnavailable"];
         };
     };
+    getWorkPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The policy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkPolicy"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    saveWorkPolicy: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkPolicyRequest"];
+            };
+        };
+        responses: {
+            /** @description The stored policy */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkPolicy"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
     getAppConfig: {
         parameters: {
             query?: never;
             header?: never;
             path: {
-                objectKey: string;
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
             };
             cookie?: never;
         };
@@ -3439,7 +3542,8 @@ export interface operations {
             query?: never;
             header?: never;
             path: {
-                objectKey: string;
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
             };
             cookie?: never;
         };

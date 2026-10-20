@@ -40,6 +40,14 @@ interface PageProps {
 /** One page of the inbox; the API slices and reports the total. */
 const PER_PAGE = 25;
 
+/** PRIORITY_LABELS name the priorities a task can carry. */
+const PRIORITY_LABELS: Record<string, string> = {
+  low: 'Thấp',
+  normal: 'Bình thường',
+  high: 'Cao',
+  urgent: 'Khẩn',
+};
+
 /** isOverdue says whether a deadline has passed. */
 function isOverdue(dueAt: string): boolean {
   return new Date(dueAt).getTime() <= Date.now();
@@ -188,6 +196,17 @@ export default async function TasksPage({ searchParams }: PageProps) {
                     {item.task.attempt > 1 ? (
                       <span className="rounded-full border border-border px-2 py-0.5 text-[11px] text-on-surface-muted">
                         {`lần ${item.task.attempt}`}
+                      </span>
+                    ) : null}
+                    {item.task.priority && item.task.priority !== 'normal' ? (
+                      <span
+                        className={
+                          item.task.priority === 'urgent' || item.task.priority === 'high'
+                            ? 'rounded-full border border-danger/40 px-2 py-0.5 text-[11px] text-danger'
+                            : 'rounded-full border border-border px-2 py-0.5 text-[11px] text-on-surface-muted'
+                        }
+                      >
+                        {PRIORITY_LABELS[item.task.priority] ?? item.task.priority}
                       </span>
                     ) : null}
                     {item.task.dueAt ? (

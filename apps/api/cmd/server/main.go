@@ -99,10 +99,14 @@ func run() error {
 				// The steps get a deadline, counted in the organisation's working hours
 				// (ADR 0031).
 				service.WithWorkingHours(workingHours),
+				// The policy of the kind of work decides the deadline and the priority
+				// of a step that does not declare its own (ADR 0035).
+				service.WithWorkPolicies(service.NewWorkPolicies(st)),
 			),
 			Identity:       service.NewIdentity(st, twoFactor),
 			WorkingHours:   workingHours,
 			AppConfigs:     service.NewAppConfigs(st),
+			WorkPolicies:   service.NewWorkPolicies(st),
 			TwoFactor:      twoFactor,
 			Admin:          service.NewAdmin(st),
 			Attachments:    service.NewAttachments(st),

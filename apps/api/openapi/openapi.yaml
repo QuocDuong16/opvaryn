@@ -1481,7 +1481,60 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
-  /api/v1/app-configs/{objectKey}:
+  /api/v1/admin/work-policies/{key}:
+    get:
+      operationId: getWorkPolicy
+      tags: [administration]
+      summary: The policy of one kind of work
+      description: |
+        The default deadline (in working hours), the default priority, and the role that takes
+        an overdue step over (ADR 0035). A step of a process may declare its own deadline and
+        priority, which win over the policy.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/ObjectKey'
+      responses:
+        '200':
+          description: The policy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkPolicy'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    put:
+      operationId: saveWorkPolicy
+      tags: [administration]
+      summary: Set the policy of one kind of work
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/ObjectKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/WorkPolicyRequest'
+      responses:
+        '200':
+          description: The stored policy
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/WorkPolicy'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/app-configs/{key}:
     get:
       operationId: getAppConfig
       tags: [applications]
@@ -1493,12 +1546,7 @@ paths:
       security:
         - sessionCookie: []
       parameters:
-        - name: objectKey
-          in: path
-          required: true
-          schema:
-            type: string
-            pattern: '^[a-z][a-z0-9_]{1,63}$'
+        - $ref: '#/components/parameters/ObjectKey'
       responses:
         '200':
           description: The configuration
@@ -1520,12 +1568,7 @@ paths:
       security:
         - sessionCookie: []
       parameters:
-        - name: objectKey
-          in: path
-          required: true
-          schema:
-            type: string
-            pattern: '^[a-z][a-z0-9_]{1,63}$'
+        - $ref: '#/components/parameters/ObjectKey'
       requestBody:
         required: true
         content:
@@ -2936,6 +2979,10 @@ components:
         escalated:
           type: boolean
           description: Whether the step was already taken over once (ADR 0031).
+        priority:
+          type: string
+          enum: [low, normal, high, urgent]
+          description: How urgent the task is (ADR 0035).
     ProcessEvent:
       type: object
       required: [id, type, actor, payload, createdAt]
@@ -3459,6 +3506,35 @@ components:
         value:
           description: The literal to compare against, typed by the field.
       description: The single filter a metric carries, using the D04 condition shape.
+    WorkPolicy:
+      type: object
+      required: [objectKey, defaultDueHours, defaultPriority, escalationRole]
+      properties:
+        objectKey:
+          type: string
+        defaultDueHours:
+          type: integer
+          minimum: 0
+          description: The deadline of a step that does not declare one, in working hours.
+          example: 8
+        defaultPriority:
+          type: string
+          enum: [low, normal, high, urgent]
+        escalationRole:
+          type: string
+          description: The role that takes an overdue step over; empty means nobody does.
+    WorkPolicyRequest:
+      type: object
+      required: [defaultDueHours, defaultPriority, escalationRole]
+      properties:
+        defaultDueHours:
+          type: integer
+          minimum: 0
+        defaultPriority:
+          type: string
+          enum: [low, normal, high, urgent]
+        escalationRole:
+          type: string
     AppConfig:
       type: object
       required: [objectKey, name, kanbanField, listColumns]

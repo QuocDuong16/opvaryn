@@ -342,6 +342,30 @@ func (e ProcessNodeType) Valid() bool {
 	}
 }
 
+// Defines values for ProcessTaskPriority.
+const (
+	ProcessTaskPriorityHigh   ProcessTaskPriority = "high"
+	ProcessTaskPriorityLow    ProcessTaskPriority = "low"
+	ProcessTaskPriorityNormal ProcessTaskPriority = "normal"
+	ProcessTaskPriorityUrgent ProcessTaskPriority = "urgent"
+)
+
+// Valid indicates whether the value is a known member of the ProcessTaskPriority enum.
+func (e ProcessTaskPriority) Valid() bool {
+	switch e {
+	case ProcessTaskPriorityHigh:
+		return true
+	case ProcessTaskPriorityLow:
+		return true
+	case ProcessTaskPriorityNormal:
+		return true
+	case ProcessTaskPriorityUrgent:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for ProcessTaskStatus.
 const (
 	ProcessTaskStatusApproved  ProcessTaskStatus = "approved"
@@ -405,6 +429,54 @@ func (e WebhookDeliveryStatus) Valid() bool {
 	case Failed:
 		return true
 	case Pending:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkPolicyDefaultPriority.
+const (
+	WorkPolicyDefaultPriorityHigh   WorkPolicyDefaultPriority = "high"
+	WorkPolicyDefaultPriorityLow    WorkPolicyDefaultPriority = "low"
+	WorkPolicyDefaultPriorityNormal WorkPolicyDefaultPriority = "normal"
+	WorkPolicyDefaultPriorityUrgent WorkPolicyDefaultPriority = "urgent"
+)
+
+// Valid indicates whether the value is a known member of the WorkPolicyDefaultPriority enum.
+func (e WorkPolicyDefaultPriority) Valid() bool {
+	switch e {
+	case WorkPolicyDefaultPriorityHigh:
+		return true
+	case WorkPolicyDefaultPriorityLow:
+		return true
+	case WorkPolicyDefaultPriorityNormal:
+		return true
+	case WorkPolicyDefaultPriorityUrgent:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for WorkPolicyRequestDefaultPriority.
+const (
+	WorkPolicyRequestDefaultPriorityHigh   WorkPolicyRequestDefaultPriority = "high"
+	WorkPolicyRequestDefaultPriorityLow    WorkPolicyRequestDefaultPriority = "low"
+	WorkPolicyRequestDefaultPriorityNormal WorkPolicyRequestDefaultPriority = "normal"
+	WorkPolicyRequestDefaultPriorityUrgent WorkPolicyRequestDefaultPriority = "urgent"
+)
+
+// Valid indicates whether the value is a known member of the WorkPolicyRequestDefaultPriority enum.
+func (e WorkPolicyRequestDefaultPriority) Valid() bool {
+	switch e {
+	case WorkPolicyRequestDefaultPriorityHigh:
+		return true
+	case WorkPolicyRequestDefaultPriorityLow:
+		return true
+	case WorkPolicyRequestDefaultPriorityNormal:
+		return true
+	case WorkPolicyRequestDefaultPriorityUrgent:
 		return true
 	default:
 		return false
@@ -1243,10 +1315,16 @@ type ProcessTask struct {
 	Escalated *bool              `json:"escalated,omitempty"`
 	Id        openapi_types.UUID `json:"id"`
 	NodeKey   string             `json:"nodeKey"`
-	Reason    *string            `json:"reason,omitempty"`
-	Status    ProcessTaskStatus  `json:"status"`
-	Title     string             `json:"title"`
+
+	// Priority How urgent the task is (ADR 0035).
+	Priority *ProcessTaskPriority `json:"priority,omitempty"`
+	Reason   *string              `json:"reason,omitempty"`
+	Status   ProcessTaskStatus    `json:"status"`
+	Title    string               `json:"title"`
 }
+
+// ProcessTaskPriority How urgent the task is (ADR 0035).
+type ProcessTaskPriority string
 
 // ProcessTaskStatus defines model for ProcessTaskStatus.
 type ProcessTaskStatus string
@@ -1450,6 +1528,32 @@ type WebhookDeliveryList struct {
 	// Example: 120
 	Total int `json:"total"`
 }
+
+// WorkPolicy defines model for WorkPolicy.
+type WorkPolicy struct {
+	// DefaultDueHours The deadline of a step that does not declare one, in working hours.
+	//
+	// Example: 8
+	DefaultDueHours int                       `json:"defaultDueHours"`
+	DefaultPriority WorkPolicyDefaultPriority `json:"defaultPriority"`
+
+	// EscalationRole The role that takes an overdue step over; empty means nobody does.
+	EscalationRole string `json:"escalationRole"`
+	ObjectKey      string `json:"objectKey"`
+}
+
+// WorkPolicyDefaultPriority defines model for WorkPolicy.DefaultPriority.
+type WorkPolicyDefaultPriority string
+
+// WorkPolicyRequest defines model for WorkPolicyRequest.
+type WorkPolicyRequest struct {
+	DefaultDueHours int                              `json:"defaultDueHours"`
+	DefaultPriority WorkPolicyRequestDefaultPriority `json:"defaultPriority"`
+	EscalationRole  string                           `json:"escalationRole"`
+}
+
+// WorkPolicyRequestDefaultPriority defines model for WorkPolicyRequest.DefaultPriority.
+type WorkPolicyRequestDefaultPriority string
 
 // WorkingHour defines model for WorkingHour.
 type WorkingHour struct {
@@ -1729,6 +1833,9 @@ type UpdateAdminUserJSONRequestBody = UpdateAdminUserRequest
 
 // SetAdminUserPasswordJSONRequestBody defines body for SetAdminUserPassword for application/json ContentType.
 type SetAdminUserPasswordJSONRequestBody = SetAdminUserPasswordRequest
+
+// SaveWorkPolicyJSONRequestBody defines body for SaveWorkPolicy for application/json ContentType.
+type SaveWorkPolicyJSONRequestBody = WorkPolicyRequest
 
 // ReplaceWorkingHoursJSONRequestBody defines body for ReplaceWorkingHours for application/json ContentType.
 type ReplaceWorkingHoursJSONRequestBody = WorkingHoursRequest

@@ -29,6 +29,7 @@ type Services struct {
 	TwoFactor          *service.TwoFactor
 	WorkingHours       *service.WorkingHours
 	AppConfigs         *service.AppConfigs
+	WorkPolicies       *service.WorkPolicies
 }
 
 // NewRouter builds the HTTP handler for the demo API.
@@ -112,6 +113,13 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 					r.Delete("/", handleDeleteAdminDepartment(services.Admin, log))
 				})
 			})
+			// The policy of each kind of work (ADR 0035).
+			r.Route("/work-policies", func(r chi.Router) {
+				r.Route("/{key}", func(r chi.Router) {
+					r.Get("/", handleGetWorkPolicy(services.WorkPolicies, log))
+					r.Put("/", handleSaveWorkPolicy(services.WorkPolicies, log))
+				})
+			})
 			// The organisation's working calendar (ADR 0031).
 			r.Route("/working-hours", func(r chi.Router) {
 				r.Get("/", handleListWorkingHours(services.WorkingHours, log))
@@ -164,7 +172,7 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 		// The configuration of the application view (ADR 0033). Reading it is open to
 		// every signed-in person; changing it is administration work.
 		r.Route("/app-configs", func(r chi.Router) {
-			r.Route("/{objectKey}", func(r chi.Router) {
+			r.Route("/{key}", func(r chi.Router) {
 				r.Get("/", handleGetAppConfig(services.AppConfigs, log))
 				r.Put("/", handleSaveAppConfig(services.AppConfigs, log))
 			})

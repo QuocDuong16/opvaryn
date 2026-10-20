@@ -57,6 +57,9 @@ type ProcessNode struct {
 	// EscalateToRole is the role that takes the step over when it runs out of time
 	// (ADR 0031). Empty means nobody takes over: the step is only reported as late.
 	EscalateToRole string `json:"escalateToRole,omitempty"`
+	// Priority is how urgent the step is (ADR 0035). Empty means the policy of the kind
+	// of work decides.
+	Priority string `json:"priority,omitempty"`
 }
 
 // ProcessEdge connects two nodes. On a condition node, `when` is "true" or
@@ -158,6 +161,18 @@ type ProcessTask struct {
 	// Escalated marks a task that was already taken over once: it is never escalated
 	// again, so a step that nobody finishes does not bounce between roles forever.
 	Escalated bool
+	// Priority is how urgent the task is (ADR 0035).
+	Priority string
+}
+
+// WorkPolicy is the policy of one kind of work (ADR 0035): the default deadline, the
+// default priority, and the role that takes an overdue step over.
+type WorkPolicy struct {
+	ObjectKey       string
+	DefaultDueHours int
+	DefaultPriority string
+	EscalationRole  string
+	UpdatedAt       time.Time
 }
 
 // WorkingHour is one stretch of working time in a weekday (ADR 0031). Weekday 0 is Sunday,
@@ -180,6 +195,7 @@ type EscalationCandidate struct {
 	EscalateToRole    string
 	DueInWorkingHours int
 	DueAt             time.Time
+	Priority          string
 }
 
 // ProcessEventType enumerates the append-only audit trail (ADR 0007 §10).
