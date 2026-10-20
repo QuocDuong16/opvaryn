@@ -159,6 +159,54 @@ export function FieldEditor({
                   />
                 </label>
               ) : null}
+
+              {row.type === 'formula' ? (
+                <label className="mt-2 block">
+                  <span className="text-[11px] text-on-surface-muted">
+                    Công thức — hệ thống tự tính, người dùng không nhập
+                  </span>
+                  <input
+                    value={row.formula}
+                    onChange={(event) => updateRow(row.id, { formula: event.target.value })}
+                    placeholder="so_luong * don_gia"
+                    className={`${INPUT_CLASS} mt-0.5 font-mono text-xs`}
+                  />
+                  <span className="mt-1 block text-[11px] text-on-surface-muted">
+                    Dùng các trường số của mẫu này. Có: + − × ÷, ngoặc, so sánh, ROUND, ABS, MIN,
+                    MAX.
+                  </span>
+                </label>
+              ) : null}
+
+              {row.type === 'table' ? (
+                <label className="mt-2 block">
+                  <span className="text-[11px] text-on-surface-muted">
+                    Cột của bảng — mỗi dòng một cột, dạng <code>mã = Tên</code>
+                  </span>
+                  <textarea
+                    value={row.columns}
+                    onChange={(event) => updateRow(row.id, { columns: event.target.value })}
+                    rows={3}
+                    placeholder={'ten_mon = Tên món\ngia = Giá'}
+                    className={`${INPUT_CLASS} mt-0.5 font-mono text-xs`}
+                  />
+                </label>
+              ) : null}
+
+              {row.type !== 'formula' && row.type !== 'table' ? (
+                <label className="mt-2 block">
+                  <span className="text-[11px] text-on-surface-muted">
+                    Chỉ hiện khi — <code>trường phép so sánh giá trị</code>, ví dụ{' '}
+                    <code>so_luong &gt; 10</code>
+                  </span>
+                  <input
+                    value={row.visibleWhen}
+                    onChange={(event) => updateRow(row.id, { visibleWhen: event.target.value })}
+                    placeholder="so_luong > 10"
+                    className={`${INPUT_CLASS} mt-0.5 font-mono text-xs`}
+                  />
+                </label>
+              ) : null}
             </li>
           ))}
         </ul>

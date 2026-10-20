@@ -8,6 +8,8 @@ export const FIELD_TYPE_LABELS: Record<FieldDefinition['type'], string> = {
   select: 'Lựa chọn',
   file: 'Tệp',
   rows: 'Danh sách dòng',
+  table: 'Bảng',
+  formula: 'Công thức',
 };
 
 const TIMESTAMP_FORMAT = new Intl.DateTimeFormat('vi-VN', {

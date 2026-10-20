@@ -1093,13 +1093,33 @@ export interface components {
          * @description Field kinds supported by the form builder.
          * @enum {string}
          */
-        FieldType: "text" | "number" | "date" | "select" | "file" | "rows";
+        FieldType: "text" | "number" | "date" | "select" | "file" | "rows" | "table" | "formula";
         /** @description One selectable option of a `select` field. */
         FieldOption: {
             /** @example kinh_doanh */
             value: string;
             /** @example Kinh doanh */
             label: string;
+        };
+        /** @description One typed column of a `table` field (ADR 0032). */
+        FieldColumn: {
+            /** @example price */
+            key: string;
+            /** @example Giá */
+            label: string;
+            /** @enum {string} */
+            type: "text" | "number" | "date";
+        };
+        /**
+         * @description A condition on a field: the field is shown when it holds (ADR 0032). It is the same
+         *     shape as the condition of a process step.
+         */
+        FieldCondition: {
+            /** @example quantity */
+            field: string;
+            /** @enum {string} */
+            op: "eq" | "ne" | "gt" | "gte" | "lt" | "lte";
+            value?: unknown;
         };
         FieldDefinition: {
             /** @example estimated_amount */
@@ -1111,6 +1131,15 @@ export interface components {
             required: boolean;
             /** @description Allowed options. Required for `select` fields, rejected on other types. */
             options?: components["schemas"]["FieldOption"][];
+            /**
+             * @description The expression of a computed field (ADR 0032), for example "quantity * unit_price".
+             *     The server calculates it; the person never types it.
+             * @example quantity * unit_price
+             */
+            formula?: string;
+            visibleWhen?: components["schemas"]["FieldCondition"];
+            /** @description The typed columns of a `table` field (ADR 0032). */
+            columns?: components["schemas"]["FieldColumn"][];
         };
         BusinessObject: {
             /** Format: uuid */

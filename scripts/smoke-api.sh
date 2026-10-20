@@ -293,6 +293,38 @@ status="$(request_as "$designer_jar" PUT /api/v1/business-objects/smoke_missing_
 [[ "$status" == "404" ]] || fail "updating an unknown object returned $status, expected 404"
 grep -q '"code":"not_found"' "$body_file" || fail "unknown object update did not return the not_found error code"
 
+echo "smoke: a computed field, a hidden field and a table (ADR 0032)"
+smart_key="smoke_smart_$stamp"
+smart_body="$(printf '{"key":"%s","name":"Smoke smart form","fields":[{"key":"so_luong","label":"Số lượng","type":"number"},{"key":"don_gia","label":"Đơn giá","type":"number"},{"key":"thanh_tien","label":"Thành tiền","type":"formula","formula":"so_luong * don_gia"},{"key":"ghi_chu","label":"Ghi chú gấp","type":"text","visibleWhen":{"field":"so_luong","op":"gt","value":10}},{"key":"items","label":"Danh sách món","type":"table","columns":[{"key":"ten_mon","label":"Tên món","type":"text"},{"key":"gia","label":"Giá","type":"number"}]}]}' "$smart_key")"
+status="$(request_as "$designer_jar" POST /api/v1/business-objects "$smart_body")"
+[[ "$status" == "201" ]] || fail "creating a definition with a computed field returned $status, expected 201"
+
+status="$(request_as "$designer_jar" POST "/api/v1/business-objects/$smart_key/records" '{"values":{"so_luong":3,"don_gia":2500000,"ghi_chu":"cần gấp","items":[{"ten_mon":"Màn hình","gia":2500000}]}}')"
+[[ "$status" == "201" ]] || fail "creating a record with a computed field returned $status, expected 201"
+python3 - "$body_file" <<'PY' || fail "the computed field or the hidden field is wrong"
+import json, sys
+
+record = json.load(open(sys.argv[1], encoding="utf-8"))
+values = record["values"]
+if values.get("thanh_tien") != 7500000:
+    sys.exit(f"the computed field = {values.get('thanh_tien')!r}, want 7500000")
+if "ghi_chu" in values:
+    sys.exit("a field whose condition does not hold must not be stored")
+if not values.get("items"):
+    sys.exit("the rows of the table were not stored")
+PY
+
+# With a big quantity the condition holds, so the field is part of the record.
+status="$(request_as "$designer_jar" POST "/api/v1/business-objects/$smart_key/records" '{"values":{"so_luong":20,"don_gia":2500000,"ghi_chu":"cần gấp"}}')"
+[[ "$status" == "201" ]] || fail "creating a record with the field shown returned $status, expected 201"
+python3 - "$body_file" <<'PY' || fail "a field whose condition holds was not stored"
+import json, sys
+
+record = json.load(open(sys.argv[1], encoding="utf-8"))
+if record["values"].get("ghi_chu") != "cần gấp":
+    sys.exit("a field whose condition holds must keep its value")
+PY
+
 echo "smoke: POST records (after the edit -> binds to version 2)"
 status="$(request_as "$designer_jar" POST "/api/v1/business-objects/$object_key/records" '{"values":{"amount":5000,"note":"ghi chú v2"}}')"
 [[ "$status" == "201" ]] || fail "creating a record after the update returned $status, expected 201"

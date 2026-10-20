@@ -236,6 +236,11 @@
 
 ## Schema-driven UI
 
+- The form's field kinds (ADR 0032): `formula` is a read-only line in the form (the server
+  computes it), `visibleWhen` hides a field the form does not need (the same rule as the
+  server's, in `lib/conditions.ts`), and `table` is an editable table of typed cells
+  (`components/forms/table-field.tsx`). The schema editor writes them in
+  `components/objects/field-draft.ts`.
 - `components/objects/field-editor.tsx` (client) edits field rows and submits one JSON hidden
   input; `field-draft.ts` serializes drafts (`value = Nhãn` option lines, blank rows dropped,
   options only on select).

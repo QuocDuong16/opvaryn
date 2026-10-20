@@ -210,6 +210,25 @@ func toDomainFields(fields *[]apiv1.FieldDefinition) []domain.FieldDefinition {
 			}
 			converted.Options = options
 		}
+		converted.Formula = stringValue(field.Formula)
+		if field.VisibleWhen != nil {
+			converted.VisibleWhen = &domain.FieldCondition{
+				Field: field.VisibleWhen.Field,
+				Op:    string(field.VisibleWhen.Op),
+				Value: field.VisibleWhen.Value,
+			}
+		}
+		if field.Columns != nil {
+			columns := make([]domain.FieldColumn, len(*field.Columns))
+			for j, column := range *field.Columns {
+				columns[j] = domain.FieldColumn{
+					Key:   column.Key,
+					Label: column.Label,
+					Type:  domain.FieldType(column.Type),
+				}
+			}
+			converted.Columns = columns
+		}
 		result[i] = converted
 	}
 	return result

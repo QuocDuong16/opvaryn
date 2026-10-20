@@ -2273,7 +2273,7 @@ components:
     FieldType:
       type: string
       description: Field kinds supported by the form builder.
-      enum: [text, number, date, select, file, rows]
+      enum: [text, number, date, select, file, rows, table, formula]
     FieldOption:
       type: object
       description: One selectable option of a `select` field.
@@ -2289,6 +2289,34 @@ components:
           minLength: 1
           maxLength: 120
           example: Kinh doanh
+    FieldColumn:
+      type: object
+      description: One typed column of a `table` field (ADR 0032).
+      required: [key, label, type]
+      properties:
+        key:
+          type: string
+          example: price
+        label:
+          type: string
+          example: Giá
+        type:
+          type: string
+          enum: [text, number, date]
+    FieldCondition:
+      type: object
+      description: |
+        A condition on a field: the field is shown when it holds (ADR 0032). It is the same
+        shape as the condition of a process step.
+      required: [field, op]
+      properties:
+        field:
+          type: string
+          example: quantity
+        op:
+          type: string
+          enum: [eq, ne, gt, gte, lt, lte]
+        value: {}
     FieldDefinition:
       type: object
       required: [key, label, type]
@@ -2309,6 +2337,19 @@ components:
           description: Allowed options. Required for `select` fields, rejected on other types.
           items:
             $ref: '#/components/schemas/FieldOption'
+        formula:
+          type: string
+          description: |
+            The expression of a computed field (ADR 0032), for example "quantity * unit_price".
+            The server calculates it; the person never types it.
+          example: quantity * unit_price
+        visibleWhen:
+          $ref: '#/components/schemas/FieldCondition'
+        columns:
+          type: array
+          description: The typed columns of a `table` field (ADR 0032).
+          items:
+            $ref: '#/components/schemas/FieldColumn'
     BusinessObject:
       type: object
       required: [id, key, name, fields, version, createdAt, updatedAt]
