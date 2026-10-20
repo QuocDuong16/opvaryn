@@ -34,7 +34,7 @@ tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
   và trả về đúng phạm vi dữ liệu người đăng nhập được đọc; dashboard sắp bố cục và lưu lại. D06 chốt
   hướng tự viết (ADR 0010). Cùng trang đó có **số liệu vận hành** của engine (instance đã chạy,
   cycle time, thời gian một bước, tỉ lệ duyệt, tỉ lệ phải chạy lại) trên một read model cố định
-  (ADR 0011); SLA vẫn thuộc V1.x vì engine chưa có chính sách thời gian làm việc.
+  (ADR 0011). Hạn xử lý và chuyển cấp thì đã có, tính theo lịch giờ làm việc của tổ chức (ADR 0031).
 - **Live**: tích hợp ra ngoài — webhook có ký HMAC cho bốn sự kiện của engine, hàng đợi ghi cùng
   transaction với sự kiện, retry có backoff, nhật ký giao xem được ở trang Cài đặt (ADR 0012). Điều
   kiện nghiệm thu #5 của playbook đạt bằng một tích hợp chạy thật, được kiểm chứng end-to-end.
@@ -71,8 +71,8 @@ tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
   quản trị thấy tài khoản nào đang chờ và mở khoá ngay trong khu vực **Quản trị**, hoặc bằng
   `make useradm ARGS="-unlock -email ..."` khi cần đường phục hồi ngoài sản phẩm (ADR 0028).
 - **Concept**: điều kiện hiển thị và calculated field của Form Builder, tab Cấu hình của Application
-  Builder, SLA/escalation, template library, và nội dung Roadmap — các phần phụ thuộc quyết định
-  còn mở hoặc thuộc V1.x.
+  Builder, template library, và nội dung Roadmap — các phần phụ thuộc quyết định còn mở hoặc thuộc
+  V1.x.
 
 Toàn bộ D04–D10 đã chốt và đang chạy trong code (ADR 0005–0010). Chi tiết phạm vi demo ở
 [ADR 0002](docs/adr/0002-demo-scope-and-labels.md),

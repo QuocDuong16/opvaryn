@@ -116,8 +116,8 @@ const NOT_YET: readonly { title: string; body: string }[] = [
     body: 'Đăng nhập hiện dùng tài khoản nội bộ; kết nối hệ thống đăng nhập của tổ chức đang chờ chính hệ thống đó.',
   },
   {
-    title: 'Hạn xử lý và chuyển cấp',
-    body: 'Cần một chính sách thời gian làm việc; chưa có, nên hệ thống không hiển thị hạn giả.',
+    title: 'Mức ưu tiên và hạn khác nhau',
+    body: 'Mỗi bước có một hạn tính theo giờ làm việc của tổ chức; chưa có mức ưu tiên và hạn riêng theo từng loại việc.',
   },
   {
     title: 'Kết nối hai chiều',
