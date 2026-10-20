@@ -324,6 +324,36 @@ status="$(request_as "$admin_jar" PUT "/api/v1/admin/work-policies/$object_key" 
   '{"defaultDueHours":8,"defaultPriority":"khong_hop_le","escalationRole":""}')"
 [[ "$status" == "400" ]] || fail "a policy with an unknown priority returned $status, expected 400"
 
+echo "smoke: the policy of the kind of work decides the deadline of a step that has none (ADR 0035)"
+policy_key="smoke_policy_$stamp"
+status="$(request_as "$designer_jar" POST /api/v1/business-objects \
+  "$(printf '{"key":"%s","name":"Smoke policy object","fields":[{"key":"amount","label":"Số tiền","type":"number"}]}' "$policy_key")")"
+[[ "$status" == "201" ]] || fail "creating the policy fixture returned $status, expected 201"
+status="$(request_as "$admin_jar" PUT "/api/v1/admin/work-policies/$policy_key" \
+  '{"defaultDueHours":6,"defaultPriority":"high","escalationRole":""}')"
+[[ "$status" == "200" ]] || fail "setting the policy returned $status, expected 200"
+policy_flow="smoke_policy_flow_$stamp"
+status="$(request_as "$designer_jar" POST /api/v1/process-definitions \
+  "$(printf '{"key":"%s","name":"Smoke policy flow","objectKey":"%s","nodes":[{"key":"start","type":"start","title":"Bắt đầu"},{"key":"approve","type":"human_task","title":"Duyệt","assigneeRole":"%s"},{"key":"end","type":"end","title":"Kết thúc"}],"edges":[{"from":"start","to":"approve"},{"from":"approve","to":"end"}]}' "$policy_flow" "$policy_key" "$designer_role")")"
+[[ "$status" == "201" ]] || fail "creating the policy flow returned $status, expected 201"
+status="$(request_as "$designer_jar" POST "/api/v1/business-objects/$policy_key/records" \
+  '{"values":{"amount":1000}}')"
+[[ "$status" == "201" ]] || fail "creating the policy record returned $status, expected 201"
+policy_record="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$body_file")"
+status="$(request_as "$designer_jar" POST /api/v1/process-instances \
+  "$(printf '{"definitionKey":"%s","recordId":"%s"}' "$policy_flow" "$policy_record")")"
+[[ "$status" == "201" ]] || fail "starting the policy run returned $status, expected 201"
+python3 - "$body_file" <<'PY' || fail "the policy of the kind of work did not decide the deadline"
+import json, sys
+
+tasks = json.load(open(sys.argv[1], encoding="utf-8"))["tasks"]
+task = next(t for t in tasks if t["nodeKey"] == "approve")
+if not task.get("dueAt"):
+    sys.exit("a step without its own deadline takes the one of the policy")
+if task.get("priority") != "high":
+    sys.exit(f"the task priority = {task.get('priority')!r}, want high")
+PY
+
 echo "smoke: a field takes its options from another system (ADR 0034)"
 status="$(request_as "$admin_jar" GET "/api/v1/lookups/$object_key")"
 [[ "$status" == "200" ]] || fail "reading the lookups returned $status, expected 200"

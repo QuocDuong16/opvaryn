@@ -23,7 +23,7 @@ func (s *Store) ListEscalationCandidates(
 ) ([]domain.EscalationCandidate, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT t.id, t.instance_id, t.node_key, t.title, t.attempt, t.assignee_role,
-		       t.due_at, t.priority, v.nodes
+		       t.due_at, t.priority, v.nodes, i.object_key
 		  FROM process_tasks t
 		  JOIN process_instances i ON i.id = t.instance_id
 		  JOIN process_definition_versions v ON v.id = i.definition_version_id
@@ -47,7 +47,7 @@ func (s *Store) ListEscalationCandidates(
 		if err := rows.Scan(
 			&candidate.TaskID, &candidate.InstanceID, &candidate.NodeKey, &candidate.Title,
 			&candidate.Attempt, &candidate.CurrentRole, &candidate.DueAt, &candidate.Priority,
-			&nodes,
+			&nodes, &candidate.ObjectKey,
 		); err != nil {
 			return nil, classify(fmt.Errorf("scan escalation candidate: %w", err))
 		}

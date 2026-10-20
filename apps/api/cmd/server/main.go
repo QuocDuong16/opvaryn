@@ -76,7 +76,7 @@ func run() error {
 		log.Warn("the organisation's timezone is unavailable, using the server's time", "error", err)
 	}
 	workingHours := service.NewWorkingHours(st, location)
-	escalation := service.NewEscalation(st, workingHours, log)
+	escalation := service.NewEscalation(st, workingHours, service.NewWorkPolicies(st), log)
 	go escalation.Run(ctx)
 
 	// Two-step verification for administrators (ADR 0030). Without a key the feature is

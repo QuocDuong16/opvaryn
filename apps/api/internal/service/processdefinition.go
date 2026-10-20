@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"strconv"
 	"strings"
 	"time"
 
@@ -608,4 +609,19 @@ func numberLiteral(value any) (float64, bool) {
 	default:
 		return 0, false
 	}
+}
+
+// numberFromForm reads a value that came from a form: a person types text, and a field
+// holding "10" is the number 10 when it is compared with one (ADR 0032: one rule, two
+// sides). The literal of a condition stays strict — it comes from the definition.
+func numberFromForm(value any) (float64, bool) {
+	if number, ok := numberLiteral(value); ok {
+		return number, true
+	}
+	text, ok := value.(string)
+	if !ok {
+		return 0, false
+	}
+	parsed, err := strconv.ParseFloat(strings.TrimSpace(text), 64)
+	return parsed, err == nil
 }

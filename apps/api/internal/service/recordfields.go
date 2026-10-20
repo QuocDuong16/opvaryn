@@ -56,6 +56,7 @@ func prepareValues(
 	// A field that is not shown is not part of the record: its value is dropped, and it is
 	// not required either.
 	prepared := make(map[string]any, len(submitted))
+	hidden := make(map[string]bool, len(object.Fields))
 	for _, field := range object.Fields {
 		value, present := submitted[field.Key]
 		if !present {
@@ -68,21 +69,28 @@ func prepareValues(
 				Value: field.VisibleWhen.Value,
 			}, submitted)
 			if !shown {
+				hidden[field.Key] = true
 				continue
 			}
 		}
 		prepared[field.Key] = value
 	}
 
-	// The computed fields, in the order of the definition, so one can read another.
+	// The computed fields, in the order of the definition, so one can read another. A
+	// field that is not shown is not computed either: it is not part of the record.
 	for _, field := range object.Fields {
 		if field.Type != domain.FieldTypeFormula {
 			continue
 		}
+		if hidden[field.Key] {
+			continue
+		}
 		result, err := formula.Evaluate(field.Formula, formula.Value{Fields: prepared})
 		if err != nil {
-			// A broken expression is a problem of the definition, which is checked when
-			// it is published; a record is not refused because of it.
+			// A broken expression is a problem of the definition. The record says so
+			// instead of being saved with a silently empty value.
+			problems = append(problems, fmt.Sprintf(
+				"values.%s: the formula of this field could not be computed: %v", field.Key, err))
 			continue
 		}
 		prepared[field.Key] = formulaValue(result)
@@ -159,7 +167,7 @@ func validateTableValue(field domain.FieldDefinition, value any) []string {
 func validateColumnValue(column domain.FieldColumn, value any) string {
 	switch column.Type {
 	case domain.FieldTypeNumber:
-		if _, ok := numberValue(value); !ok {
+		if _, ok := numberFromForm(value); !ok {
 			return "must be a number"
 		}
 	case domain.FieldTypeDate:

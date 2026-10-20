@@ -92,8 +92,17 @@ type token struct {
 	number float64
 }
 
+// maxTokens bounds the size of an expression, so a huge one cannot cost much to parse.
+const maxTokens = 200
+
+// maxExpressionLength bounds the length of an expression.
+const maxExpressionLength = 1000
+
 // tokenize splits the expression into numbers, field names, operators and punctuation.
 func tokenize(expression string) ([]token, error) {
+	if len(expression) > maxExpressionLength {
+		return nil, fmt.Errorf("the expression is longer than %d characters", maxExpressionLength)
+	}
 	tokens := make([]token, 0, 8)
 	runes := []rune(expression)
 	for i := 0; i < len(runes); {
@@ -140,6 +149,9 @@ func tokenize(expression string) ([]token, error) {
 			tokens = append(tokens, token{kind: tokenOperator, text: string(runes[start:i])})
 		default:
 			return nil, fmt.Errorf("%q is not something an expression can contain", string(char))
+		}
+		if len(tokens) > maxTokens {
+			return nil, fmt.Errorf("the expression has more than %d parts", maxTokens)
 		}
 	}
 	return tokens, nil

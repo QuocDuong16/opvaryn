@@ -49,7 +49,7 @@ export default async function ApplicationsPage() {
       <PageHeader
         eyebrow="07 / Ứng dụng"
         title="Ứng dụng"
-        lead="Cùng một dữ liệu, nhiều dạng xem: danh sách, chi tiết, kanban, cấu hình và panel tích hợp — phần sẽ cho phép tự cấu hình ở bản sau. Danh sách và chi tiết đọc dữ liệu thật; kanban, cấu hình và tích hợp chỉ là minh hoạ, mỗi dạng xem gắn nhãn riêng."
+        lead="Cùng một dữ liệu, nhiều dạng xem: danh sách, chi tiết, kanban, cấu hình và panel tích hợp. Danh sách, chi tiết, kanban và cấu hình đọc dữ liệu thật; panel tích hợp vẫn là minh hoạ, mỗi dạng xem gắn nhãn riêng."
       />
 
       {error ? (

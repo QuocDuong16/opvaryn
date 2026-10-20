@@ -266,6 +266,17 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   definition: the name, the field the kanban groups by, the list's columns). Reading it is open
   to every signed-in person; changing it needs the admin role, and the fields it names must
   exist in the definition (the kanban groups by a select field).
+- The rules of a form (ADR 0032) live in `service/recordfields.go` (`prepareValues`): a field
+  whose condition does not hold is dropped from the record and is not required, a computed
+  field is computed by the server, and a broken formula is reported instead of leaving the
+  field silently empty. The condition rule is shared: the server reads a value that came from
+  a form leniently (`numberFromForm`), the literal of a condition strictly (`numberLiteral`).
+- The form's controls are **controlled**: the browser holds the values in a state, so a
+  condition re-evaluates while the person types (`components/forms/object-form.tsx`).
+- A lookup source is fetched by the server with guards: no redirects, and addresses of this
+  machine, the local network and the cloud metadata service are refused
+  (`service/lookup.go`). A field with a lookup source is not checked against the options
+  the definition declares.
 - The form's field kinds (ADR 0032): a `formula` field is computed by the server (the
   expression is parsed into a tree and walked — never evaluated as code; `internal/formula`),
   a field with `visibleWhen` is not shown and not stored when its condition does not hold,

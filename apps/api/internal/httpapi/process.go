@@ -425,6 +425,7 @@ func toAPIInstanceSummaries(summaries []domain.ProcessInstanceSummary) []apiv1.P
 func toAPIInstanceView(view service.InstanceView) apiv1.ProcessInstanceView {
 	tasks := make([]apiv1.ProcessTask, len(view.Tasks))
 	for i, task := range view.Tasks {
+		priority := apiv1.ProcessTaskPriority(task.Priority)
 		converted := apiv1.ProcessTask{
 			Id:           task.ID,
 			NodeKey:      task.NodeKey,
@@ -438,6 +439,7 @@ func toAPIInstanceView(view service.InstanceView) apiv1.ProcessInstanceView {
 			DecidedAt:    task.DecidedAt,
 			DueAt:        task.DueAt,
 			Escalated:    &task.Escalated,
+			Priority:     &priority,
 		}
 		tasks[i] = converted
 	}

@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"net"
 	"net/http"
 	"net/url"
 	"strings"
@@ -39,9 +40,52 @@ type lookupStore interface {
 	DeleteLookupSource(ctx context.Context, objectKey string, fieldKey string) error
 }
 
-// NewLookups returns the lookup service.
+// NewLookups returns the lookup service. Its client refuses to reach the machine's own
+// network: a source is configured by an administrator, but every signed-in person can make
+// the server call it, and that must not turn the server into a bridge into the network.
 func NewLookups(st lookupStore) *Lookups {
-	return &Lookups{store: st, client: &http.Client{Timeout: lookupTimeout}}
+	dialer := &net.Dialer{Timeout: lookupTimeout}
+	client := &http.Client{
+		Timeout: lookupTimeout,
+		// A source that redirects is not followed: the redirect could point anywhere.
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return fmt.Errorf("the source tried to redirect")
+		},
+		Transport: &http.Transport{
+			DialContext: func(ctx context.Context, network string, address string) (net.Conn, error) {
+				host, _, err := net.SplitHostPort(address)
+				if err != nil {
+					return nil, fmt.Errorf("the source has no address")
+				}
+				if err := refuseInternalAddress(host); err != nil {
+					return nil, err
+				}
+				return dialer.DialContext(ctx, network, address)
+			},
+		},
+	}
+	return &Lookups{store: st, client: client}
+}
+
+// refuseInternalAddress keeps the server from calling itself, the local network or the
+// metadata service of a cloud host.
+func refuseInternalAddress(host string) error {
+	if strings.EqualFold(host, "localhost") {
+		return fmt.Errorf("the source points at this machine")
+	}
+	addresses, err := net.DefaultResolver.LookupIPAddr(context.Background(), host)
+	if err != nil {
+		return fmt.Errorf("the source's host cannot be found")
+	}
+	for _, address := range addresses {
+		ip := address.IP
+		switch {
+		case ip.IsLoopback(), ip.IsPrivate(), ip.IsLinkLocalUnicast(),
+			ip.IsLinkLocalMulticast(), ip.IsUnspecified():
+			return fmt.Errorf("the source points at an address of this network")
+		}
+	}
+	return nil
 }
 
 // LookupField is one field of a definition and the options its source offers.

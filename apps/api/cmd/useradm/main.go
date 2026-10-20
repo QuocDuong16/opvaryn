@@ -188,7 +188,7 @@ func run() error {
 			return fmt.Errorf("load the organisation's timezone: %w", locationErr)
 		}
 		workingHours := service.NewWorkingHours(st, location)
-		escalation := service.NewEscalation(st, workingHours, nil)
+		escalation := service.NewEscalation(st, workingHours, service.NewWorkPolicies(st), nil)
 		escalated, err := escalation.RunOnce(ctx)
 		if err != nil {
 			return err
