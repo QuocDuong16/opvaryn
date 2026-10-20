@@ -18,6 +18,14 @@ const webhookDeliveryColumns = `
 	payload, status, attempts, next_attempt_at, last_status_code, coalesce(last_error, ''),
 	created_at, updated_at, delivered_at`
 
+// scopedWebhookDeliveryColumns is the read shape of one delivery, with the table named, so
+// the scoped query can join the run and the record it belongs to.
+const scopedWebhookDeliveryColumns = `
+	d.id, d.event_type, d.instance_id,
+	coalesce(d.task_id, '00000000-0000-0000-0000-000000000000'::uuid),
+	d.payload, d.status, d.attempts, d.next_attempt_at, d.last_status_code,
+	coalesce(d.last_error, ''), d.created_at, d.updated_at, d.delivered_at`
+
 // ClaimWebhookDeliveries takes up to limit deliveries that are due, counting the attempt
 // as it takes them. FOR UPDATE SKIP LOCKED means a second API replica drains a different
 // batch instead of fighting over the same rows (ADR 0012).
@@ -98,19 +106,31 @@ func (s *Store) MarkWebhookFailed(
 // total behind it (ADR 0017).
 func (s *Store) ListWebhookDeliveriesPage(
 	ctx context.Context,
+	scope domain.RecordScope,
 	page domain.Page,
 ) (domain.Paged[domain.WebhookDelivery], error) {
 	var total int
 	if err := s.pool.QueryRow(ctx,
-		`SELECT count(*) FROM webhook_deliveries`).Scan(&total); err != nil {
+		`SELECT count(*) FROM webhook_deliveries d
+		   JOIN process_instances i ON i.id = d.instance_id
+		   JOIN business_object_records r ON r.id = i.record_id
+		 WHERE `+recordVisibleToScopeAt(1),
+		scope.All, scope.DepartmentKey, scope.UserID).Scan(&total); err != nil {
 		return domain.Paged[domain.WebhookDelivery]{}, classify(fmt.Errorf("count webhook deliveries: %w", err))
 	}
 
+	// The log is scoped like every other read: a run of a record the caller may not read is
+	// not theirs to read (ADR 0008). The id breaks the tie, so a page never repeats or
+	// loses a row.
 	rows, err := s.pool.Query(ctx, `
-		SELECT `+webhookDeliveryColumns+`
-		  FROM webhook_deliveries
-		 ORDER BY created_at DESC
-		 LIMIT $1 OFFSET $2`, page.Limit, page.Offset)
+		SELECT `+scopedWebhookDeliveryColumns+`
+		  FROM webhook_deliveries d
+		  JOIN process_instances i ON i.id = d.instance_id
+		  JOIN business_object_records r ON r.id = i.record_id
+		 WHERE `+recordVisibleToScopeAt(1)+`
+		 ORDER BY d.created_at DESC, d.id DESC
+		 LIMIT $4 OFFSET $5`,
+		scope.All, scope.DepartmentKey, scope.UserID, page.Limit, page.Offset)
 	if err != nil {
 		return domain.Paged[domain.WebhookDelivery]{}, classify(fmt.Errorf("list webhook deliveries: %w", err))
 	}

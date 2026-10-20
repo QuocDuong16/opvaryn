@@ -931,3 +931,52 @@ func TestRecordLabelUsesTheRecordsOwnVersion(t *testing.T) {
 		})
 	}
 }
+
+// A record without a readable name says so: a file identifier or a list of rows is not a
+// name, and a choice is shown by its label (ADR 0016, ADR 0018).
+func TestRecordLabelRendersByFieldType(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		source domain.RecordLabelSource
+		want   string
+	}{
+		{
+			name: "a choice is shown by its label",
+			source: domain.RecordLabelSource{
+				Values: map[string]any{"severity": "nghiem_trong"},
+				Fields: []domain.FieldDefinition{{
+					Key: "severity", Type: domain.FieldTypeSelect,
+					Options: []domain.FieldOption{{Value: "nghiem_trong", Label: "Nghiêm trọng"}},
+				}},
+			},
+			want: "Nghiêm trọng",
+		},
+		{
+			name: "a file identifier is not a name",
+			source: domain.RecordLabelSource{
+				Values: map[string]any{"invoice": "0f2b1c44-0c1e-4f6f-9d1a-1f2b3c4d5e6f"},
+				Fields: []domain.FieldDefinition{{Key: "invoice", Type: domain.FieldTypeFile}},
+			},
+			want: "",
+		},
+		{
+			name: "a list of rows is not a name",
+			source: domain.RecordLabelSource{
+				Values: map[string]any{"items": []any{"a", "b"}},
+				Fields: []domain.FieldDefinition{{Key: "items", Type: domain.FieldTypeRows}},
+			},
+			want: "",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			if got := recordLabel(testCase.source); got != testCase.want {
+				t.Fatalf("recordLabel = %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}

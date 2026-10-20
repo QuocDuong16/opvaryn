@@ -58,6 +58,7 @@ func (f *fakeWebhookStore) MarkWebhookFailed(_ context.Context, id uuid.UUID, st
 
 func (f *fakeWebhookStore) ListWebhookDeliveriesPage(
 	_ context.Context,
+	_ domain.RecordScope,
 	page domain.Page,
 ) (domain.Paged[domain.WebhookDelivery], error) {
 	items := f.listed

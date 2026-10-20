@@ -244,11 +244,25 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   `0012_record_audit.sql` (append-only `record_audit`; no FK on `record_id`; actor name snapshot;
   `changes` jsonb) and `0013_login_failures.sql` (`login_failures(email, failed_at)` for the
   cooldown).
+- `store/search.go` holds `likeTerm`: a search term is escaped (`%`, `_`, `\`) and every
+  ILIKE filter declares `ESCAPE '\'`, so a person searching for "50%" finds that text and not
+  everything. A term is escaped in the store method that owns the query.
+- The record search reads the typed projection (`record_field_values`), not the raw JSONB: a
+  field that is filtered gets a projection (AGENTS.md). The filter is `objectRecordFilter` in
+  store/objectrecord.go; it matches values only, never field names.
+- `recordVisibleToScope` is now `recordVisibleToScopeAt(base)` (a function), so a query whose
+  own parameters are few can use the rule without a gap in the numbering; the webhook delivery
+  log uses base 1 and joins the run to the record, so a delivery of a record the caller may not
+  read is not listed.
 - `store.RecordLabelSources` reads the values and the version fields of a page of records, so a
   list can name each record with the schema that record has (ADR 0006). `service.recordLabel`
   (service/recordlabel.go) applies the rule — the first text field, else the first field — and
   `ProcessRuntime.List`/`Inbox` put the result in `RecordName`; the API returns it as
   `recordName`. The web no longer builds record names from a sample of 100 records.
+- The role catalogue (`store.ListHeldRolesPage`) only offers roles an **active** person holds:
+  a role only disabled people carry would wait forever on a run.
+- Setting a password (admin area or CLI) clears the sign-in counter of that address, and so does
+  changing the address — the remedy the administrator just applied ends the wait.
 - `Principal.PublisherLabel()` is who published a definition version: the person's name, or their
   address when nobody has named them, and `system` when there is no person. It is written to
   `published_by` (ADR 0006, point 7).

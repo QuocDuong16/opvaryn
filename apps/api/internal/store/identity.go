@@ -105,16 +105,21 @@ func (s *Store) ListHeldRolesPage(
 	ctx context.Context,
 	page domain.Page,
 ) (domain.Paged[string], error) {
+	// Only roles an *active* person holds: a role only disabled people carry would wait
+	// forever on a run, which is exactly what the catalogue exists to prevent.
+	const held = `
+		SELECT 1 FROM user_roles ur
+		  JOIN users u ON u.id = ur.user_id
+		 WHERE ur.role = r.key AND u.status = 'active'`
 	const roles = `
 		SELECT r.key
 		  FROM roles r
-		 WHERE EXISTS (SELECT 1 FROM user_roles ur WHERE ur.role = r.key)
+		 WHERE EXISTS (` + held + `)
 		 ORDER BY r.key`
 
 	var total int
 	if err := s.pool.QueryRow(ctx,
-		`SELECT count(*) FROM roles r
-		 WHERE EXISTS (SELECT 1 FROM user_roles ur WHERE ur.role = r.key)`).Scan(&total); err != nil {
+		`SELECT count(*) FROM roles r WHERE EXISTS (`+held+`)`).Scan(&total); err != nil {
 		return domain.Paged[string]{}, classify(fmt.Errorf("count roles: %w", err))
 	}
 

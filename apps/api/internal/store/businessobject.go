@@ -35,7 +35,8 @@ const businessObjectVersionColumns = `
 // listSearch matches the key or the name of a definition. $1 is the search term; an empty
 // term matches everything, which is how "no filter" is expressed in one query.
 const businessObjectSearch = `
-		 WHERE ($1 = '' OR o.key ILIKE '%' || $1 || '%' OR o.name ILIKE '%' || $1 || '%')`
+		 WHERE ($1 = '' OR o.key ILIKE '%' || $1 || '%' ESCAPE '\'
+		    OR o.name ILIKE '%' || $1 || '%' ESCAPE '\')`
 
 // ListBusinessObjects returns one page of definitions ordered by key, with the total behind
 // the page so a screen can render pagination without a second request.
@@ -44,15 +45,16 @@ func (s *Store) ListBusinessObjects(
 	query string,
 	page domain.Page,
 ) (domain.Paged[domain.BusinessObject], error) {
+	term := likeTerm(query)
 	var total int
 	if err := s.pool.QueryRow(ctx,
-		`SELECT count(*) FROM business_objects o`+businessObjectSearch, query).Scan(&total); err != nil {
+		`SELECT count(*) FROM business_objects o`+businessObjectSearch, term).Scan(&total); err != nil {
 		return domain.Paged[domain.BusinessObject]{}, classify(fmt.Errorf("count business objects: %w", err))
 	}
 
 	rows, err := s.pool.Query(ctx, businessObjectSelect+businessObjectSearch+`
 		 ORDER BY o.key
-		 LIMIT $2 OFFSET $3`, query, page.Limit, page.Offset)
+		 LIMIT $2 OFFSET $3`, term, page.Limit, page.Offset)
 	if err != nil {
 		return domain.Paged[domain.BusinessObject]{}, classify(fmt.Errorf("query business objects: %w", err))
 	}

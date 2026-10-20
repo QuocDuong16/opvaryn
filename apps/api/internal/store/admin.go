@@ -15,7 +15,8 @@ import (
 // adminUserSearch matches the address or the name of a person; an empty term is "no
 // filter". The same fragment is used by the count and the page so they cannot disagree.
 const adminUserSearch = `
-	 WHERE ($1 = '' OR u.email ILIKE '%' || $1 || '%' OR u.name ILIKE '%' || $1 || '%')`
+	 WHERE ($1 = '' OR u.email ILIKE '%' || $1 || '%' ESCAPE '\'
+		    OR u.name ILIKE '%' || $1 || '%' ESCAPE '\')`
 
 // ListUsersPage returns one page of users for the administration screen, ordered by email
 // so pagination is stable. Password hashes are part of domain.User and are stripped by the
@@ -25,15 +26,16 @@ func (s *Store) ListUsersPage(
 	query string,
 	page domain.Page,
 ) (domain.Paged[domain.User], error) {
+	term := likeTerm(query)
 	var total int
 	if err := s.pool.QueryRow(ctx,
-		`SELECT count(*) FROM users u`+adminUserSearch, query).Scan(&total); err != nil {
+		`SELECT count(*) FROM users u`+adminUserSearch, term).Scan(&total); err != nil {
 		return domain.Paged[domain.User]{}, classify(fmt.Errorf("count users: %w", err))
 	}
 
 	rows, err := s.pool.Query(ctx, userSelect+adminUserSearch+`
 		 ORDER BY u.email
-		 LIMIT $2 OFFSET $3`, query, page.Limit, page.Offset)
+		 LIMIT $2 OFFSET $3`, term, page.Limit, page.Offset)
 	if err != nil {
 		return domain.Paged[domain.User]{}, classify(fmt.Errorf("query users: %w", err))
 	}
@@ -127,7 +129,8 @@ func (s *Store) UpdateUser(ctx context.Context, user domain.User) (domain.User, 
 // ---------------------------------------------------------- departments ----
 
 const departmentSearch = `
-	 WHERE ($1 = '' OR d.name ILIKE '%' || $1 || '%' OR d.key ILIKE '%' || $1 || '%')`
+	 WHERE ($1 = '' OR d.name ILIKE '%' || $1 || '%' ESCAPE '\'
+		    OR d.key ILIKE '%' || $1 || '%' ESCAPE '\')`
 
 // ListDepartmentsPage returns one page of the closed department catalogue with the number
 // of people in each department.
@@ -136,9 +139,10 @@ func (s *Store) ListDepartmentsPage(
 	query string,
 	page domain.Page,
 ) (domain.Paged[domain.DepartmentSummary], error) {
+	term := likeTerm(query)
 	var total int
 	if err := s.pool.QueryRow(ctx,
-		`SELECT count(*) FROM departments d`+departmentSearch, query).Scan(&total); err != nil {
+		`SELECT count(*) FROM departments d`+departmentSearch, term).Scan(&total); err != nil {
 		return domain.Paged[domain.DepartmentSummary]{}, classify(fmt.Errorf("count departments: %w", err))
 	}
 
@@ -148,7 +152,7 @@ func (s *Store) ListDepartmentsPage(
 		  LEFT JOIN users u ON u.department_key = d.key`+departmentSearch+`
 		 GROUP BY d.key, d.name, d.created_at
 		 ORDER BY d.name, d.key
-		 LIMIT $2 OFFSET $3`, query, page.Limit, page.Offset)
+		 LIMIT $2 OFFSET $3`, term, page.Limit, page.Offset)
 	if err != nil {
 		return domain.Paged[domain.DepartmentSummary]{}, classify(fmt.Errorf("query departments: %w", err))
 	}
@@ -241,7 +245,8 @@ func (s *Store) DeleteDepartment(ctx context.Context, key string) error {
 // ---------------------------------------------------------------- roles ----
 
 const roleSearch = `
-	 WHERE ($1 = '' OR r.key ILIKE '%' || $1 || '%' OR r.label ILIKE '%' || $1 || '%')`
+	 WHERE ($1 = '' OR r.key ILIKE '%' || $1 || '%' ESCAPE '\'
+		    OR r.label ILIKE '%' || $1 || '%' ESCAPE '\')`
 
 // ListRolesPage returns one page of the whole role catalogue, including roles nobody holds
 // yet. The holder count tells an administrator whether deleting one is possible.
@@ -250,9 +255,10 @@ func (s *Store) ListRolesPage(
 	query string,
 	page domain.Page,
 ) (domain.Paged[domain.Role], error) {
+	term := likeTerm(query)
 	var total int
 	if err := s.pool.QueryRow(ctx,
-		`SELECT count(*) FROM roles r`+roleSearch, query).Scan(&total); err != nil {
+		`SELECT count(*) FROM roles r`+roleSearch, term).Scan(&total); err != nil {
 		return domain.Paged[domain.Role]{}, classify(fmt.Errorf("count roles: %w", err))
 	}
 
@@ -262,7 +268,7 @@ func (s *Store) ListRolesPage(
 		  LEFT JOIN user_roles ur ON ur.role = r.key`+roleSearch+`
 		 GROUP BY r.key
 		 ORDER BY r.key
-		 LIMIT $2 OFFSET $3`, query, page.Limit, page.Offset)
+		 LIMIT $2 OFFSET $3`, term, page.Limit, page.Offset)
 	if err != nil {
 		return domain.Paged[domain.Role]{}, classify(fmt.Errorf("query roles: %w", err))
 	}

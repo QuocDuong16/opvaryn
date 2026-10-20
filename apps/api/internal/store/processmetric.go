@@ -14,7 +14,7 @@ import (
 // Placeholders follow the convention the scope fragment fixes: $2..$4 are the scope
 // (all, department, user), so this query's own parameters sit at $1 (definition key;
 // an empty string means every definition) and $5 (the window start).
-const processMetricScope = `
+var processMetricScope = `
 	  FROM process_instances i
 	  JOIN business_object_records r ON r.id = i.record_id
 	  JOIN process_definitions d ON d.id = i.definition_id

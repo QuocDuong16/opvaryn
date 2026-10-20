@@ -36,6 +36,9 @@ trusted proxy. Vì vậy chính sách phải dựa trên **tài khoản**, khôn
    sau `requireAdmin`; CLI vẫn giữ vai trò đường phục hồi.
 6. **Không đổi mô hình phiên.** Cooldown chặn **đăng nhập mới**; các phiên đang mở vẫn dùng được
    cho tới khi hết hạn hoặc bị thu hồi. Thu hồi phiên là việc của quản trị (ADR 0022).
+7. **Cách chữa thì xoá luôn cái bệnh.** Đặt lại mật khẩu (qua khu vực quản trị hoặc CLI) xoá
+   bộ đếm của địa chỉ đó: người vừa được đặt mật khẩu mới không bị từ chối vì những lần gõ sai
+   trước đó. Đổi địa chỉ email cũng xoá bộ đếm của cả địa chỉ cũ lẫn địa chỉ mới.
 
 ## Hệ quả
 
