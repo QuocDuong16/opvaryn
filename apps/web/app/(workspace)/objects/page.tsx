@@ -36,7 +36,7 @@ export default async function ObjectsPage({ searchParams }: PageProps) {
       api.listBusinessObjects({ q: query || undefined, limit: PER_PAGE, offset }),
       api.getMe(),
       api
-        .listRoles()
+        .listRoles({ limit: 100 })
         .then((page) => page.data)
         .catch(() => []),
     ]);

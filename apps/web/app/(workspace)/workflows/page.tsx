@@ -87,7 +87,7 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
       api.listBusinessObjects({ limit: 100 }),
       api.getMe(),
       api
-        .listRoles()
+        .listRoles({ limit: 100 })
         .then((page) => page.data)
         .catch(() => []),
     ]);

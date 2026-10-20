@@ -57,7 +57,7 @@ async function loadRoleLabels(): Promise<ReadonlyMap<string, string>> {
   try {
     return roleLabels(
       await createServerApiClient()
-        .listRoles()
+        .listRoles({ limit: 100 })
         .then((page) => page.data),
     );
   } catch {

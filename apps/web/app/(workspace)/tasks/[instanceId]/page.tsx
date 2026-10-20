@@ -19,7 +19,7 @@ import {
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
-import { formatFieldValue, formatTimestamp } from '@/lib/format';
+import { formatFieldValue, formatTimestamp, primaryFieldValue } from '@/lib/format';
 import { fieldNames, labelOrKey } from '@/lib/names';
 import { cn } from '@/lib/utils';
 
@@ -60,7 +60,7 @@ export default async function ProcessInstancePage({ params }: PageProps) {
     // The screen names roles, so it needs the catalogue. A missing catalogue is not fatal:
     // the chips fall back to the key rather than showing nothing.
     const catalogue = await api
-      .listRoles()
+      .listRoles({ limit: 100 })
       .then((page) => page.data)
       .catch(() => []);
     roleLabels = Object.fromEntries(catalogue.map((entry) => [entry.key, entry.label]));
@@ -124,6 +124,10 @@ export default async function ProcessInstancePage({ params }: PageProps) {
   const waiting = nextTasks(tasks);
 
   const recordContext = await loadRecordContext(instance.objectKey, instance.recordId);
+  // The record is named with the definition version it was created under (ADR 0006).
+  const recordName = recordContext.record
+    ? primaryFieldValue(recordContext.fields, recordContext.record)
+    : 'một bản ghi bạn không đọc được';
   // The log carries keys; the screen reads names (ADR 0018).
   const timeline = events.map((event) =>
     describeEvent(event, {
@@ -137,7 +141,7 @@ export default async function ProcessInstancePage({ params }: PageProps) {
       <PageHeader
         eyebrow={`05 / Việc của tôi · ${definitionName} v${instance.definitionVersion}`}
         title="Chi tiết công việc"
-        lead={`Chạy trên ${recordContext.record ? 'bản ghi bên dưới' : 'một bản ghi bạn không đọc được'} theo ${definitionName} phiên bản ${instance.definitionVersion}. Mọi quyết định bên dưới đều được ghi lại.`}
+        lead={`Chạy trên ${recordName} theo ${definitionName} phiên bản ${instance.definitionVersion}. Mọi quyết định bên dưới đều được ghi lại.`}
       />
 
       <p className="mb-6 flex flex-wrap items-center gap-3 text-sm">

@@ -225,6 +225,8 @@
   `components/forms/object-form-state.ts`, `components/forms/record-values.ts`,
   `components/objects/field-draft.ts`).
 - `lib/format.ts`: `FIELD_TYPE_LABELS`, `formatTimestamp`, `formatClock` (the one time format),
+  `primaryFieldValue` (the naming rule, aligned with the API's: a file or a list of rows is not
+  a name, so a record without a readable name says so),
   `formatDate` (no timezone shift),
   `formatFieldValue` (per field type), `primaryFieldValue` (the label that identifies a record).
 

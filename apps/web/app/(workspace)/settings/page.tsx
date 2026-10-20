@@ -268,6 +268,14 @@ const DELIVERY_STATUS_LABELS: Record<string, string> = {
   failed: 'bỏ cuộc',
 };
 
+/** DELIVERY_EVENT_LABELS name the engine events the log carries. */
+const DELIVERY_EVENT_LABELS: Record<string, string> = {
+  instance_started: 'Lần chạy bắt đầu',
+  task_created: 'Việc được giao',
+  instance_completed: 'Lần chạy kết thúc',
+  instance_rejected: 'Lần chạy bị từ chối',
+};
+
 export default async function SettingsPage() {
   // This screen describes how the system is built and operated, so it belongs to the
   // administrator and only while advanced mode is on (ADR 0015). Everyone else gets a 404,
@@ -440,9 +448,9 @@ export default async function SettingsPage() {
                       {deliveries.data.map((delivery) => (
                         <tr key={delivery.id}>
                           <td className="px-4 py-3 align-top font-mono text-xs">
-                            {delivery.event}
+                            {DELIVERY_EVENT_LABELS[delivery.event] ?? delivery.event}
                             <span className="mt-0.5 block text-[10px] text-on-surface-muted">
-                              {`instance ${delivery.instanceId.slice(0, 8)}…`}
+                              {`lần chạy ${delivery.instanceId.slice(0, 8)}…`}
                             </span>
                           </td>
                           <td className="px-4 py-3 align-top text-xs">
