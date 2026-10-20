@@ -253,6 +253,11 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   transaction: the old task is cancelled, the new one created for the other role, and a
   `task_escalated` event appended. `process_tasks.escalated` keeps a step from bouncing
   between roles.
+- The policy of each kind of work (ADR 0035) lives in `work_policies`: the default deadline
+  (working hours), the default priority (`low`/`normal`/`high`/`urgent`) and the escalation
+  role. A step of a process may declare its own `dueInWorkingHours`, `escalateToRole` and
+  `priority`; the step wins over the policy. `process_tasks.priority` carries the priority of
+  the task, and the inbox shows it.
 - The configuration of the application view (ADR 0033) lives in `app_configs` (one row per data
   definition: the name, the field the kanban groups by, the list's columns). Reading it is open
   to every signed-in person; changing it needs the admin role, and the fields it names must

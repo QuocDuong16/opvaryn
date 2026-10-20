@@ -116,8 +116,8 @@ const NOT_YET: readonly { title: string; body: string }[] = [
     body: 'Đăng nhập hiện dùng tài khoản nội bộ; kết nối hệ thống đăng nhập của tổ chức đang chờ chính hệ thống đó.',
   },
   {
-    title: 'Mức ưu tiên và hạn khác nhau',
-    body: 'Mỗi bước có một hạn tính theo giờ làm việc của tổ chức; chưa có mức ưu tiên và hạn riêng theo từng loại việc.',
+    title: 'Ưu tiên theo từng người',
+    body: 'Mỗi loại việc có hạn và mức ưu tiên riêng, nhưng chưa có sắp xếp hộp việc theo ưu tiên.',
   },
   {
     title: 'Kết nối hai chiều',

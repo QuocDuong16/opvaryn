@@ -98,6 +98,7 @@ export type ErrorResponse = components['schemas']['ErrorResponse'];
 /** The signed-in user with roles and department. */
 export type Me = components['schemas']['Me'];
 export type AppConfig = components['schemas']['AppConfig'];
+export type WorkPolicy = components['schemas']['WorkPolicy'];
 export type FieldColumn = components['schemas']['FieldColumn'];
 export type FieldCondition = components['schemas']['FieldCondition'];
 export type WorkingHour = components['schemas']['WorkingHour'];
@@ -190,6 +191,17 @@ export interface ApiClient {
   enableMyTwoFactor(code: string): Promise<TwoFactorEnabled>;
   /** Switches the second step off. */
   disableMyTwoFactor(code: string): Promise<void>;
+  /** The policy of one kind of work: the default deadline, priority and escalation. */
+  getWorkPolicy(objectKey: string): Promise<WorkPolicy>;
+  /** Stores the policy of one kind of work. */
+  saveWorkPolicy(
+    objectKey: string,
+    policy: {
+      defaultDueHours: number;
+      defaultPriority: string;
+      escalationRole: string;
+    },
+  ): Promise<WorkPolicy>;
   /** The configuration of the application view (ADR 0033). */
   getAppConfig(objectKey: string): Promise<AppConfig>;
   /** Stores the configuration of the application view. */
@@ -403,6 +415,15 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
       request<void>('/api/v1/me/two-factor/disable', {
         method: 'POST',
         body: { code },
+      }),
+
+    getWorkPolicy: (objectKey) =>
+      request<WorkPolicy>(`/api/v1/admin/work-policies/${encodeURIComponent(objectKey)}`),
+
+    saveWorkPolicy: (objectKey, policy) =>
+      request<WorkPolicy>(`/api/v1/admin/work-policies/${encodeURIComponent(objectKey)}`, {
+        method: 'PUT',
+        body: policy,
       }),
 
     getAppConfig: (objectKey) =>

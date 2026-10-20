@@ -4,6 +4,7 @@ import { revalidatePath } from 'next/cache';
 import { redirect } from 'next/navigation';
 
 import type { AdminActionState } from '@/components/admin/admin-state';
+import type { WorkPolicyState } from '@/components/admin/work-policy-state';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
 
 /**
@@ -119,6 +120,27 @@ export async function unlockAdminUserAction(
   // confirmation therefore travels in the address, where the next render can show it.
   revalidatePath('/admin/users');
   redirect(`/admin/users/${userId}?unlocked=1`);
+}
+
+// ------------------------------------------------------- work policies ----
+
+export async function saveWorkPolicyAction(
+  _previous: WorkPolicyState,
+  formData: FormData,
+): Promise<WorkPolicyState> {
+  const objectKey = field(formData, 'objectKey');
+  const dueHours = Number(field(formData, 'defaultDueHours'));
+  try {
+    await createServerApiClient().saveWorkPolicy(objectKey, {
+      defaultDueHours: Number.isFinite(dueHours) ? dueHours : 0,
+      defaultPriority: field(formData, 'defaultPriority'),
+      escalationRole: field(formData, 'escalationRole'),
+    });
+    revalidatePath('/admin/policies');
+    return { status: 'success', message: 'Đã lưu chính sách của loại việc này.' };
+  } catch (cause) {
+    return failure(cause);
+  }
 }
 
 // ------------------------------------------------------- working hours ----

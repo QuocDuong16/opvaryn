@@ -21,7 +21,7 @@ func handleGetAppConfig(configs *service.AppConfigs, log *slog.Logger) http.Hand
 		if !ok {
 			return
 		}
-		config, err := configs.Get(r.Context(), domain.NewPrincipal(user), chi.URLParam(r, "objectKey"))
+		config, err := configs.Get(r.Context(), domain.NewPrincipal(user), chi.URLParam(r, "key"))
 		if err != nil {
 			writeStoreError(w, log, err, "read app config")
 			return
@@ -45,7 +45,7 @@ func handleSaveAppConfig(configs *service.AppConfigs, log *slog.Logger) http.Han
 			return
 		}
 		saved, err := configs.Save(r.Context(), domain.NewPrincipal(user), domain.AppConfig{
-			ObjectKey:   chi.URLParam(r, "objectKey"),
+			ObjectKey:   chi.URLParam(r, "key"),
 			Name:        body.Name,
 			KanbanField: body.KanbanField,
 			ListColumns: body.ListColumns,

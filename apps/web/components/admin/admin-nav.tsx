@@ -11,6 +11,7 @@ const ITEMS = [
   { href: '/admin/departments', label: 'Phòng ban' },
   { href: '/admin/roles', label: 'Vai trò' },
   { href: '/admin/working-hours', label: 'Giờ làm việc' },
+  { href: '/admin/policies', label: 'Chính sách việc' },
 ] as const;
 
 /** The administration areas, with the current one marked. */

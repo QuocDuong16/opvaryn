@@ -311,6 +311,19 @@ status="$(request_as "$admin_jar" PUT "/api/v1/app-configs/$object_key" \
   '{"name":"Smoke app","kanbanField":"amount","listColumns":[]}')"
 [[ "$status" == "400" ]] || fail "a kanban grouping by a number returned $status, expected 400"
 
+echo "smoke: the policy of a kind of work decides the deadline and the priority (ADR 0035)"
+status="$(request_as "$admin_jar" GET "/api/v1/admin/work-policies/$object_key")"
+[[ "$status" == "200" ]] || fail "reading the work policy returned $status, expected 200"
+status="$(request_as "$designer_jar" PUT "/api/v1/admin/work-policies/$object_key" \
+  '{"defaultDueHours":8,"defaultPriority":"high","escalationRole":""}')"
+[[ "$status" == "403" ]] || fail "a non-admin changed the work policy (status $status), expected 403"
+status="$(request_as "$admin_jar" PUT "/api/v1/admin/work-policies/$object_key" \
+  '{"defaultDueHours":8,"defaultPriority":"high","escalationRole":""}')"
+[[ "$status" == "200" ]] || fail "an admin changed the work policy (status $status), expected 200"
+status="$(request_as "$admin_jar" PUT "/api/v1/admin/work-policies/$object_key" \
+  '{"defaultDueHours":8,"defaultPriority":"khong_hop_le","escalationRole":""}')"
+[[ "$status" == "400" ]] || fail "a policy with an unknown priority returned $status, expected 400"
+
 echo "smoke: a computed field, a hidden field and a table (ADR 0032)"
 smart_key="smoke_smart_$stamp"
 smart_body="$(printf '{"key":"%s","name":"Smoke smart form","fields":[{"key":"so_luong","label":"Số lượng","type":"number"},{"key":"don_gia","label":"Đơn giá","type":"number"},{"key":"thanh_tien","label":"Thành tiền","type":"formula","formula":"so_luong * don_gia"},{"key":"ghi_chu","label":"Ghi chú gấp","type":"text","visibleWhen":{"field":"so_luong","op":"gt","value":10}},{"key":"items","label":"Danh sách món","type":"table","columns":[{"key":"ten_mon","label":"Tên món","type":"text"},{"key":"gia","label":"Giá","type":"number"}]}]}' "$smart_key")"

@@ -76,6 +76,8 @@ tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
   bảng nhiều dòng có cột có kiểu trong Form Builder (ADR 0032).
 - **Live (MVP)**: cấu hình của màn Ứng dụng được lưu theo từng loại dữ liệu — tên hiển thị,
   trường gom cột kanban, các cột của danh sách; người quản trị sửa, người khác xem (ADR 0033).
+- **Live (MVP)**: chính sách việc theo từng loại việc — hạn mặc định, mức ưu tiên và vai trò nhận
+  việc khi quá hạn; bước của quy trình vẫn khai riêng được (ADR 0035).
 - **Concept**: tra cứu dữ liệu từ hệ thống ngoài, kéo thả trong màn Ứng dụng, template library,
   và nội dung Roadmap — các phần phụ thuộc quyết định còn mở hoặc thuộc V1.x.
 

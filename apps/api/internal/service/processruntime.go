@@ -69,6 +69,9 @@ type processRuntimeStore interface {
 // store only applies the resulting write atomically (ADR 0007 section 8).
 type ProcessRuntime struct {
 	store processRuntimeStore
+	// policies decide the deadline and the priority of a step that does not declare
+	// its own (ADR 0035).
+	policies *WorkPolicies
 	// webhooks decides whether a committed write also owes the outside world a
 	// notification; the rows travel inside the same write (ADR 0012).
 	webhooks WebhookConfig
@@ -90,6 +93,12 @@ func WithWebhooks(config WebhookConfig) RuntimeOption {
 // working hours (ADR 0031).
 func WithWorkingHours(hours *WorkingHours) RuntimeOption {
 	return func(runtime *ProcessRuntime) { runtime.workingHours = hours }
+}
+
+// WithWorkPolicies gives the steps of a process the deadline and the priority of their
+// kind of work, when the step does not declare its own (ADR 0035).
+func WithWorkPolicies(policies *WorkPolicies) RuntimeOption {
+	return func(runtime *ProcessRuntime) { runtime.policies = policies }
 }
 
 // NewProcessRuntime returns a ProcessRuntime over the given store.
@@ -195,7 +204,7 @@ func (r *ProcessRuntime) Start(ctx context.Context, in StartInput) (InstanceView
 	var tasks []domain.ProcessTask
 	switch walk.kind {
 	case walkWait:
-		task, taskErr := r.taskWithDeadline(ctx, instanceID, walk.stopNode, 1)
+		task, taskErr := r.taskWithDeadline(ctx, instanceID, definition.ObjectKey, walk.stopNode, 1)
 		if taskErr != nil {
 			return InstanceView{}, taskErr
 		}
@@ -314,7 +323,7 @@ func (r *ProcessRuntime) Decide(ctx context.Context, in DecideInput) (InstanceVi
 		if walk.kind == walkWait {
 			write.NewState = domain.ProcessRunning
 			write.NewCurrentNode = walk.stopNode.Key
-			task, taskErr := r.taskWithDeadline(ctx, instance.ID, walk.stopNode, instance.Attempt)
+			task, taskErr := r.taskWithDeadline(ctx, instance.ID, version.ObjectKey, walk.stopNode, instance.Attempt)
 			if taskErr != nil {
 				return InstanceView{}, taskErr
 			}
@@ -351,7 +360,7 @@ func (r *ProcessRuntime) Decide(ctx context.Context, in DecideInput) (InstanceVi
 		write.Events = append(write.Events, walkEvents(instance.ID, actor, walk)...)
 		if walk.kind == walkWait {
 			write.NewCurrentNode = walk.stopNode.Key
-			task, taskErr := r.taskWithDeadline(ctx, instance.ID, walk.stopNode, attempt)
+			task, taskErr := r.taskWithDeadline(ctx, instance.ID, version.ObjectKey, walk.stopNode, attempt)
 			if taskErr != nil {
 				return InstanceView{}, taskErr
 			}
@@ -603,14 +612,35 @@ func newTask(instanceID uuid.UUID, node domain.ProcessNode, attempt int) domain.
 func (r *ProcessRuntime) taskWithDeadline(
 	ctx context.Context,
 	instanceID uuid.UUID,
+	objectKey string,
 	node domain.ProcessNode,
 	attempt int,
 ) (domain.ProcessTask, error) {
 	task := newTask(instanceID, node, attempt)
-	if r.workingHours == nil || node.DueInWorkingHours <= 0 {
+	task.Priority = defaultPriority
+
+	// The step's own rules win; the policy of the kind of work decides the rest
+	// (ADR 0035).
+	hours := node.DueInWorkingHours
+	if node.Priority != "" {
+		task.Priority = node.Priority
+	}
+	if r.policies != nil && objectKey != "" {
+		policy, err := r.policies.Get(ctx, domain.Principal{}, objectKey)
+		if err == nil {
+			if hours <= 0 {
+				hours = policy.DefaultDueHours
+			}
+			if node.Priority == "" && policy.DefaultPriority != "" {
+				task.Priority = policy.DefaultPriority
+			}
+		}
+	}
+
+	if r.workingHours == nil || hours <= 0 {
 		return task, nil
 	}
-	due, hasDeadline, err := r.workingHours.Deadline(ctx, r.now().UTC(), node.DueInWorkingHours)
+	due, hasDeadline, err := r.workingHours.Deadline(ctx, r.now().UTC(), hours)
 	if err != nil {
 		return domain.ProcessTask{}, fmt.Errorf("compute the deadline of step %q: %w", node.Key, err)
 	}
