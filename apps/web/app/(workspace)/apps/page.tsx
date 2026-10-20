@@ -75,7 +75,8 @@ export default async function ApplicationsPage() {
         <Card>
           <CardTitle>Đang chạy thật</CardTitle>
           <CardDescription>
-            Danh sách và chi tiết đọc bản ghi đã lưu; thêm bản ghi mới sẽ xuất hiện ngay ở đây.
+            Danh sách và chi tiết đọc bản ghi đã lưu — mỗi loại dữ liệu hiện {RECORDS_PER_APP} bản
+            ghi gần nhất; thêm bản ghi mới sẽ xuất hiện ngay ở đây.
           </CardDescription>
         </Card>
         <Card>
