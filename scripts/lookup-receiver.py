@@ -9,13 +9,20 @@ while the record has not been changed in the meantime.
 
 It is a test fixture, not a product: no framework, no state beyond the file.
 
-Usage: python3 scripts/lookup-receiver.py <output-file> <port>
+Usage: python3 scripts/lookup-receiver.py <output-file> <port> [catalogue-json] [bind]
+The catalogue is the list of options the system offers on a GET; it defaults to one
+supplier. The bind address defaults to 127.0.0.1, so a receiver started on the host is
+not reachable from the network; a receiver inside a container passes 0.0.0.0.
 """
 import json
 import sys
-from http.server import BaseHTTPRequestHandler, HTTPServer
+from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
 output_path, port = sys.argv[1], int(sys.argv[2])
+catalogue = {"options": [{"value": "sup-01", "label": "Công ty Một"}]}
+if len(sys.argv) > 3 and sys.argv[3].strip():
+    catalogue = {"options": json.loads(sys.argv[3])}
+bind = sys.argv[4] if len(sys.argv) > 4 else "127.0.0.1"
 
 
 class Handler(BaseHTTPRequestHandler):
@@ -59,9 +66,8 @@ class Handler(BaseHTTPRequestHandler):
         self.wfile.write(encoded)
 
     def do_GET(self) -> None:  # noqa: N802 - http.server's naming
-        # The catalogue of the same system: it offers no options, which is enough for a
-        # test that only cares about the write-back.
-        encoded = json.dumps({"options": []}).encode("utf-8")
+        # The catalogue of the same system: the options it offers.
+        encoded = json.dumps(catalogue).encode("utf-8")
         self.send_response(200)
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(encoded)))
@@ -72,4 +78,6 @@ class Handler(BaseHTTPRequestHandler):
         return
 
 
-HTTPServer(("127.0.0.1", port), Handler).serve_forever()
+# Threaded: the write-back worker keeps its connection open, and a single-threaded
+# server would then not answer the catalogue request that comes at the same time.
+ThreadingHTTPServer((bind, port), Handler).serve_forever()

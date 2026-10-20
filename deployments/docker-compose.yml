@@ -27,6 +27,14 @@ x-api-env: &api-env
   OPVARYN_WEBHOOK_SECRET: ${OPVARYN_WEBHOOK_SECRET:-}
   OPVARYN_WEBHOOK_TIMEOUT: ${OPVARYN_WEBHOOK_TIMEOUT:-5s}
   OPVARYN_WEBHOOK_MAX_ATTEMPTS: ${OPVARYN_WEBHOOK_MAX_ATTEMPTS:-5}
+  # The external catalogues of ADR 0034 and the write-back of ADR 0037. Where a catalogue
+  # lives and where records are written back to is configured per field in the admin
+  # area, not here; these are the limits of the calls.
+  OPVARYN_LOOKUP_TIMEOUT: ${OPVARYN_LOOKUP_TIMEOUT:-5s}
+  OPVARYN_LOOKUP_MAX_ATTEMPTS: ${OPVARYN_LOOKUP_MAX_ATTEMPTS:-5}
+  # Lets a catalogue live in this network. Off by default: the server must not become a
+  # bridge into the network.
+  OPVARYN_LOOKUP_ALLOW_INTERNAL: ${OPVARYN_LOOKUP_ALLOW_INTERNAL:-false}
   # Two-step verification for administrators (ADR 0030). Empty means the feature is not
   # configured on this host, and the setup screen says so.
   TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
