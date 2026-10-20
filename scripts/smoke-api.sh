@@ -322,6 +322,17 @@ if len(records) != 1 or records[0]["values"].get("note") != "ghi chú v2":
     sys.exit(f"expected the one record whose value matches, got {records}")
 PY
 
+# A number is a value too: the search reaches the typed projection.
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects/$object_key/records?q=1500000")"
+[[ "$status" == "200" ]] || fail "searching for a number returned $status, expected 200"
+python3 - "$body_file" <<'PY' || fail "the record search did not find the record by its number"
+import json, sys
+
+records = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+if len(records) != 1 or records[0]["values"].get("amount") != 1500000:
+    sys.exit(f"expected the one record whose number matches, got {records}")
+PY
+
 # A wildcard in the search term is literal: "%" must not match every record.
 status="$(request_as "$designer_jar" GET "/api/v1/business-objects/$object_key/records?q=%25")"
 [[ "$status" == "200" ]] || fail "searching for a percent sign returned $status, expected 200"
