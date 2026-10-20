@@ -49,6 +49,9 @@ DELETE FROM process_definitions WHERE key ~ '^(smoke|flow|restart)_';
 DELETE FROM attachments        WHERE object_key ~ '^(smoke|flow|restart)_';
 -- The audit table has no foreign key (it outlives records), so it is cleaned by object key.
 DELETE FROM record_audit       WHERE object_key ~ '^(smoke|flow|restart)_';
+-- The write-backs have no foreign key either (they outlive the record), so they are
+-- cleaned by object key (ADR 0037).
+DELETE FROM lookup_writebacks  WHERE object_key ~ '^(smoke|flow|restart)_';
 DELETE FROM login_failures     WHERE email LIKE '%@example.com';
 DELETE FROM business_objects    WHERE key ~ '^(smoke|flow|restart)_';
 DELETE FROM metric_definitions  WHERE key ~ '^(smoke|flow|restart)_';

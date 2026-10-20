@@ -257,6 +257,16 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   field key, URL). The **server** fetches the source (`service.Lookups`, 5s, 1 MB, 200 options,
   http/https only) and answers `GET /api/v1/lookups/{key}` with the options; a source that
   cannot be reached is reported per field instead of pretending the field has no options.
+- A lookup source may also be **written back to** (ADR 0037): `lookup_sources.write_url` +
+  `write_fields`. The delivery is a `lookup_writebacks` row inserted **in the same transaction**
+  as the record change, so an outside system never blocks a record; a worker
+  (`service.LookupWritebacks`, same retry/backoff and HMAC as the outbound webhook) sends it.
+  The outside system may answer with corrections (`{"accepted":true,"values":{...}}`); they are
+  applied **only while the record still stands at the version the delivery was queued for**
+  (the store's update is conditional on `updated_at`), otherwise the delivery becomes a
+  `conflict` and a person decides. A correction may only touch the fields that were sent, and
+  it is never written back again. `OPVARYN_LOOKUP_ALLOW_INTERNAL=true` lets a source live in
+  the machine's own network (off by default).
 - The policy of each kind of work (ADR 0035) lives in `work_policies`: the default deadline
   (working hours), the default priority (`low`/`normal`/`high`/`urgent`) and the escalation
   role. A step of a process may declare its own `dueInWorkingHours`, `escalateToRole` and

@@ -27,6 +27,13 @@ type Config struct {
 	WebhookTimeout     time.Duration `env:"OPVARYN_WEBHOOK_TIMEOUT" envDefault:"5s"`
 	WebhookMaxAttempts int           `env:"OPVARYN_WEBHOOK_MAX_ATTEMPTS" envDefault:"5"`
 
+	// The external catalogues of ADR 0034 and the write-back of ADR 0037. The secret is
+	// the webhook's: it is the same kind of integration. AllowInternal lets a source
+	// live in the machine's own network, which is off by default.
+	LookupTimeout       time.Duration `env:"OPVARYN_LOOKUP_TIMEOUT" envDefault:"5s"`
+	LookupMaxAttempts   int           `env:"OPVARYN_LOOKUP_MAX_ATTEMPTS" envDefault:"5"`
+	LookupAllowInternal bool          `env:"OPVARYN_LOOKUP_ALLOW_INTERNAL" envDefault:"false"`
+
 	// Two-step verification for administrators (ADR 0030). The key encrypts the shared
 	// secret at rest: 32 bytes, base64. An empty key means the feature is not configured
 	// on this server, and the setup endpoint says so instead of storing a secret in clear.
@@ -58,6 +65,10 @@ func (c Config) validate() error {
 		return fmt.Errorf("OPVARYN_WEBHOOK_MAX_ATTEMPTS must be at least 1, got %d", c.WebhookMaxAttempts)
 	case c.WebhookURL != "" && c.WebhookTimeout <= 0:
 		return fmt.Errorf("OPVARYN_WEBHOOK_TIMEOUT must be positive, got %s", c.WebhookTimeout)
+	case c.LookupMaxAttempts < 1:
+		return fmt.Errorf("OPVARYN_LOOKUP_MAX_ATTEMPTS must be at least 1, got %d", c.LookupMaxAttempts)
+	case c.LookupTimeout <= 0:
+		return fmt.Errorf("OPVARYN_LOOKUP_TIMEOUT must be positive, got %s", c.LookupTimeout)
 	}
 	if c.TOTPEncryptionKey != "" {
 		if _, err := decodeEncryptionKey(c.TOTPEncryptionKey); err != nil {

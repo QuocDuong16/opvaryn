@@ -20,8 +20,12 @@ interface PageProps {
 
 const PLANNED_CAPABILITIES: readonly { title: string; body: string }[] = [
   {
-    title: 'Ghi ngược lại hệ thống ngoài',
-    body: 'Tra cứu đã kéo được dữ liệu của hệ thống khác vào; việc ghi ngược lại thuộc về tích hợp hai chiều.',
+    title: 'Tra cứu ngoài làm mới liên tục',
+    body: 'Danh sách lựa chọn được lấy lúc mở màn hình; nó chưa tự làm mới khi danh mục bên ngoài thay đổi.',
+  },
+  {
+    title: 'Ghi ngược theo lịch của tổ chức',
+    body: 'Bản ghi đã được gửi lại hệ thống ngoài ngay khi thay đổi; chưa có lịch gửi theo nhịp riêng.',
   },
 ];
 

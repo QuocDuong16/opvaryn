@@ -109,7 +109,12 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
   {
     method: 'PUT',
     path: '/api/v1/admin/lookups/{key}/{fieldKey}',
-    purpose: 'Gắn một trường vào danh mục của hệ thống khác',
+    purpose: 'Gắn một trường vào danh mục của hệ thống khác, và nơi ghi bản ghi về lại',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/admin/lookups/writebacks',
+    purpose: 'Nhật ký các lần ghi bản ghi về hệ thống ngoài',
   },
   {
     method: 'GET',

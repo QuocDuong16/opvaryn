@@ -42,6 +42,7 @@ type recordStore interface {
 		bindings []domain.AttachmentBinding,
 		audit domain.RecordAudit,
 		admin bool,
+		writebacks []domain.LookupWriteback,
 	) (domain.ObjectRecord, error)
 	CreateObjectRecords(
 		ctx context.Context,
@@ -62,7 +63,16 @@ type recordStore interface {
 		editorID uuid.UUID,
 		audit domain.RecordAudit,
 		admin bool,
+		writebacks []domain.LookupWriteback,
 	) (domain.ObjectRecord, error)
+	ApplyObjectRecordValues(
+		ctx context.Context,
+		record domain.ObjectRecord,
+		projection []domain.RecordFieldValue,
+		tableProjection []domain.RecordTableValue,
+		expectedUpdatedAt time.Time,
+		audit domain.RecordAudit,
+	) (bool, error)
 	DeleteObjectRecord(ctx context.Context, id uuid.UUID, audit domain.RecordAudit) error
 	ListRecordAudit(ctx context.Context, recordID uuid.UUID, page domain.Page) (domain.Paged[domain.RecordAudit], error)
 	FindAttachmentForBinding(
@@ -215,6 +225,11 @@ func (s *ObjectRecords) Create(ctx context.Context, objectKey string, values map
 		return domain.ObjectRecord{}, err
 	}
 
+	// The systems this record's options come from are told about it in the same
+	// transaction as the record itself (ADR 0037).
+	writebacks := s.writebacks(ctx, object, record, record.Values, nil,
+		domain.RecordCreated, principal)
+
 	created, err := s.store.CreateObjectRecord(ctx, record,
 		projectRecordValues(object.Fields, record.Values),
 		projectTableValues(object.Fields, record.Values),
@@ -225,7 +240,7 @@ func (s *ObjectRecords) Create(ctx context.Context, objectKey string, values map
 			ActorID:   principal.UserID,
 			ActorName: principal.Name,
 			Action:    domain.RecordCreated,
-		}, principal.IsAdmin())
+		}, principal.IsAdmin(), writebacks)
 	if err != nil {
 		return domain.ObjectRecord{}, err
 	}
@@ -307,6 +322,10 @@ func (s *ObjectRecords) Update(
 	record.Values = normalizeRecordValues(object, prepared)
 	changes := recordChanges(previous, record.Values, object.Fields)
 
+	// Only a change to a field that is sent reaches the outside system (ADR 0037).
+	writebacks := s.writebacks(ctx, object, record, record.Values, previous,
+		domain.RecordUpdated, principal)
+
 	bindings, fileFieldKeys, err := s.fileBindings(ctx, object.Key, object.Fields,
 		record.Values, record.ID, principal)
 	if err != nil {
@@ -325,7 +344,7 @@ func (s *ObjectRecords) Update(
 	updated, err := s.store.UpdateObjectRecord(ctx, record,
 		projectRecordValues(object.Fields, record.Values),
 		projectTableValues(object.Fields, record.Values),
-		fileFieldKeys, bindings, principal.UserID, audit, principal.IsAdmin())
+		fileFieldKeys, bindings, principal.UserID, audit, principal.IsAdmin(), writebacks)
 	if err != nil {
 		return domain.ObjectRecord{}, err
 	}
@@ -689,6 +708,104 @@ func (s *ObjectRecords) lookupFields(ctx context.Context, objectKey string) map[
 		fields[source.FieldKey] = true
 	}
 	return fields
+}
+
+// writebacks turns a record change into the write-backs the systems its options come
+// from are owed (ADR 0037). A source that cannot be read is not a reason to refuse the
+// record: the change is stored, and the write-back simply does not happen.
+func (s *ObjectRecords) writebacks(
+	ctx context.Context,
+	object domain.BusinessObject,
+	record domain.ObjectRecord,
+	values map[string]any,
+	previous map[string]any,
+	action string,
+	principal domain.Principal,
+) []domain.LookupWriteback {
+	sources, err := s.store.ListLookupSources(ctx, object.Key)
+	if err != nil {
+		return nil
+	}
+	return lookupWritebacksFor(sources, record, values, previous, action, principal, time.Now().UTC())
+}
+
+// ApplyExternalValues applies the corrections an outside system answered with. It is the
+// system's own write: there is no person to ask, so the write rule of ADR 0023 does not
+// apply — but the change goes through the same validation, the same typed projection and
+// the same history as any other change (ADR 0037).
+//
+// It answers false when the record changed while the delivery waited: the correction is
+// then not applied, because a person's work is never overwritten quietly.
+func (s *ObjectRecords) ApplyExternalValues(
+	ctx context.Context,
+	recordID uuid.UUID,
+	corrections map[string]any,
+	source string,
+	expectedUpdatedAt time.Time,
+) (bool, error) {
+	record, found, err := s.store.FindVisibleObjectRecord(
+		ctx, recordID, domain.RecordScope{All: true})
+	if err != nil {
+		return false, fmt.Errorf("read the record: %w", err)
+	}
+	if !found {
+		return false, fmt.Errorf("%w: record %s", ErrNotFound, recordID)
+	}
+	version, found, err := s.store.FindBusinessObjectVersion(ctx, record.ObjectVersionID)
+	if err != nil {
+		return false, fmt.Errorf("look up record version: %w", err)
+	}
+	if !found {
+		return false, fmt.Errorf("%w: record version %s", ErrNotFound, record.ObjectVersionID)
+	}
+	object := domain.BusinessObject{
+		ID:     record.ObjectID,
+		Key:    record.ObjectKey,
+		Fields: version.Fields,
+	}
+
+	// A file field holds an attachment, not a value the outside system may set.
+	for _, field := range object.Fields {
+		if field.Type != domain.FieldTypeFile {
+			continue
+		}
+		if _, corrected := corrections[field.Key]; corrected {
+			return false, &ValidationError{Problems: []string{
+				fmt.Sprintf("the answer changed %q, which holds a file", field.Key),
+			}}
+		}
+	}
+
+	previous := record.Values
+	merged := make(map[string]any, len(previous)+len(corrections))
+	for key, value := range previous {
+		merged[key] = value
+	}
+	for key, value := range corrections {
+		merged[key] = value
+	}
+	prepared, problems := prepareValues(object, merged)
+	lookupFields := s.lookupFields(ctx, object.Key)
+	if problems = append(problems, validateRecordValues(object, prepared, lookupFields)...); len(problems) > 0 {
+		return false, &ValidationError{Problems: problems}
+	}
+
+	record.Values = prepared
+	applied, err := s.store.ApplyObjectRecordValues(ctx, record,
+		projectRecordValues(object.Fields, prepared),
+		projectTableValues(object.Fields, prepared),
+		expectedUpdatedAt,
+		domain.RecordAudit{
+			RecordID:  record.ID,
+			ObjectKey: record.ObjectKey,
+			ActorName: source,
+			Action:    domain.RecordUpdated,
+			Changes:   recordChanges(previous, prepared, object.Fields),
+		})
+	if err != nil {
+		return false, fmt.Errorf("apply the correction: %w", err)
+	}
+	return applied, nil
 }
 
 // isHiddenField reports whether a field's condition keeps it out of the record.

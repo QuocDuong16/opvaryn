@@ -101,6 +101,8 @@ export type AppConfig = components['schemas']['AppConfig'];
 export type WorkPolicy = components['schemas']['WorkPolicy'];
 export type LookupField = components['schemas']['LookupField'];
 export type LookupOption = components['schemas']['LookupOption'];
+/** One queued write-back of a record to the system its options come from (ADR 0037). */
+export type LookupWriteback = components['schemas']['LookupWriteback'];
 export type FieldColumn = components['schemas']['FieldColumn'];
 export type FieldCondition = components['schemas']['FieldCondition'];
 export type WorkingHour = components['schemas']['WorkingHour'];
@@ -196,7 +198,13 @@ export interface ApiClient {
   /** The external options of the fields that take them from another system (ADR 0034). */
   listLookups(objectKey: string): Promise<{ data: LookupField[] }>;
   /** Points one field at an external catalogue; an empty address removes the source. */
-  saveLookupSource(objectKey: string, fieldKey: string, url: string): Promise<void>;
+  saveLookupSource(
+    objectKey: string,
+    fieldKey: string,
+    config: { url: string; writeUrl?: string; writeFields?: string[] },
+  ): Promise<void>;
+  /** The log of what was written back to the outside systems (ADR 0037). */
+  listLookupWritebacks(query?: PageQuery): Promise<Paged<LookupWriteback>>;
   /** The policy of one kind of work: the default deadline, priority and escalation. */
   getWorkPolicy(objectKey: string): Promise<WorkPolicy>;
   /** Stores the policy of one kind of work. */
@@ -426,10 +434,15 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
     listLookups: (objectKey) =>
       request<{ data: LookupField[] }>(`/api/v1/lookups/${encodeURIComponent(objectKey)}`),
 
-    saveLookupSource: (objectKey, fieldKey, url) =>
+    saveLookupSource: (objectKey, fieldKey, config) =>
       request<void>(
         `/api/v1/admin/lookups/${encodeURIComponent(objectKey)}/${encodeURIComponent(fieldKey)}`,
-        { method: 'PUT', body: { url } },
+        { method: 'PUT', body: config },
+      ),
+
+    listLookupWritebacks: (query) =>
+      request<Paged<LookupWriteback>>(
+        `/api/v1/admin/lookups/writebacks${pageParams(query)}`,
       ),
 
     getWorkPolicy: (objectKey) =>

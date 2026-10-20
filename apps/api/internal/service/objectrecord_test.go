@@ -50,6 +50,10 @@ type fakeRecordStore struct {
 	// lastAudit and auditPage stand in for record_audit.
 	lastAudit domain.RecordAudit
 	auditPage domain.Paged[domain.RecordAudit]
+	// writebacks are the write-backs a record change queued (ADR 0037).
+	writebacks []domain.LookupWriteback
+	// applied is what the store's conditional update answers.
+	applied bool
 }
 
 func (f *fakeRecordStore) ListLookupSources(
@@ -111,6 +115,7 @@ func (f *fakeRecordStore) CreateObjectRecord(
 	bindings []domain.AttachmentBinding,
 	audit domain.RecordAudit,
 	_ bool,
+	writebacks []domain.LookupWriteback,
 ) (domain.ObjectRecord, error) {
 	if f.err != nil {
 		return domain.ObjectRecord{}, f.err
@@ -120,6 +125,7 @@ func (f *fakeRecordStore) CreateObjectRecord(
 	f.tableProjected = tableProjection
 	f.bindings = bindings
 	f.lastAudit = audit
+	f.writebacks = writebacks
 	return record, nil
 }
 
@@ -202,6 +208,7 @@ func (f *fakeRecordStore) UpdateObjectRecord(
 	_ uuid.UUID,
 	audit domain.RecordAudit,
 	_ bool,
+	writebacks []domain.LookupWriteback,
 ) (domain.ObjectRecord, error) {
 	if f.err != nil {
 		return domain.ObjectRecord{}, f.err
@@ -211,7 +218,27 @@ func (f *fakeRecordStore) UpdateObjectRecord(
 	f.tableProjected = tableProjection
 	f.bindings = bindings
 	f.lastAudit = audit
+	f.writebacks = writebacks
 	return record, nil
+}
+
+// ApplyObjectRecordValues stands in for the store's conditional update.
+func (f *fakeRecordStore) ApplyObjectRecordValues(
+	_ context.Context,
+	record domain.ObjectRecord,
+	projection []domain.RecordFieldValue,
+	tableProjection []domain.RecordTableValue,
+	_ time.Time,
+	audit domain.RecordAudit,
+) (bool, error) {
+	if f.err != nil {
+		return false, f.err
+	}
+	f.updated = record
+	f.projected = projection
+	f.tableProjected = tableProjection
+	f.lastAudit = audit
+	return f.applied, nil
 }
 
 func (f *fakeRecordStore) DeleteObjectRecord(

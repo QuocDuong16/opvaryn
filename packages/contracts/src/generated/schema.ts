@@ -812,8 +812,35 @@ export interface paths {
          * Point a field at an external catalogue
          * @description Stores the source of one field. An empty address removes the source. Reading it is open
          *     to every signed-in person; changing it is administration work.
+         *
+         *     A source may also be written back to: `writeUrl` is where a record is sent and
+         *     `writeFields` are the fields it carries (ADR 0037). Without a `writeUrl` the source
+         *     stays read-only.
          */
         put: operations["saveLookupSource"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/lookups/writebacks": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Recent write-backs to the outside systems
+         * @description The delivery log of the two-way lookup (ADR 0037): what was written back to which
+         *     system, how many attempts it took, and why it did not land. A delivery that stands in
+         *     conflict was not applied, because the record changed while it waited — a person has
+         *     to decide. Requires `admin`.
+         */
+        get: operations["listLookupWritebacks"];
+        put?: never;
         post?: never;
         delete?: never;
         options?: never;
@@ -1901,9 +1928,45 @@ export interface components {
         LookupField: {
             fieldKey: string;
             url: string;
+            /**
+             * @description Where a record is written back to that system. Empty means the source is
+             *     read-only (ADR 0037).
+             */
+            writeUrl?: string;
+            /** @description The fields that are sent to that system. */
+            writeFields?: string[];
             options: components["schemas"]["LookupOption"][];
             /** @description Why the source could not be read; the field then offers no options. */
             error?: string;
+        };
+        LookupWriteback: {
+            /** Format: uuid */
+            id: string;
+            objectKey: string;
+            fieldKey: string;
+            /** Format: uuid */
+            recordId: string;
+            /** @enum {string} */
+            status: "pending" | "delivered" | "failed" | "conflict" | "rejected";
+            attempts: number;
+            /** Format: date-time */
+            nextAttemptAt: string;
+            lastStatusCode?: number;
+            /** @description Why the delivery did not land, or why it was not applied. */
+            lastError?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            deliveredAt?: string;
+        };
+        LookupWritebackList: {
+            /**
+             * @description Deliveries behind the page. A caller paginates with it instead of asking for everything.
+             * @example 12
+             */
+            total: number;
+            /** @description Newest first. */
+            data: components["schemas"]["LookupWriteback"][];
         };
         WorkPolicy: {
             objectKey: string;
@@ -3563,6 +3626,13 @@ export interface operations {
                 "application/json": {
                     /** @description The address of the catalogue; empty removes the source. */
                     url: string;
+                    /**
+                     * @description Where a record is written back to that system; empty keeps the source
+                     *     read-only.
+                     */
+                    writeUrl?: string;
+                    /** @description The fields that are sent to that system. */
+                    writeFields?: string[];
                 };
             };
         };
@@ -3573,6 +3643,35 @@ export interface operations {
                     [name: string]: unknown;
                 };
                 content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listLookupWritebacks: {
+        parameters: {
+            query?: {
+                /** @description How many deliveries to return, newest first (default 25, maximum 100). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The delivery log */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["LookupWritebackList"];
+                };
             };
             400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
