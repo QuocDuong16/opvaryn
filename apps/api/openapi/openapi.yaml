@@ -1481,6 +1481,72 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/app-configs/{objectKey}:
+    get:
+      operationId: getAppConfig
+      tags: [applications]
+      summary: The configuration of the application view
+      description: |
+        The name of the application, the field the kanban groups by, and the columns the list
+        shows (ADR 0033). Reading it is open to every signed-in person; changing it is
+        administration work.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: objectKey
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z][a-z0-9_]{1,63}$'
+      responses:
+        '200':
+          description: The configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppConfig'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    put:
+      operationId: saveAppConfig
+      tags: [applications]
+      summary: Set the configuration of the application view
+      description: |
+        Stores the configuration of one data definition. The fields it names have to exist in
+        that definition, and the kanban groups by a field of the type lựa chọn.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: objectKey
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z][a-z0-9_]{1,63}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/AppConfigRequest'
+      responses:
+        '200':
+          description: The stored configuration
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AppConfig'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/metrics:
     get:
       operationId: listMetrics
@@ -3393,6 +3459,35 @@ components:
         value:
           description: The literal to compare against, typed by the field.
       description: The single filter a metric carries, using the D04 condition shape.
+    AppConfig:
+      type: object
+      required: [objectKey, name, kanbanField, listColumns]
+      properties:
+        objectKey:
+          type: string
+        name:
+          type: string
+          description: The name of the application, as a person reads it.
+        kanbanField:
+          type: string
+          description: The field the kanban groups by; empty means the kanban is not set up.
+        listColumns:
+          type: array
+          description: The fields the list shows, in order.
+          items:
+            type: string
+    AppConfigRequest:
+      type: object
+      required: [name, kanbanField, listColumns]
+      properties:
+        name:
+          type: string
+        kanbanField:
+          type: string
+        listColumns:
+          type: array
+          items:
+            type: string
     MetricDefinition:
       type: object
       required: [id, key, name, objectKey, aggregation, createdAt, updatedAt]

@@ -102,6 +102,7 @@ func run() error {
 			),
 			Identity:       service.NewIdentity(st, twoFactor),
 			WorkingHours:   workingHours,
+			AppConfigs:     service.NewAppConfigs(st),
 			TwoFactor:      twoFactor,
 			Admin:          service.NewAdmin(st),
 			Attachments:    service.NewAttachments(st),

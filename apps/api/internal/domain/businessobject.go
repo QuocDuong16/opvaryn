@@ -79,6 +79,17 @@ type FieldDefinition struct {
 	Columns []FieldColumn `json:"columns,omitempty"`
 }
 
+// AppConfig is the configuration of the application view of one data definition
+// (ADR 0033): the name of the application, the field the kanban groups by, and the
+// columns the list shows. An empty configuration means the defaults.
+type AppConfig struct {
+	ObjectKey   string
+	Name        string
+	KanbanField string
+	ListColumns []string
+	UpdatedAt   time.Time
+}
+
 // BusinessObject is the definition of one business entity kind: identity, schema
 // and metadata. Its published snapshots live in BusinessObjectVersion, and its
 // records are stored in ObjectRecord against the version they were created under.

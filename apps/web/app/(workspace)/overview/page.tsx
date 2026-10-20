@@ -124,8 +124,8 @@ const NOT_YET: readonly { title: string; body: string }[] = [
     body: 'Hiện gửi được sự kiện ra hệ thống khác kèm thử lại và nhật ký; đọc dữ liệu từ hệ thống ngoài thì chưa.',
   },
   {
-    title: 'Kanban và panel tích hợp thật',
-    body: 'Trong màn Ứng dụng, hai phần này chỉ là minh hoạ cho phần sẽ làm ở V2.',
+    title: 'Kéo thả trong màn Ứng dụng',
+    body: 'Bảng kanban đã gom cột theo cấu hình của tổ chức; chuyển bản ghi giữa các cột bằng kéo thả sẽ làm ở V2.',
   },
   {
     title: 'Tiện ích trình soạn quy trình',

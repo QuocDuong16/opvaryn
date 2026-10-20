@@ -1,9 +1,15 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
-import type { BusinessObject, BusinessObjectVersion, ObjectRecord } from '@opvaryn/contracts';
+import type {
+  AppConfig,
+  BusinessObject,
+  BusinessObjectVersion,
+  ObjectRecord,
+} from '@opvaryn/contracts';
 
 import { fieldsForVersionNumber } from '@/components/objects/record-grouping';
+import { AppConfigForm } from '@/components/apps/app-config-form';
 import { StatusBadge, type StatusKind } from '@/components/ui/status-badge';
 import { formatFieldValue, formatTimestamp, primaryFieldValue } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -13,6 +19,8 @@ export interface MiniAppData {
   records: readonly ObjectRecord[];
   /** The published versions of the definition, so a record is read with its own schema. */
   versions: readonly BusinessObjectVersion[];
+  /** The configuration of this application view (ADR 0033). */
+  config: AppConfig;
 }
 
 type ViewKind = 'list' | 'detail' | 'kanban' | 'config' | 'integration';
@@ -20,8 +28,8 @@ type ViewKind = 'list' | 'detail' | 'kanban' | 'config' | 'integration';
 const VIEWS: readonly { kind: ViewKind; label: string; stage: StatusKind }[] = [
   { kind: 'list', label: 'Danh sách', stage: 'live' },
   { kind: 'detail', label: 'Chi tiết', stage: 'live' },
-  { kind: 'kanban', label: 'Kanban', stage: 'mock' },
-  { kind: 'config', label: 'Cấu hình', stage: 'concept' },
+  { kind: 'kanban', label: 'Kanban', stage: 'live' },
+  { kind: 'config', label: 'Cấu hình', stage: 'live' },
   { kind: 'integration', label: 'Tích hợp', stage: 'mock' },
 ];
 
@@ -132,9 +140,9 @@ export function MiniApp({ apps }: { apps: readonly MiniAppData[] }) {
       ) : view === 'detail' ? (
         <DetailView app={app} record={selectedRecord} />
       ) : view === 'kanban' ? (
-        <KanbanView app={app} statusFieldKey={statusField?.key} />
+        <KanbanView app={app} />
       ) : view === 'config' ? (
-        <ConfigView key={app.object.key} app={app} statusFieldKey={statusField?.key} />
+        <ConfigView key={app.object.key} app={app} />
       ) : (
         <IntegrationView />
       )}
@@ -156,7 +164,14 @@ function ListView({ app, onOpen }: { app: MiniAppData; onOpen: (recordId: string
       {app.records.map((record) => {
         // A record keeps the fields of the version it was created under (ADR 0006).
         const fields = fieldsForVersionNumber(app.versions, record.objectVersion);
-        const secondary = fields.filter((field) => field.type !== 'text').slice(0, 2);
+        // The columns come from the configuration; without one, the list falls back to
+        // the first fields of the definition (ADR 0033).
+        const configured = app.config.listColumns
+          .map((key) => fields.find((field) => field.key === key))
+          .filter((field): field is NonNullable<typeof field> => Boolean(field));
+        const secondary = (
+          configured.length > 0 ? configured : fields.filter((field) => field.type !== 'text')
+        ).slice(0, 2);
         return (
           <li key={record.id}>
             <button
@@ -237,15 +252,14 @@ function DetailView({ app, record }: { app: MiniAppData; record: ObjectRecord | 
   );
 }
 
-function KanbanView({ app, statusFieldKey }: { app: MiniAppData; statusFieldKey?: string }) {
-  const statusField = app.object.fields.find((field) => field.key === statusFieldKey);
+function KanbanView({ app }: { app: MiniAppData }) {
+  // The grouping comes from the configuration, not from a rule nobody chose (ADR 0033).
+  const statusField = app.object.fields.find((field) => field.key === app.config.kanbanField);
 
   if (!statusField || !statusField.options || statusField.options.length === 0) {
     return (
       <p className="rounded-xl border border-dashed border-border-strong px-5 py-10 text-center text-sm text-on-surface-muted">
-        {`Loại dữ liệu ${app.object.name} chưa có trường kiểu lựa chọn nên chưa gom cột được. Bảng
-        kanban cần một trường trạng thái có danh sách lựa chọn — thêm một trường như vậy trong định
-        nghĩa dữ liệu để xem dạng xem này.`}
+        Chưa chọn trường để gom cột. Mở tab Cấu hình và chọn một trường lựa chọn làm trạng thái.
       </p>
     );
   }
@@ -269,8 +283,7 @@ function KanbanView({ app, statusFieldKey }: { app: MiniAppData; statusFieldKey?
   return (
     <div>
       <p className="mb-3 text-xs text-on-surface-muted">
-        {`Gom cột theo trường ${statusField.label} cho mục đích minh hoạ — chính sách gom nhóm và
-        kéo thả sẽ làm ở bản sau.`}
+        {`Gom cột theo trường ${statusField.label} — cấu hình trong tab Cấu hình.`}
       </p>
       <div className="grid gap-3 sm:grid-cols-3">
         {columns.map((column) => (
@@ -355,14 +368,12 @@ const CONFIG_ROLES: readonly {
 const CONFIG_ACTIONS: readonly string[] = ['Duyệt', 'Trả về chỉnh sửa', 'Từ chối'];
 
 /**
- * ConfigView is the administration preview of the Application Builder: the knobs
- * an administrator would turn to shape a mini-app. Nothing here is stored and
- * every control is disabled on purpose — configuring views, actions and
- * permissions is V2 scope, and pretending the toggles work would be a mock
- * presented as a feature.
+ * ConfigView is the configuration of the application view (ADR 0033): the name of the
+ * application, the field the kanban groups by, and the columns the list shows. An
+ * administrator saves it; everybody else reads it.
  */
-function ConfigView({ app, statusFieldKey }: { app: MiniAppData; statusFieldKey?: string }) {
-  const statusField = app.object.fields.find((field) => field.key === statusFieldKey);
+function ConfigView({ app }: { app: MiniAppData }) {
+  const statusField = app.object.fields.find((field) => field.key === app.config.kanbanField);
   const listColumns = app.object.fields.filter((field) => field.type !== 'file').slice(0, 3);
 
   const views: readonly { name: string; enabled: boolean; note: string }[] = [
@@ -390,16 +401,16 @@ function ConfigView({ app, statusFieldKey }: { app: MiniAppData; statusFieldKey?
     <div className="space-y-4">
       <div className="flex flex-wrap items-start justify-between gap-3 rounded-xl border border-dashed border-border-strong px-4 py-3">
         <div>
-          <p className="text-sm font-medium">Ví dụ cấu hình — chỉ để xem, không lưu</p>
+          <p className="text-sm font-medium">Cấu hình của ứng dụng này</p>
           <p className="mt-1 max-w-3xl text-xs leading-relaxed text-on-surface-muted">
-            Đây là những công tắc mà admin sẽ dùng khi Application Builder thành hình (V2). Mọi ô ở
-            tab này bị khoá và giá trị chỉ là ví dụ minh hoạ hình dạng cấu hình; đổi chúng không có
-            hiệu lực. Muốn làm thật cần: version hoá cấu hình đã publish, model quyền (D09) và audit
-            mọi thay đổi cấu hình.
+            Tên hiển thị, trường dùng để gom cột kanban, và các cột của danh sách. Người quản trị
+            lưu được; người khác chỉ xem.
           </p>
         </div>
-        <StatusBadge kind="concept" />
+        <StatusBadge kind="live" />
       </div>
+
+      <AppConfigForm app={app} />
 
       <div className="grid gap-3 lg:grid-cols-2">
         <ConfigPanel title="Dạng xem đang bật" subtitle="View nào xuất hiện trong mini-app">

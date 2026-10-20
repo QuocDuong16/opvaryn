@@ -24,11 +24,19 @@ export default async function ApplicationsPage() {
         // The showcase shows a sample, not a dump: the API page is the sample. The
         // published versions come along, because a record is read with the definition
         // version it was created under (ADR 0006).
-        const [records, versions] = await Promise.all([
+        const [records, versions, config] = await Promise.all([
           api.listObjectRecords(object.key, { limit: RECORDS_PER_APP }),
           api.listBusinessObjectVersions(object.key),
+          // The configuration of the application view (ADR 0033); a definition without one
+          // answers with the defaults.
+          api.getAppConfig(object.key).catch(() => ({
+            objectKey: object.key,
+            name: '',
+            kanbanField: '',
+            listColumns: [],
+          })),
         ]);
-        return { object, records: records.data, versions };
+        return { object, records: records.data, versions, config };
       }),
     );
     apps = withRecords;

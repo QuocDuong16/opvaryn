@@ -74,8 +74,10 @@ tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
   bảng nhiều dòng có cột có kiểu trong Form Builder (ADR 0032).
 - **Live (MVP)**: ô công thức (hệ thống tự tính từ các trường khác), ô ẩn theo điều kiện, và
   bảng nhiều dòng có cột có kiểu trong Form Builder (ADR 0032).
-- **Concept**: tra cứu dữ liệu từ hệ thống ngoài, tab Cấu hình của Application Builder, template
-  library, và nội dung Roadmap — các phần phụ thuộc quyết định còn mở hoặc thuộc V1.x.
+- **Live (MVP)**: cấu hình của màn Ứng dụng được lưu theo từng loại dữ liệu — tên hiển thị,
+  trường gom cột kanban, các cột của danh sách; người quản trị sửa, người khác xem (ADR 0033).
+- **Concept**: tra cứu dữ liệu từ hệ thống ngoài, kéo thả trong màn Ứng dụng, template library,
+  và nội dung Roadmap — các phần phụ thuộc quyết định còn mở hoặc thuộc V1.x.
 
 Toàn bộ D04–D10 đã chốt và đang chạy trong code (ADR 0005–0010). Chi tiết phạm vi demo ở
 [ADR 0002](docs/adr/0002-demo-scope-and-labels.md),

@@ -93,6 +93,16 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
   },
   {
     method: 'GET',
+    path: '/api/v1/app-configs/{objectKey}',
+    purpose: 'Cấu hình của màn ứng dụng: tên, trường gom cột kanban, các cột của danh sách',
+  },
+  {
+    method: 'PUT',
+    path: '/api/v1/app-configs/{objectKey}',
+    purpose: 'Lưu cấu hình của màn ứng dụng',
+  },
+  {
+    method: 'GET',
     path: '/api/v1/admin/working-hours',
     purpose: 'Lịch giờ làm việc của tổ chức — hạn xử lý tính theo lịch này',
   },
