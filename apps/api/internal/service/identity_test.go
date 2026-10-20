@@ -222,6 +222,10 @@ func (f *fakeIdentityStore) CountRecentLoginFailures(
 	return count, nil
 }
 
+func (f *fakeIdentityStore) DeleteTwoFactor(_ context.Context, _ uuid.UUID) error {
+	return nil
+}
+
 func (f *fakeIdentityStore) ClearLoginFailures(_ context.Context, email string) error {
 	delete(f.loginFailures, email)
 	return nil
@@ -343,7 +347,7 @@ func TestLoginAndSessionLifecycle(t *testing.T) {
 	identity := NewIdentity(store)
 	user := createTestUser(t, identity, "lan@example.com", []string{managerRole})
 
-	token, signedIn, err := identity.Login(context.Background(), " Lan@Example.com ", "a-long-enough-password")
+	token, signedIn, err := identity.Login(context.Background(), " Lan@Example.com ", "a-long-enough-password", "")
 	if err != nil {
 		t.Fatalf("Login returned error: %v", err)
 	}
@@ -397,7 +401,7 @@ func TestExpiredSessionIsRefused(t *testing.T) {
 	identity := NewIdentity(store)
 	createTestUser(t, identity, "lan@example.com", []string{managerRole})
 
-	token, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password")
+	token, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password", "")
 	if err != nil {
 		t.Fatalf("Login returned error: %v", err)
 	}
@@ -423,7 +427,7 @@ func TestLoginRefusesUnknownWrongAndDisabled(t *testing.T) {
 	for name, attempt := range cases {
 		t.Run(name, func(t *testing.T) {
 			t.Parallel()
-			if _, _, err := identity.Login(context.Background(), attempt.email, attempt.password); !errors.Is(err, ErrInvalidCredentials) {
+			if _, _, err := identity.Login(context.Background(), attempt.email, attempt.password, ""); !errors.Is(err, ErrInvalidCredentials) {
 				t.Fatalf("expected ErrInvalidCredentials, got %v", err)
 			}
 		})
@@ -434,7 +438,7 @@ func TestLoginRefusesUnknownWrongAndDisabled(t *testing.T) {
 			store.users[i].Status = domain.UserDisabled
 		}
 	}
-	if _, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password"); !errors.Is(err, ErrInvalidCredentials) {
+	if _, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password", ""); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("a disabled user must not log in, got %v", err)
 	}
 }
@@ -550,10 +554,10 @@ func TestSetPasswordAndListUsers(t *testing.T) {
 	if _, err := identity.SetPassword(context.Background(), "lan@example.com", "another-long-password"); err != nil {
 		t.Fatalf("SetPassword returned error: %v", err)
 	}
-	if _, _, err := identity.Login(context.Background(), "lan@example.com", "another-long-password"); err != nil {
+	if _, _, err := identity.Login(context.Background(), "lan@example.com", "another-long-password", ""); err != nil {
 		t.Fatalf("the new password must work: %v", err)
 	}
-	if _, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password"); !errors.Is(err, ErrInvalidCredentials) {
+	if _, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password", ""); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("the old password must stop working, got %v", err)
 	}
 
@@ -660,11 +664,11 @@ func TestChangePassword(t *testing.T) {
 	identity := NewIdentity(store)
 	createTestUser(t, identity, "lan@example.com", []string{managerRole})
 
-	token, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password")
+	token, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password", "")
 	if err != nil {
 		t.Fatalf("Login returned error: %v", err)
 	}
-	otherToken, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password")
+	otherToken, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password", "")
 	if err != nil {
 		t.Fatalf("second Login returned error: %v", err)
 	}
@@ -688,10 +692,10 @@ func TestChangePassword(t *testing.T) {
 	if _, err := identity.Authenticate(context.Background(), otherToken); !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("another session must be signed out, got %v", err)
 	}
-	if _, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password"); !errors.Is(err, ErrInvalidCredentials) {
+	if _, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password", ""); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("the old password must stop working, got %v", err)
 	}
-	if _, _, err := identity.Login(context.Background(), "lan@example.com", "a-new-long-password"); err != nil {
+	if _, _, err := identity.Login(context.Background(), "lan@example.com", "a-new-long-password", ""); err != nil {
 		t.Fatalf("the new password must sign in: %v", err)
 	}
 }
@@ -705,7 +709,7 @@ func TestAuthenticateRenewsASessionNearExpiry(t *testing.T) {
 	identity.now = func() time.Time { return now }
 	createTestUser(t, identity, "lan@example.com", []string{managerRole})
 
-	token, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password")
+	token, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password", "")
 	if err != nil {
 		t.Fatalf("Login returned error: %v", err)
 	}
@@ -763,19 +767,19 @@ func TestLoginCooldownAfterRepeatedFailures(t *testing.T) {
 	createTestUser(t, identity, "lan@example.com", []string{managerRole})
 
 	for i := 0; i < loginFailureLimit; i++ {
-		if _, _, err := identity.Login(context.Background(), "lan@example.com", "not-the-password"); !errors.Is(err, ErrInvalidCredentials) {
+		if _, _, err := identity.Login(context.Background(), "lan@example.com", "not-the-password", ""); !errors.Is(err, ErrInvalidCredentials) {
 			t.Fatalf("attempt %d: expected invalid credentials, got %v", i+1, err)
 		}
 	}
 
 	// The right password is refused during the cooldown, with the same answer.
-	if _, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password"); !errors.Is(err, ErrInvalidCredentials) {
+	if _, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password", ""); !errors.Is(err, ErrInvalidCredentials) {
 		t.Fatalf("the cooldown must refuse even the right password, got %v", err)
 	}
 
 	// After the window the address can sign in again; success clears the count.
 	now = now.Add(loginFailureWindow + time.Minute)
-	if _, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password"); err != nil {
+	if _, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password", ""); err != nil {
 		t.Fatalf("the account must be usable after the window: %v", err)
 	}
 	if len(store.loginFailures["lan@example.com"]) != 0 {
@@ -792,7 +796,7 @@ func TestLoginCooldownDoesNotRevealTheAddress(t *testing.T) {
 	identity.now = func() time.Time { return now }
 
 	for i := 0; i < loginFailureLimit; i++ {
-		if _, _, err := identity.Login(context.Background(), "nobody@example.com", "secret"); !errors.Is(err, ErrInvalidCredentials) {
+		if _, _, err := identity.Login(context.Background(), "nobody@example.com", "secret", ""); !errors.Is(err, ErrInvalidCredentials) {
 			t.Fatalf("expected invalid credentials, got %v", err)
 		}
 	}
@@ -813,12 +817,12 @@ func TestUnlockEmailClearsTheCooldown(t *testing.T) {
 	createTestUser(t, identity, "lan@example.com", []string{managerRole})
 
 	for i := 0; i < loginFailureLimit; i++ {
-		_, _, _ = identity.Login(context.Background(), "lan@example.com", "not-the-password")
+		_, _, _ = identity.Login(context.Background(), "lan@example.com", "not-the-password", "")
 	}
 	if err := identity.UnlockEmail(context.Background(), "LAN@example.com"); err != nil {
 		t.Fatalf("UnlockEmail returned error: %v", err)
 	}
-	if _, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password"); err != nil {
+	if _, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password", ""); err != nil {
 		t.Fatalf("the unlocked account must sign in: %v", err)
 	}
 }
@@ -841,7 +845,7 @@ func TestDisabledAccountDoesNotCountFailures(t *testing.T) {
 	}
 
 	for i := 0; i < loginFailureLimit+2; i++ {
-		if _, _, err := identity.Login(context.Background(), "lan@example.com", "not-the-password"); !errors.Is(err, ErrInvalidCredentials) {
+		if _, _, err := identity.Login(context.Background(), "lan@example.com", "not-the-password", ""); !errors.Is(err, ErrInvalidCredentials) {
 			t.Fatalf("expected invalid credentials, got %v", err)
 		}
 	}

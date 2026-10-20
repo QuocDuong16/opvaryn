@@ -56,6 +56,12 @@ var ErrUnauthorized = errors.New("service: unauthorized")
 // ErrUserNotFound reports that the addressed user does not exist.
 var ErrUserNotFound = errors.New("service: user not found")
 
+// ErrTwoFactorRequired says the password was right and the second step is still missing.
+var ErrTwoFactorRequired = errors.New("service: two factor code required")
+
+// ErrTwoFactorInvalid says the second step was answered with a code that does not match.
+var ErrTwoFactorInvalid = errors.New("service: two factor code does not match")
+
 // errAccountDisabled is an internal signal: the address exists but the account is off. The
 // caller still answers exactly like a wrong password, but the sign-in counter is left alone,
 // because an account that cannot sign in is not being guessed at.
@@ -85,6 +91,7 @@ type identityStore interface {
 	ClearLoginFailures(ctx context.Context, email string) error
 	ListLockedAddresses(ctx context.Context, since time.Time, limit int) ([]string, error)
 	PruneLoginFailures(ctx context.Context, before time.Time) (int64, error)
+	DeleteTwoFactor(ctx context.Context, userID uuid.UUID) error
 }
 
 // Credentials is what a provider needs to identify a person. Password auth uses
@@ -155,14 +162,22 @@ func dummyHash() string {
 // Identity authenticates people, opens sessions and administers users. It is the
 // only place that touches password hashes.
 type Identity struct {
-	store    identityStore
-	provider Provider
-	now      func() time.Time
+	store     identityStore
+	provider  Provider
+	twoFactor *TwoFactor
+	now       func() time.Time
 }
 
 // NewIdentity returns an Identity service using local password auth.
 func NewIdentity(st identityStore) *Identity {
 	return &Identity{store: st, provider: &LocalProvider{users: st}, now: time.Now}
+}
+
+// WithTwoFactor attaches the second step of a login (ADR 0030). Without it, a sign-in
+// needs the password alone.
+func (s *Identity) WithTwoFactor(twoFactor *TwoFactor) *Identity {
+	s.twoFactor = twoFactor
+	return s
 }
 
 // NewUserInput is an administrator creating one user.
@@ -182,7 +197,15 @@ func NormalizeEmail(email string) string {
 
 // Login verifies credentials and opens a session. The returned token is the only
 // copy: only its hash is stored.
-func (s *Identity) Login(ctx context.Context, email string, secret string) (string, domain.User, error) {
+//
+// The code is the second step of the sign-in (ADR 0030). It is only asked for when the
+// account has that step switched on, so the answer for an ordinary account is unchanged.
+func (s *Identity) Login(
+	ctx context.Context,
+	email string,
+	secret string,
+	code string,
+) (string, domain.User, error) {
 	normalized := NormalizeEmail(email)
 
 	blocked, err := s.loginBlocked(ctx, normalized)
@@ -210,6 +233,25 @@ func (s *Identity) Login(ctx context.Context, email string, secret string) (stri
 		}
 		return "", domain.User{}, err
 	}
+	// The second step: the account may need the code of its authenticator app. The answer
+	// comes only after the password was right, so it never says whether an address exists.
+	if s.twoFactor != nil {
+		required, ok, verifyErr := s.twoFactor.Verify(ctx, user.ID, code)
+		if verifyErr != nil {
+			return "", domain.User{}, verifyErr
+		}
+		if required && !ok {
+			if strings.TrimSpace(code) == "" {
+				return "", domain.User{}, ErrTwoFactorRequired
+			}
+			// A wrong code is a wrong guess: it counts like a wrong password (ADR 0028).
+			if recordErr := s.store.RecordLoginFailure(ctx, normalized, s.now().UTC()); recordErr != nil {
+				return "", domain.User{}, fmt.Errorf("record login failure: %w", recordErr)
+			}
+			return "", domain.User{}, ErrTwoFactorInvalid
+		}
+	}
+
 	// A successful sign-in starts the count over. This runs before the session is created:
 	// if it fails, no half-opened login is returned.
 	if err := s.store.ClearLoginFailures(ctx, normalized); err != nil {
@@ -319,6 +361,20 @@ func (s *Identity) loginBlocked(ctx context.Context, email string) (bool, error)
 // locked out by mistyping or when an account is handed over.
 func (s *Identity) UnlockEmail(ctx context.Context, email string) error {
 	return s.store.ClearLoginFailures(ctx, NormalizeEmail(email))
+}
+
+// ResetTwoFactor turns the second step off for one account: the way back in when the
+// person lost the device (ADR 0030). The CLI uses it, because the administration area
+// needs an administrator who can sign in.
+func (s *Identity) ResetTwoFactor(ctx context.Context, email string) error {
+	user, found, err := s.store.FindUserByEmail(ctx, NormalizeEmail(email))
+	if err != nil {
+		return fmt.Errorf("look up user: %w", err)
+	}
+	if !found {
+		return fmt.Errorf("user %q: %w", email, ErrUserNotFound)
+	}
+	return s.store.DeleteTwoFactor(ctx, user.ID)
 }
 
 // LockedEmails lists the addresses that are waiting out a sign-in cooldown right now. The

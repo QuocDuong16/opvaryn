@@ -26,6 +26,36 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
   { method: 'GET', path: '/api/v1/roles', purpose: 'Danh mục vai trò có ít nhất một người giữ' },
   {
     method: 'GET',
+    path: '/api/v1/me/two-factor',
+    purpose: 'Tài khoản này đã bật xác thực hai bước chưa',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/me/two-factor',
+    purpose: 'Tạo khoá bí mật cho ứng dụng xác thực',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/me/two-factor/enable',
+    purpose: 'Bật xác thực hai bước và nhận mã cứu hộ',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/me/two-factor/disable',
+    purpose: 'Tắt xác thực hai bước',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/admin/users/{userId}/two-factor',
+    purpose: 'Tài khoản kia đã bật xác thực hai bước chưa',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/admin/users/{userId}/two-factor/reset',
+    purpose: 'Gỡ xác thực hai bước khi người đó mất thiết bị',
+  },
+  {
+    method: 'GET',
     path: '/api/v1/tasks',
     purpose: 'Hộp việc của các vai trò người đang đăng nhập giữ',
   },

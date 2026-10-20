@@ -67,6 +67,10 @@ func run() error {
 		log.Info("outbound webhook enabled", "maxAttempts", cfg.WebhookMaxAttempts)
 	}
 
+	// Two-step verification for administrators (ADR 0030). Without a key the feature is
+	// simply not configured on this server: the setup endpoint says so.
+	twoFactor := service.NewTwoFactor(st, cfg.TwoFactorKey())
+
 	server := &http.Server{
 		Addr: net.JoinHostPort("", strconv.Itoa(cfg.Port)),
 		Handler: httpapi.NewRouter(cfg, st, httpapi.Services{
@@ -79,7 +83,8 @@ func run() error {
 				Timeout:     cfg.WebhookTimeout,
 				MaxAttempts: cfg.WebhookMaxAttempts,
 			})),
-			Identity:       service.NewIdentity(st),
+			Identity:       service.NewIdentity(st).WithTwoFactor(twoFactor),
+			TwoFactor:      twoFactor,
 			Admin:          service.NewAdmin(st),
 			Attachments:    service.NewAttachments(st),
 			Metrics:        service.NewMetrics(st, st),

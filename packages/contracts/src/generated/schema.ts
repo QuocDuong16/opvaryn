@@ -323,6 +323,75 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/two-factor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether this account has the second step switched on
+         * @description Two-step verification (ADR 0030). The check is for the signed-in person, so a screen
+         *     can say what is missing without asking for a code.
+         */
+        get: operations["getMyTwoFactor"];
+        put?: never;
+        /**
+         * Prepare the second step
+         * @description Makes a fresh shared secret and returns it once, together with the link an
+         *     authenticator app reads. The secret is stored sealed, but the second step is not in
+         *     use until the person proves the app works with `enableMyTwoFactor`.
+         */
+        post: operations["setupMyTwoFactor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/two-factor/enable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Switch the second step on
+         * @description Checks the code the app produced and, when it matches, switches the second step on
+         *     and hands out the single-use recovery codes — shown once, here.
+         */
+        post: operations["enableMyTwoFactor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/me/two-factor/disable": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Switch the second step off
+         * @description Checks the code of the app, or one of the recovery codes, and switches the second
+         *     step off.
+         */
+        post: operations["disableMyTwoFactor"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/me": {
         parameters: {
             query?: never;
@@ -475,6 +544,47 @@ export interface paths {
          *     and no session is touched.
          */
         post: operations["unlockAdminUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{userId}/two-factor": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Whether one account has the second step switched on
+         * @description What the administration screen needs to decide whether to offer the reset (ADR 0030).
+         */
+        get: operations["getAdminUserTwoFactor"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{userId}/two-factor/reset": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Turn the second step off for one account
+         * @description The way back in when a person lost the device (ADR 0030). The account keeps its
+         *     password; only the second step is removed. The person can switch it on again.
+         */
+        post: operations["resetAdminUserTwoFactor"];
         delete?: never;
         options?: never;
         head?: never;
@@ -1361,6 +1471,30 @@ export interface components {
             email: string;
             /** @example correct horse battery staple */
             password: string;
+            /**
+             * @description The code of the authenticator app, when the account has the second step switched
+             *     on (ADR 0030). A recovery code works here too, once.
+             * @example 123456
+             */
+            code?: string;
+        };
+        TwoFactorStatus: {
+            /** @description Whether the second step is switched on for this account. */
+            enabled: boolean;
+        };
+        TwoFactorSetup: {
+            /** @description The shared secret, in base32. Type it into the authenticator app. */
+            secret: string;
+            /** @description The link an authenticator app reads. */
+            uri: string;
+        };
+        TwoFactorEnabled: {
+            /** @description Single-use codes, shown once. Keep them where the passwords are kept. */
+            recoveryCodes: string[];
+        };
+        TwoFactorCodeRequest: {
+            /** @description The code of the authenticator app, or one of the recovery codes. */
+            code: string;
         };
         Me: {
             /** Format: uuid */
@@ -2318,6 +2452,102 @@ export interface operations {
             };
         };
     };
+    getMyTwoFactor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The state of the second step */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    setupMyTwoFactor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The secret to type into the app */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorSetup"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    enableMyTwoFactor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description The recovery codes, shown once */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorEnabled"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    disableMyTwoFactor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["TwoFactorCodeRequest"];
+            };
+        };
+        responses: {
+            /** @description The second step is off */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
     getMe: {
         parameters: {
             query?: never;
@@ -2564,6 +2794,58 @@ export interface operations {
                 content?: never;
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getAdminUserTwoFactor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Account identifier. */
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The state of the second step */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["TwoFactorStatus"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    resetAdminUserTwoFactor: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Account identifier. */
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The second step is off */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
             401: components["responses"]["Unauthorized"];
             403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];

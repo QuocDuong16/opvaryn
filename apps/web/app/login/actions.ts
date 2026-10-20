@@ -16,14 +16,19 @@ import type { LoginState } from '@/components/auth/login-state';
 export async function loginAction(_previous: LoginState, formData: FormData): Promise<LoginState> {
   const email = String(formData.get('email') ?? '').trim();
   const password = String(formData.get('password') ?? '');
+  const code = String(formData.get('code') ?? '').trim();
 
   if (email === '' || password === '') {
     return { status: 'error', message: 'Nhập email và mật khẩu.' };
   }
 
-  const outcome = await loginViaApi(email, password);
+  const outcome = await loginViaApi(email, password, code);
   if (!outcome.ok || !outcome.token) {
-    return { status: 'error', message: outcome.message ?? 'Đăng nhập thất bại.' };
+    return {
+      status: 'error',
+      message: outcome.message ?? 'Đăng nhập thất bại.',
+      twoFactorRequired: outcome.twoFactorRequired ?? false,
+    };
   }
 
   const store = await cookies();

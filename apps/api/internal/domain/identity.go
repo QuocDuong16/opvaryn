@@ -99,6 +99,17 @@ func (u User) HasAnyRole(roles ...string) bool {
 	return false
 }
 
+// TwoFactor is the two-step state of one account (ADR 0030). Secret is the sealed shared
+// secret; RecoveryCodes are hashed, so the database never holds a usable code.
+type TwoFactor struct {
+	UserID        uuid.UUID
+	Secret        string
+	Enabled       bool
+	RecoveryCodes []string
+	CreatedAt     time.Time
+	UpdatedAt     time.Time
+}
+
 // Session is one login. TokenHash is the SHA-256 of the token kept by the client,
 // so sessions can be looked up without storing the token itself.
 type Session struct {

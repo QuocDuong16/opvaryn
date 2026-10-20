@@ -16,6 +16,8 @@ export interface LoginOutcome {
   ok: boolean;
   token?: string;
   message?: string;
+  /** True when the password was right and the second step is still missing (ADR 0030). */
+  twoFactorRequired?: boolean;
 }
 
 /**
@@ -23,25 +25,44 @@ export interface LoginOutcome {
  * header. It talks to the API directly (not through the contracts client) because
  * the token lives in a response header, not in the JSON body.
  */
-export async function loginViaApi(email: string, password: string): Promise<LoginOutcome> {
+export async function loginViaApi(
+  email: string,
+  password: string,
+  code?: string,
+): Promise<LoginOutcome> {
   let response: Response;
   try {
     response = await fetch(`${apiBaseUrl()}/api/v1/auth/login`, {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ email, password }),
+      body: JSON.stringify({ email, password, ...(code ? { code } : {}) }),
       cache: 'no-store',
       signal: AbortSignal.timeout(API_TIMEOUT_MS),
     });
   } catch {
-    return { ok: false, message: 'Không gọi được API. Kiểm tra server Go ở cổng 21501.' };
+    return { ok: false, message: 'Không gọi được máy chủ. Thử lại sau ít phút.' };
   }
 
   if (!response.ok) {
+    const payload = (await response.json().catch(() => undefined)) as { code?: string } | undefined;
+    if (payload?.code === 'two_factor_required') {
+      return {
+        ok: false,
+        twoFactorRequired: true,
+        message: 'Mật khẩu đúng. Nhập mã trong ứng dụng xác thực để tiếp tục.',
+      };
+    }
+    if (payload?.code === 'two_factor_invalid') {
+      return {
+        ok: false,
+        twoFactorRequired: true,
+        message: 'Mã xác thực không đúng. Thử lại, hoặc dùng một mã cứu hộ.',
+      };
+    }
     if (response.status === 401) {
       return { ok: false, message: 'Email hoặc mật khẩu không đúng.' };
     }
-    return { ok: false, message: `Đăng nhập thất bại (HTTP ${response.status}).` };
+    return { ok: false, message: 'Đăng nhập thất bại. Thử lại sau ít phút.' };
   }
 
   const token = readSessionCookie(response.headers.get('set-cookie'));

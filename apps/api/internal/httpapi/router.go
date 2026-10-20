@@ -26,6 +26,7 @@ type Services struct {
 	Metrics            *service.Metrics
 	ProcessMetrics     *service.ProcessMetrics
 	Webhooks           *service.Webhooks
+	TwoFactor          *service.TwoFactor
 }
 
 // NewRouter builds the HTTP handler for the demo API.
@@ -66,6 +67,13 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 		r.Get("/me", handleMe(services.Identity, log))
 		r.Post("/me/password", handleChangeMyPassword(services.Identity, log))
 		r.Get("/roles", handleListRoles(services.Identity, log))
+		// Two-step verification (ADR 0030).
+		r.Route("/me/two-factor", func(r chi.Router) {
+			r.Get("/", handleGetMyTwoFactor(services.TwoFactor, log))
+			r.Post("/", handleSetupMyTwoFactor(services.TwoFactor, log))
+			r.Post("/enable", handleEnableMyTwoFactor(services.TwoFactor, log))
+			r.Post("/disable", handleDisableMyTwoFactor(services.TwoFactor, log))
+		})
 		r.Get("/tasks", handleInbox(services.ProcessRuntime, log))
 
 		// Files for record fields (ADR 0025): upload first, bind while saving the record,
@@ -89,6 +97,8 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 					r.Put("/", handleUpdateAdminUser(services.Admin, log))
 					r.Post("/password", handleSetAdminUserPassword(services.Admin, log))
 					r.Post("/unlock", handleUnlockAdminUser(services.Admin, log))
+					r.Get("/two-factor", handleGetAdminUserTwoFactor(services.TwoFactor, log))
+					r.Post("/two-factor/reset", handleResetAdminUserTwoFactor(services.TwoFactor, log))
 					r.Delete("/sessions", handleRevokeAdminUserSessions(services.Admin, log))
 				})
 			})

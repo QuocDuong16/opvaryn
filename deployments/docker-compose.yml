@@ -27,6 +27,9 @@ x-api-env: &api-env
   OPVARYN_WEBHOOK_SECRET: ${OPVARYN_WEBHOOK_SECRET:-}
   OPVARYN_WEBHOOK_TIMEOUT: ${OPVARYN_WEBHOOK_TIMEOUT:-5s}
   OPVARYN_WEBHOOK_MAX_ATTEMPTS: ${OPVARYN_WEBHOOK_MAX_ATTEMPTS:-5}
+  # Two-step verification for administrators (ADR 0030). Empty means the feature is not
+  # configured on this host, and the setup screen says so.
+  TOTP_ENCRYPTION_KEY: ${TOTP_ENCRYPTION_KEY:-}
   TZ: ${TZ:-Asia/Ho_Chi_Minh}
 
 services:

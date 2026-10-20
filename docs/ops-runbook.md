@@ -25,6 +25,24 @@ Local development (`make docker-up` + `make dev`) không dùng trang này — xe
 chỉ dựng Postgres cho dev, còn `make pilot-up` dựng nó cùng stack đầy đủ.
 API và web chỉ bind loopback: ops vào được từ chính host, còn mạng ngoài chỉ thấy Caddy.
 
+### Khoá mã hoá xác thực hai bước
+
+Xác thực hai bước cho tài khoản quản trị (ADR 0030) cần một khoá để mã hoá khoá bí mật của
+ứng dụng xác thực khi nó nằm trong PostgreSQL:
+
+```bash
+# Sinh khoá 32 byte, base64, rồi đặt vào .env trên host
+openssl rand -base64 32
+```
+
+```bash
+TOTP_ENCRYPTION_KEY='khoá-vừa-sinh'
+```
+
+Không có khoá thì tính năng không bật được: màn hình quản trị nói rõ, và không có gì được lưu
+dạng rõ. Mất khoá thì phải bật lại xác thực hai bước cho từng tài khoản (quản trị khác làm
+được trong khu vực Quản trị, hoặc `useradm -reset-2fa`).
+
 ## 2. Chuẩn bị host (một lần)
 
 Chọn tên nội bộ cho host (`OPVARYN_HOSTNAME`, mặc định `opvaryn.local`) và **trỏ nó về máy chủ này**
@@ -180,6 +198,9 @@ docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/u
 
 # Xoá tệp tải lên rồi bỏ dở, không bao giờ gắn vào bản ghi (quá 24 giờ)
 docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/useradm -prune-orphan-attachments
+
+# Gỡ xác thực hai bước khi người dùng mất điện thoại (mật khẩu của họ giữ nguyên)
+docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/useradm -reset-2fa -email user@congty.local
 
 # Xem những địa chỉ đang chờ hết thời gian tạm khoá sau 5 lần sai trong 15 phút
 docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/useradm -list-lockouts
