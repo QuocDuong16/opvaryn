@@ -45,6 +45,11 @@ const TASK_STYLES: Record<string, string> = {
   rejected: 'border-danger/40 text-danger',
 };
 
+/** isOverdue says whether a deadline has passed. */
+function isOverdue(dueAt: string): boolean {
+  return new Date(dueAt).getTime() <= Date.now();
+}
+
 export default async function ProcessInstancePage({ params }: PageProps) {
   const { instanceId } = await params;
   const api = createServerApiClient();
