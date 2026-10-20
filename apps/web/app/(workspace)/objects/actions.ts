@@ -411,7 +411,10 @@ export async function startProcessInstanceAction(
     // failing only costs a nicer sentence, so neither can fail the run.
     const [definition, catalogue] = await Promise.all([
       api.getProcessDefinition(definitionKey).catch(() => null),
-      api.listRoles().catch(() => []),
+      api
+        .listRoles()
+        .then((page) => page.data)
+        .catch(() => []),
     ]);
     const name = labelOrKey(definition?.name, definitionKey);
     const named = roleLabels(catalogue);

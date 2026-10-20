@@ -1,7 +1,6 @@
 import Link from 'next/link';
 import { ApiError, type InboxItem, type Me } from '@opvaryn/contracts';
 
-import { recordLabels } from '@/components/objects/record-labels';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { ListSearch, Pagination, pageOffset } from '@/components/ui/list-controls';
 import { PageHeader } from '@/components/ui/page-header';
@@ -52,7 +51,6 @@ export default async function TasksPage({ searchParams }: PageProps) {
   let total = 0;
   let definitionNames: Record<string, string> = {};
   let objectNames: Record<string, string> = {};
-  let labels: Record<string, string> = {};
   let error: string | null = null;
   let needsSignIn = false;
 
@@ -72,23 +70,9 @@ export default async function TasksPage({ searchParams }: PageProps) {
     );
     objectNames = Object.fromEntries(objects.data.map((object) => [object.key, object.name]));
 
-    // A person decides on a *record*, so the card names it — with the schema of the version
-    // that record was created under (ADR 0006). One read per object on the page, and a
-    // failed read only costs the name.
-    const objectKeys = [...new Set(items.map((item) => item.instance.objectKey))];
-    const perObject = await Promise.all(
-      objectKeys.map(async (objectKey) => {
-        const [versions, records] = await Promise.all([
-          api.listBusinessObjectVersions(objectKey).catch(() => []),
-          api
-            .listObjectRecords(objectKey, { limit: 100 })
-            .then((recordPage) => recordPage.data)
-            .catch(() => []),
-        ]);
-        return recordLabels(records, versions);
-      }),
-    );
-    labels = Object.assign({}, ...perObject);
+    // A person decides on a *record*, so the card names it. The API names it with the
+    // schema of the version that record was created under (ADR 0006), so the screen does
+    // not have to guess from a sample of the records.
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'unauthorized') {
       needsSignIn = true;
@@ -204,7 +188,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
                   </p>
                   <h2 className="mt-1.5 text-base font-semibold tracking-tight">
                     <Link href={`/tasks/${item.instance.id}`} className="hover:text-accent-strong">
-                      {labels[item.instance.recordId] ??
+                      {item.recordName ??
                         labelOrKey(objectNames[item.instance.objectKey], item.instance.objectKey)}
                     </Link>
                   </h2>

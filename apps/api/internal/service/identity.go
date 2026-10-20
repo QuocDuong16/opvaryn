@@ -66,7 +66,7 @@ type identityStore interface {
 	FindUserByEmail(ctx context.Context, email string) (domain.User, bool, error)
 	FindUserByID(ctx context.Context, id uuid.UUID) (domain.User, bool, error)
 	ListUsers(ctx context.Context) ([]domain.User, error)
-	ListRoles(ctx context.Context) ([]string, error)
+	ListHeldRolesPage(ctx context.Context, page domain.Page) (domain.Paged[string], error)
 	ListRoleLabels(ctx context.Context) (map[string]string, error)
 	UpsertRoleLabel(ctx context.Context, role string, label string) error
 	CreateUser(ctx context.Context, user domain.User, passwordHash string) (domain.User, error)
@@ -505,25 +505,33 @@ func (s *Identity) ListUsers(ctx context.Context) ([]domain.User, error) {
 // that node until someone gets the role. Any signed-in user may read it: role keys already
 // appear in every definition they can read, so this adds no new information (ADR 0008);
 // the labels are what a screen shows instead of the key (ADR 0016).
-func (s *Identity) ListRoles(ctx context.Context, principal domain.Principal) ([]domain.RoleEntry, error) {
+func (s *Identity) ListRoles(
+	ctx context.Context,
+	principal domain.Principal,
+	opts ListOptions,
+) (domain.Paged[domain.RoleEntry], error) {
 	if err := requireAuthenticated(principal); err != nil {
-		return nil, err
+		return domain.Paged[domain.RoleEntry]{}, err
+	}
+	opts, err := opts.normalized()
+	if err != nil {
+		return domain.Paged[domain.RoleEntry]{}, err
 	}
 
-	keys, err := s.store.ListRoles(ctx)
+	keys, err := s.store.ListHeldRolesPage(ctx, opts.Page)
 	if err != nil {
-		return nil, err
+		return domain.Paged[domain.RoleEntry]{}, err
 	}
 	labels, err := s.store.ListRoleLabels(ctx)
 	if err != nil {
-		return nil, err
+		return domain.Paged[domain.RoleEntry]{}, err
 	}
 
-	entries := make([]domain.RoleEntry, 0, len(keys))
-	for _, key := range keys {
+	entries := make([]domain.RoleEntry, 0, len(keys.Items))
+	for _, key := range keys.Items {
 		entries = append(entries, domain.RoleEntry{Key: key, Label: labels[key]})
 	}
-	return entries, nil
+	return domain.Paged[domain.RoleEntry]{Items: entries, Total: keys.Total}, nil
 }
 
 // RoleLabels returns the display names of the roles one person holds, keyed by role. A role

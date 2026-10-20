@@ -43,7 +43,11 @@ func (f *fakeStore) ListBusinessObjectVersions(context.Context, uuid.UUID) ([]do
 	return f.versions, nil
 }
 
-func (f *fakeStore) CreateBusinessObject(_ context.Context, object domain.BusinessObject) (domain.BusinessObject, error) {
+func (f *fakeStore) CreateBusinessObject(
+	_ context.Context,
+	object domain.BusinessObject,
+	_ string,
+) (domain.BusinessObject, error) {
 	if f.err != nil {
 		return domain.BusinessObject{}, f.err
 	}
@@ -57,6 +61,7 @@ func (f *fakeStore) UpdateBusinessObject(
 	name string,
 	description string,
 	fields []domain.FieldDefinition,
+	_ string,
 ) (domain.BusinessObject, error) {
 	if f.err != nil {
 		return domain.BusinessObject{}, f.err

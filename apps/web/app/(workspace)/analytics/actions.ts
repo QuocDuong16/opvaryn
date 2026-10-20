@@ -39,7 +39,7 @@ export async function saveDashboardAction(
 
   let allowed: string[] = [];
   try {
-    allowed = (await createServerApiClient().listMetrics()).map((metric) => metric.key);
+    allowed = (await createServerApiClient().listMetrics()).data.map((metric) => metric.key);
   } catch (cause) {
     return { status: 'error', message: describeApiError(cause) };
   }

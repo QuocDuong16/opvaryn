@@ -490,7 +490,9 @@ type BusinessObjectVersion struct {
 	Name        string             `json:"name"`
 	PublishedAt time.Time          `json:"publishedAt"`
 
-	// PublishedBy Actor that published the version; "system" until identity exists.
+	// PublishedBy The person who published the version: their name, or their address when nobody has
+	// named them. It is a snapshot, so a later rename does not rewrite the history.
+	//
 	//
 	// Example: system
 	PublishedBy string `json:"publishedBy"`
@@ -677,7 +679,12 @@ type HealthStatusStatus string
 // InboxItem defines model for InboxItem.
 type InboxItem struct {
 	Instance ProcessInstance `json:"instance"`
-	Task     ProcessTask     `json:"task"`
+
+	// RecordName The value that identifies the record this task runs on, read with the definition
+	// version that record was created under. Empty when the record has no readable
+	// name; a screen then says so instead of printing an id (ADR 0018).
+	RecordName *string     `json:"recordName,omitempty"`
+	Task       ProcessTask `json:"task"`
 }
 
 // InboxList defines model for InboxList.
@@ -785,6 +792,11 @@ type MetricDefinition struct {
 type MetricDefinitionList struct {
 	// Data Metric definitions, ordered by key.
 	Data []MetricDefinition `json:"data"`
+
+	// Total Metric definitions behind the page. A caller paginates with it instead of asking for everything.
+	//
+	// Example: 3
+	Total int `json:"total"`
 }
 
 // MetricDefinitionRequest defines model for MetricDefinitionRequest.
@@ -946,8 +958,11 @@ type ProcessDefinitionVersion struct {
 	Nodes       []ProcessNode      `json:"nodes"`
 	ObjectKey   string             `json:"objectKey"`
 	PublishedAt time.Time          `json:"publishedAt"`
-	PublishedBy string             `json:"publishedBy"`
-	Version     int                `json:"version"`
+
+	// PublishedBy The person who published the version: their name, or their address when nobody has
+	// named them. It is a snapshot, so a later rename does not rewrite the history.
+	PublishedBy string `json:"publishedBy"`
+	Version     int    `json:"version"`
 }
 
 // ProcessDefinitionVersionList defines model for ProcessDefinitionVersionList.
@@ -1018,6 +1033,11 @@ type ProcessInstanceSummary struct {
 
 	// OpenTasks The tasks of this instance still waiting on a decision.
 	OpenTasks []ProcessTask `json:"openTasks"`
+
+	// RecordName The value that identifies the record this run works on, read with the definition
+	// version that record was created under. Empty when the record has no readable
+	// name; a screen then says so instead of printing an id (ADR 0018).
+	RecordName *string `json:"recordName,omitempty"`
 }
 
 // ProcessInstanceView defines model for ProcessInstanceView.
@@ -1159,6 +1179,11 @@ type RoleEntry struct {
 type RoleList struct {
 	// Data Roles held by at least one user, sorted by key.
 	Data []RoleEntry `json:"data"`
+
+	// Total Roles behind the page. A caller paginates with it instead of asking for everything.
+	//
+	// Example: 4
+	Total int `json:"total"`
 }
 
 // SetAdminUserPasswordRequest defines model for SetAdminUserPasswordRequest.
@@ -1248,6 +1273,11 @@ type WebhookDeliveryList struct {
 
 	// Enabled Whether an endpoint is configured; when false nothing is queued.
 	Enabled bool `json:"enabled"`
+
+	// Total Deliveries behind the page. A caller paginates with it instead of asking for everything.
+	//
+	// Example: 120
+	Total int `json:"total"`
 }
 
 // AdminKey defines model for AdminKey.
@@ -1398,6 +1428,15 @@ type ListObjectRecordHistoryParams struct {
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
+// ListMetricsParams defines parameters for ListMetrics.
+type ListMetricsParams struct {
+	// Limit Rows per page (default 25, maximum 100).
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Rows to skip.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
 // ListProcessDefinitionsParams defines parameters for ListProcessDefinitions.
 type ListProcessDefinitionsParams struct {
 	// Q Search term matched against the name and the key. Empty means no filter.
@@ -1439,6 +1478,15 @@ type GetProcessMetricsParams struct {
 	WindowDays *int `form:"windowDays,omitempty" json:"windowDays,omitempty"`
 }
 
+// ListRolesParams defines parameters for ListRoles.
+type ListRolesParams struct {
+	// Limit Rows per page (default 25, maximum 100).
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Rows to skip.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
 // ListInboxTasksParams defines parameters for ListInboxTasks.
 type ListInboxTasksParams struct {
 	// Q Search term matched against the task title and the process name. Empty means no filter.
@@ -1453,8 +1501,11 @@ type ListInboxTasksParams struct {
 
 // ListWebhookDeliveriesParams defines parameters for ListWebhookDeliveries.
 type ListWebhookDeliveriesParams struct {
-	// Limit How many deliveries to return, newest first; 1–200, default 50.
+	// Limit How many deliveries to return, newest first (default 25, maximum 100).
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Rows to skip.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
 // CreateAdminDepartmentJSONRequestBody defines body for CreateAdminDepartment for application/json ContentType.

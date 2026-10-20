@@ -21,7 +21,10 @@ const (
 type metricStore interface {
 	CreateMetricDefinition(ctx context.Context, metric domain.MetricDefinition) (domain.MetricDefinition, error)
 	UpdateMetricDefinition(ctx context.Context, metric domain.MetricDefinition) (domain.MetricDefinition, error)
-	ListMetricDefinitions(ctx context.Context) ([]domain.MetricDefinition, error)
+	ListMetricDefinitionsPage(
+		ctx context.Context,
+		page domain.Page,
+	) (domain.Paged[domain.MetricDefinition], error)
 	GetMetricDefinitionByKey(ctx context.Context, key string) (domain.MetricDefinition, error)
 	MetricValue(ctx context.Context, query domain.MetricQuery, scope domain.RecordScope) (float64, int64, []domain.MetricBucket, error)
 }
@@ -107,11 +110,19 @@ func (s *Metrics) Update(ctx context.Context, key string, in NewMetricInput, pri
 
 // List returns every metric definition (reading configuration is open to any
 // signed-in user, like reading definitions).
-func (s *Metrics) List(ctx context.Context, principal domain.Principal) ([]domain.MetricDefinition, error) {
+func (s *Metrics) List(
+	ctx context.Context,
+	principal domain.Principal,
+	opts ListOptions,
+) (domain.Paged[domain.MetricDefinition], error) {
 	if err := requireAuthenticated(principal); err != nil {
-		return nil, err
+		return domain.Paged[domain.MetricDefinition]{}, err
 	}
-	return s.store.ListMetricDefinitions(ctx)
+	opts, err := opts.normalized()
+	if err != nil {
+		return domain.Paged[domain.MetricDefinition]{}, err
+	}
+	return s.store.ListMetricDefinitionsPage(ctx, opts.Page)
 }
 
 // Get returns one metric definition.

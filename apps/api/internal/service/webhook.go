@@ -132,7 +132,10 @@ type webhookStore interface {
 	ClaimWebhookDeliveries(ctx context.Context, now time.Time, limit int) ([]domain.WebhookDelivery, error)
 	MarkWebhookDelivered(ctx context.Context, id uuid.UUID, statusCode int) error
 	MarkWebhookFailed(ctx context.Context, id uuid.UUID, statusCode *int, reason string, nextAttemptAt time.Time, final bool) error
-	ListWebhookDeliveries(ctx context.Context, limit int) ([]domain.WebhookDelivery, error)
+	ListWebhookDeliveriesPage(
+		ctx context.Context,
+		page domain.Page,
+	) (domain.Paged[domain.WebhookDelivery], error)
 }
 
 // Webhooks delivers queued notifications and answers what happened to them. Delivery is
@@ -174,14 +177,19 @@ func NewWebhooks(store webhookStore, config WebhookConfig, log *slog.Logger) *We
 func (w *Webhooks) Enabled() bool { return w.config.Enabled() }
 
 // RecentDeliveries returns the newest deliveries for the operations view.
-func (w *Webhooks) RecentDeliveries(ctx context.Context, limit int, principal domain.Principal) ([]domain.WebhookDelivery, error) {
+func (w *Webhooks) RecentDeliveries(
+	ctx context.Context,
+	opts ListOptions,
+	principal domain.Principal,
+) (domain.Paged[domain.WebhookDelivery], error) {
 	if err := requireDesigner(principal); err != nil {
-		return nil, err
+		return domain.Paged[domain.WebhookDelivery]{}, err
 	}
-	if limit <= 0 || limit > 200 {
-		limit = 50
+	opts, err := opts.normalized()
+	if err != nil {
+		return domain.Paged[domain.WebhookDelivery]{}, err
 	}
-	return w.store.ListWebhookDeliveries(ctx, limit)
+	return w.store.ListWebhookDeliveriesPage(ctx, opts.Page)
 }
 
 // Run drains the queue until the context is cancelled. It is started by the server and

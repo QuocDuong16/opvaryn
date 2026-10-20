@@ -70,53 +70,58 @@ export function InstanceList({
           </tr>
         </thead>
         <tbody className="divide-y divide-border bg-surface-raised/40">
-          {instances.map(({ instance, openTasks }) => (
-            <tr key={instance.id}>
-              <td className="px-4 py-3 align-top">
-                <Link
-                  href={`/tasks/${instance.id}`}
-                  className="font-medium text-accent-strong hover:underline"
-                >
-                  {recordLabels[instance.recordId] ?? 'Bản ghi chưa có tên hiển thị'}
-                </Link>
-              </td>
-              <td className="px-4 py-3 align-top text-xs">
-                {labelOrKey(definitionNames[instance.definitionKey], instance.definitionKey)}
-                <span className="mt-1 block text-[11px] text-on-surface-muted">
-                  {`phiên bản ${instance.definitionVersion}${instance.attempt > 1 ? ` · lần ${instance.attempt}` : ''}`}
-                </span>
-              </td>
-              <td className="px-4 py-3 align-top">
-                <span
-                  className={cn(
-                    'rounded-full border px-2 py-0.5 text-[11px]',
-                    STATE_STYLES[instance.state] ?? 'border-border text-on-surface-muted',
+          {instances.map((summary) => {
+            const { instance, openTasks } = summary;
+            return (
+              <tr key={instance.id}>
+                <td className="px-4 py-3 align-top">
+                  <Link
+                    href={`/tasks/${instance.id}`}
+                    className="font-medium text-accent-strong hover:underline"
+                  >
+                    {summary.recordName ??
+                      recordLabels[instance.recordId] ??
+                      'Bản ghi chưa có tên hiển thị'}
+                  </Link>
+                </td>
+                <td className="px-4 py-3 align-top text-xs">
+                  {labelOrKey(definitionNames[instance.definitionKey], instance.definitionKey)}
+                  <span className="mt-1 block text-[11px] text-on-surface-muted">
+                    {`phiên bản ${instance.definitionVersion}${instance.attempt > 1 ? ` · lần ${instance.attempt}` : ''}`}
+                  </span>
+                </td>
+                <td className="px-4 py-3 align-top">
+                  <span
+                    className={cn(
+                      'rounded-full border px-2 py-0.5 text-[11px]',
+                      STATE_STYLES[instance.state] ?? 'border-border text-on-surface-muted',
+                    )}
+                  >
+                    {INSTANCE_STATE_LABELS[instance.state] ?? instance.state}
+                  </span>
+                </td>
+                <td className="px-4 py-3 align-top">
+                  {openTasks.length === 0 ? (
+                    <span className="text-xs text-on-surface-muted">— đã kết thúc</span>
+                  ) : (
+                    <ul className="space-y-1">
+                      {openTasks.map((task) => (
+                        <li key={task.id} className="text-xs">
+                          <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-on-surface-muted">
+                            {labelOrKey(roleLabels[task.assigneeRole], task.assigneeRole)}
+                          </span>
+                          <span className="ml-2">{task.title}</span>
+                        </li>
+                      ))}
+                    </ul>
                   )}
-                >
-                  {INSTANCE_STATE_LABELS[instance.state] ?? instance.state}
-                </span>
-              </td>
-              <td className="px-4 py-3 align-top">
-                {openTasks.length === 0 ? (
-                  <span className="text-xs text-on-surface-muted">— đã kết thúc</span>
-                ) : (
-                  <ul className="space-y-1">
-                    {openTasks.map((task) => (
-                      <li key={task.id} className="text-xs">
-                        <span className="rounded-full border border-border px-2 py-0.5 text-[10px] text-on-surface-muted">
-                          {labelOrKey(roleLabels[task.assigneeRole], task.assigneeRole)}
-                        </span>
-                        <span className="ml-2">{task.title}</span>
-                      </li>
-                    ))}
-                  </ul>
-                )}
-              </td>
-              <td className="px-4 py-3 align-top text-xs whitespace-nowrap text-on-surface-muted">
-                {formatTimestamp(instance.startedAt)}
-              </td>
-            </tr>
-          ))}
+                </td>
+                <td className="px-4 py-3 align-top text-xs whitespace-nowrap text-on-surface-muted">
+                  {formatTimestamp(instance.startedAt)}
+                </td>
+              </tr>
+            );
+          })}
         </tbody>
       </table>
     </div>

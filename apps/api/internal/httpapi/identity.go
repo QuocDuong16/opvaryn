@@ -175,16 +175,21 @@ func handleListRoles(identity *service.Identity, log *slog.Logger) http.HandlerF
 		if !ok {
 			return
 		}
-		roles, err := identity.ListRoles(r.Context(), domain.NewPrincipal(user))
+		opts, err := listQuery(r)
+		if err != nil {
+			writeError(w, log, http.StatusBadRequest, codeInvalidRequest, err.Error())
+			return
+		}
+		roles, err := identity.ListRoles(r.Context(), domain.NewPrincipal(user), opts)
 		if err != nil {
 			writeStoreError(w, log, err, "list roles")
 			return
 		}
-		entries := make([]apiv1.RoleEntry, 0, len(roles))
-		for _, role := range roles {
+		entries := make([]apiv1.RoleEntry, 0, len(roles.Items))
+		for _, role := range roles.Items {
 			entries = append(entries, apiv1.RoleEntry{Key: role.Key, Label: role.Label})
 		}
-		writeJSON(w, log, http.StatusOK, apiv1.RoleList{Data: entries})
+		writeJSON(w, log, http.StatusOK, apiv1.RoleList{Data: entries, Total: roles.Total})
 	}
 }
 

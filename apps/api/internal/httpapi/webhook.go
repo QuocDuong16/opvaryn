@@ -3,7 +3,6 @@ package httpapi
 import (
 	"log/slog"
 	"net/http"
-	"strconv"
 
 	apiv1 "github.com/QuocDuong16/opvaryn/api/internal/api/v1"
 	"github.com/QuocDuong16/opvaryn/api/internal/domain"
@@ -19,30 +18,26 @@ func handleListWebhookDeliveries(webhooks *service.Webhooks, log *slog.Logger) h
 			return
 		}
 
-		limit := 0
-		if raw := r.URL.Query().Get("limit"); raw != "" {
-			parsed, err := strconv.Atoi(raw)
-			if err != nil || parsed < 1 || parsed > 200 {
-				writeError(w, log, http.StatusBadRequest, codeInvalidRequest,
-					"limit must be a whole number between 1 and 200")
-				return
-			}
-			limit = parsed
+		opts, err := listQuery(r)
+		if err != nil {
+			writeError(w, log, http.StatusBadRequest, codeInvalidRequest, err.Error())
+			return
 		}
 
-		deliveries, err := webhooks.RecentDeliveries(r.Context(), limit, domain.NewPrincipal(user))
+		deliveries, err := webhooks.RecentDeliveries(r.Context(), opts, domain.NewPrincipal(user))
 		if err != nil {
 			writeStoreError(w, log, err, "list webhook deliveries")
 			return
 		}
 
-		result := make([]apiv1.WebhookDelivery, len(deliveries))
-		for i, delivery := range deliveries {
+		result := make([]apiv1.WebhookDelivery, len(deliveries.Items))
+		for i, delivery := range deliveries.Items {
 			result[i] = toAPIWebhookDelivery(delivery)
 		}
 		writeJSON(w, log, http.StatusOK, apiv1.WebhookDeliveryList{
 			Enabled: webhooks.Enabled(),
 			Data:    result,
+			Total:   deliveries.Total,
 		})
 	}
 }

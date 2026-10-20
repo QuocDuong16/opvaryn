@@ -60,7 +60,8 @@ tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
 - **Live (MVP)**: nhập bản ghi từ CSV với cách viết số/ngày kiểu Việt, kiểm tra từng dòng, chạy thử
   trước và ghi tất cả hoặc không ghi gì (ADR 0026).
 - **Live (MVP)**: lịch sử thay đổi từng trường của bản ghi — ai sửa, trường nào, từ giá trị nào sang
-  giá trị nào — chỉ ghi thêm và đọc theo đúng phạm vi bản ghi (ADR 0027).
+  giá trị nào — chỉ ghi thêm và đọc theo đúng phạm vi bản ghi (ADR 0027). Màn hình đọc tên bản ghi
+  từ chính API theo đúng phiên bản định nghĩa của bản ghi, không đoán từ một mẫu bản ghi.
 - **Live (MVP)**: cooldown đăng nhập sau 5 lần sai trong 15 phút, trả lời giống hệt sai mật khẩu;
   quản trị thấy tài khoản nào đang chờ và mở khoá ngay trong khu vực **Quản trị**, hoặc bằng
   `make useradm ARGS="-unlock -email ..."` khi cần đường phục hồi ngoài sản phẩm (ADR 0028).

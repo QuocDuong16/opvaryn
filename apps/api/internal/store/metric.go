@@ -96,25 +96,38 @@ func (s *Store) UpdateMetricDefinition(ctx context.Context, metric domain.Metric
 }
 
 // ListMetricDefinitions returns every metric ordered by key.
-func (s *Store) ListMetricDefinitions(ctx context.Context) ([]domain.MetricDefinition, error) {
-	rows, err := s.pool.Query(ctx, `SELECT `+metricDefinitionColumns+` FROM metric_definitions ORDER BY key`)
+// ListMetricDefinitionsPage returns one page of the metric definitions, with the total
+// behind it (ADR 0017).
+func (s *Store) ListMetricDefinitionsPage(
+	ctx context.Context,
+	page domain.Page,
+) (domain.Paged[domain.MetricDefinition], error) {
+	var total int
+	if err := s.pool.QueryRow(ctx,
+		`SELECT count(*) FROM metric_definitions`).Scan(&total); err != nil {
+		return domain.Paged[domain.MetricDefinition]{}, classify(fmt.Errorf("count metrics: %w", err))
+	}
+
+	rows, err := s.pool.Query(ctx,
+		`SELECT `+metricDefinitionColumns+` FROM metric_definitions ORDER BY key LIMIT $1 OFFSET $2`,
+		page.Limit, page.Offset)
 	if err != nil {
-		return nil, classify(fmt.Errorf("query metrics: %w", err))
+		return domain.Paged[domain.MetricDefinition]{}, classify(fmt.Errorf("query metrics: %w", err))
 	}
 	defer rows.Close()
 
-	metrics := make([]domain.MetricDefinition, 0)
+	metrics := make([]domain.MetricDefinition, 0, page.Limit)
 	for rows.Next() {
 		metric, err := scanMetricDefinition(rows)
 		if err != nil {
-			return nil, classify(fmt.Errorf("scan metric: %w", err))
+			return domain.Paged[domain.MetricDefinition]{}, classify(fmt.Errorf("scan metric: %w", err))
 		}
 		metrics = append(metrics, metric)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, classify(fmt.Errorf("read metrics: %w", err))
+		return domain.Paged[domain.MetricDefinition]{}, classify(fmt.Errorf("read metrics: %w", err))
 	}
-	return metrics, nil
+	return domain.Paged[domain.MetricDefinition]{Items: metrics, Total: total}, nil
 }
 
 // GetMetricDefinitionByKey reads one metric.

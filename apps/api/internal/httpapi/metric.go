@@ -17,12 +17,20 @@ func handleListMetrics(metrics *service.Metrics, log *slog.Logger) http.HandlerF
 		if !ok {
 			return
 		}
-		list, err := metrics.List(r.Context(), domain.NewPrincipal(user))
+		opts, err := listQuery(r)
+		if err != nil {
+			writeError(w, log, http.StatusBadRequest, codeInvalidRequest, err.Error())
+			return
+		}
+		list, err := metrics.List(r.Context(), domain.NewPrincipal(user), opts)
 		if err != nil {
 			writeStoreError(w, log, err, "list metrics")
 			return
 		}
-		writeJSON(w, log, http.StatusOK, apiv1.MetricDefinitionList{Data: toAPIMetricDefinitions(list)})
+		writeJSON(w, log, http.StatusOK, apiv1.MetricDefinitionList{
+			Data:  toAPIMetricDefinitions(list.Items),
+			Total: list.Total,
+		})
 	}
 }
 

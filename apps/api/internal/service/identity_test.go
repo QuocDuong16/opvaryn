@@ -89,7 +89,10 @@ func (f *fakeIdentityStore) UpsertRoleLabel(_ context.Context, role string, labe
 }
 
 // ListRoles mirrors the store's DISTINCT + ORDER BY over user_roles.
-func (f *fakeIdentityStore) ListRoles(context.Context) ([]string, error) {
+func (f *fakeIdentityStore) ListHeldRolesPage(
+	_ context.Context,
+	page domain.Page,
+) (domain.Paged[string], error) {
 	seen := make(map[string]bool)
 	roles := make([]string, 0)
 	for _, user := range f.users {
@@ -101,7 +104,16 @@ func (f *fakeIdentityStore) ListRoles(context.Context) ([]string, error) {
 		}
 	}
 	sort.Strings(roles)
-	return roles, nil
+	items := roles
+	if page.Offset >= len(items) {
+		items = []string{}
+	} else {
+		items = items[page.Offset:]
+	}
+	if len(items) > page.Limit && page.Limit > 0 {
+		items = items[:page.Limit]
+	}
+	return domain.Paged[string]{Items: items, Total: len(roles)}, nil
 }
 
 func (f *fakeIdentityStore) CreateUser(_ context.Context, user domain.User, passwordHash string) (domain.User, error) {
@@ -583,28 +595,32 @@ func TestListRolesIsTheRoleCatalogue(t *testing.T) {
 	createTestUser(t, identity, "lan@example.com", []string{managerRole})
 	createTestUser(t, identity, "bao@example.com", []string{managerRole, "ke_toan"})
 
-	roles, err := identity.ListRoles(context.Background(), managerPrincipal())
+	roles, err := identity.ListRoles(context.Background(), managerPrincipal(), ListOptions{})
 	if err != nil {
 		t.Fatalf("ListRoles returned error: %v", err)
 	}
-	if len(roles) != 2 || roles[0].Key != "ke_toan" || roles[1].Key != managerRole {
-		t.Fatalf("expected the distinct roles sorted, got %v", roles)
+	if len(roles.Items) != 2 || roles.Items[0].Key != "ke_toan" || roles.Items[1].Key != managerRole {
+		t.Fatalf("expected the distinct roles sorted, got %v", roles.Items)
+	}
+	if roles.Total != 2 {
+		t.Fatalf("the page must say how many roles are behind it, got %d", roles.Total)
 	}
 
 	// A label is shown instead of the key, and a role nobody has named keeps its key.
-	if roles[0].Label != "" || roles[1].Label != "" {
-		t.Fatalf("roles without labels must carry an empty label, got %q and %q", roles[0].Label, roles[1].Label)
+	if roles.Items[0].Label != "" || roles.Items[1].Label != "" {
+		t.Fatalf("roles without labels must carry an empty label, got %q and %q",
+			roles.Items[0].Label, roles.Items[1].Label)
 	}
 	store.roleLabels[managerRole] = "Trưởng bộ phận"
-	labelled, err := identity.ListRoles(context.Background(), managerPrincipal())
+	labelled, err := identity.ListRoles(context.Background(), managerPrincipal(), ListOptions{})
 	if err != nil {
 		t.Fatalf("ListRoles returned error: %v", err)
 	}
-	if labelled[1].Label != "Trưởng bộ phận" || labelled[0].Label != "" {
-		t.Fatalf("labels did not follow the table: %+v", labelled)
+	if labelled.Items[1].Label != "Trưởng bộ phận" || labelled.Items[0].Label != "" {
+		t.Fatalf("labels did not follow the table: %+v", labelled.Items)
 	}
 
-	if _, err := identity.ListRoles(context.Background(), anonymous()); !errors.Is(err, ErrUnauthorized) {
+	if _, err := identity.ListRoles(context.Background(), anonymous(), ListOptions{}); !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("an anonymous caller must be refused, got %v", err)
 	}
 }
@@ -836,5 +852,42 @@ func TestDisabledAccountDoesNotCountFailures(t *testing.T) {
 	}
 	if count != 0 {
 		t.Fatalf("a disabled account was counted %d time(s); it cannot be guessed at", count)
+	}
+}
+
+// The person who publishes a version is the signed-in user, not "system": the history says
+// who changed the definition.
+func TestPublisherLabelIsTheSignedInPerson(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name      string
+		principal domain.Principal
+		want      string
+	}{
+		{
+			name:      "the name a person reads",
+			principal: domain.Principal{UserID: uuid.New(), Name: "Lan", Email: "lan@example.com"},
+			want:      "Lan",
+		},
+		{
+			name:      "the address when nobody has named them",
+			principal: domain.Principal{UserID: uuid.New(), Email: "lan@example.com"},
+			want:      "lan@example.com",
+		},
+		{
+			name:      "system when there is no person at all",
+			principal: domain.Principal{},
+			want:      "system",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			if got := testCase.principal.PublisherLabel(); got != testCase.want {
+				t.Fatalf("PublisherLabel = %q, want %q", got, testCase.want)
+			}
+		})
 	}
 }

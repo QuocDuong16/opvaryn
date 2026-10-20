@@ -39,13 +39,18 @@ type businessObjectStore interface {
 	ListBusinessObjects(ctx context.Context, query string, page domain.Page) (domain.Paged[domain.BusinessObject], error)
 	GetBusinessObjectByKey(ctx context.Context, key string) (domain.BusinessObject, error)
 	ListBusinessObjectVersions(ctx context.Context, objectID uuid.UUID) ([]domain.BusinessObjectVersion, error)
-	CreateBusinessObject(ctx context.Context, object domain.BusinessObject) (domain.BusinessObject, error)
+	CreateBusinessObject(
+		ctx context.Context,
+		object domain.BusinessObject,
+		publisher string,
+	) (domain.BusinessObject, error)
 	UpdateBusinessObject(
 		ctx context.Context,
 		key string,
 		name string,
 		description string,
 		fields []domain.FieldDefinition,
+		publisher string,
 	) (domain.BusinessObject, error)
 }
 
@@ -122,7 +127,7 @@ func (s *BusinessObjects) Create(ctx context.Context, in NewBusinessObjectInput,
 		Description: strings.TrimSpace(in.Description),
 		Fields:      normalizeFields(in.Fields),
 	}
-	return s.store.CreateBusinessObject(ctx, object)
+	return s.store.CreateBusinessObject(ctx, object, principal.PublisherLabel())
 }
 
 // Update validates the input and publishes the next version of the definition.
@@ -143,6 +148,7 @@ func (s *BusinessObjects) Update(ctx context.Context, key string, in UpdateBusin
 		strings.TrimSpace(in.Name),
 		strings.TrimSpace(in.Description),
 		normalizeFields(in.Fields),
+		principal.PublisherLabel(),
 	)
 	if err != nil {
 		return domain.BusinessObject{}, fmt.Errorf("update business object %q: %w", key, err)

@@ -1138,7 +1138,8 @@ export interface components {
             /** Format: date-time */
             publishedAt: string;
             /**
-             * @description Actor that published the version; "system" until identity exists.
+             * @description The person who published the version: their name, or their address when nobody has
+             *     named them. It is a snapshot, so a later rename does not rewrite the history.
              * @example system
              */
             publishedBy: string;
@@ -1224,6 +1225,10 @@ export interface components {
             edges: components["schemas"]["ProcessEdge"][];
             /** Format: date-time */
             publishedAt: string;
+            /**
+             * @description The person who published the version: their name, or their address when nobody has
+             *     named them. It is a snapshot, so a later rename does not rewrite the history.
+             */
             publishedBy: string;
         };
         ProcessDefinitionVersionList: {
@@ -1303,6 +1308,12 @@ export interface components {
         InboxItem: {
             task: components["schemas"]["ProcessTask"];
             instance: components["schemas"]["ProcessInstance"];
+            /**
+             * @description The value that identifies the record this task runs on, read with the definition
+             *     version that record was created under. Empty when the record has no readable
+             *     name; a screen then says so instead of printing an id (ADR 0018).
+             */
+            recordName?: string;
         };
         InboxList: {
             /**
@@ -1323,6 +1334,12 @@ export interface components {
             instance: components["schemas"]["ProcessInstance"];
             /** @description The tasks of this instance still waiting on a decision. */
             openTasks: components["schemas"]["ProcessTask"][];
+            /**
+             * @description The value that identifies the record this run works on, read with the definition
+             *     version that record was created under. Empty when the record has no readable
+             *     name; a screen then says so instead of printing an id (ADR 0018).
+             */
+            recordName?: string;
         };
         ProcessInstanceList: {
             /**
@@ -1376,6 +1393,11 @@ export interface components {
             recordId: string;
         };
         RoleList: {
+            /**
+             * @description Roles behind the page. A caller paginates with it instead of asking for everything.
+             * @example 4
+             */
+            total: number;
             /** @description Roles held by at least one user, sorted by key. */
             data: components["schemas"]["RoleEntry"][];
         };
@@ -1601,6 +1623,11 @@ export interface components {
         WebhookDeliveryList: {
             /** @description Whether an endpoint is configured; when false nothing is queued. */
             enabled: boolean;
+            /**
+             * @description Deliveries behind the page. A caller paginates with it instead of asking for everything.
+             * @example 120
+             */
+            total: number;
             /** @description Newest first. */
             data: components["schemas"]["WebhookDelivery"][];
         };
@@ -1627,6 +1654,11 @@ export interface components {
             generatedAt: string;
         };
         MetricDefinitionList: {
+            /**
+             * @description Metric definitions behind the page. A caller paginates with it instead of asking for everything.
+             * @example 3
+             */
+            total: number;
             /** @description Metric definitions, ordered by key. */
             data: components["schemas"]["MetricDefinition"][];
         };
@@ -2335,7 +2367,12 @@ export interface operations {
     };
     listRoles: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Rows per page (default 25, maximum 100). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2351,6 +2388,7 @@ export interface operations {
                     "application/json": components["schemas"]["RoleList"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             503: components["responses"]["ServiceUnavailable"];
         };
@@ -2903,7 +2941,12 @@ export interface operations {
     };
     listMetrics: {
         parameters: {
-            query?: never;
+            query?: {
+                /** @description Rows per page (default 25, maximum 100). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
             header?: never;
             path?: never;
             cookie?: never;
@@ -2919,6 +2962,7 @@ export interface operations {
                     "application/json": components["schemas"]["MetricDefinitionList"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             503: components["responses"]["ServiceUnavailable"];
         };
@@ -3056,8 +3100,10 @@ export interface operations {
     listWebhookDeliveries: {
         parameters: {
             query?: {
-                /** @description How many deliveries to return, newest first; 1–200, default 50. */
+                /** @description How many deliveries to return, newest first (default 25, maximum 100). */
                 limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
             };
             header?: never;
             path?: never;
@@ -3074,6 +3120,7 @@ export interface operations {
                     "application/json": components["schemas"]["WebhookDeliveryList"];
                 };
             };
+            400: components["responses"]["BadRequest"];
             401: components["responses"]["Unauthorized"];
             /** @description The signed-in user is not an admin or a process designer */
             403: {

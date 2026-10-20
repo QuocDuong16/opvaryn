@@ -64,11 +64,14 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
 
   try {
     const [metricList, objectList, definitionList, me, catalogue] = await Promise.all([
-      api.listMetrics(),
+      api.listMetrics().then((page) => page.data),
       api.listBusinessObjects({ limit: 100 }),
       api.listProcessDefinitions({ limit: 100 }),
       api.getMe(),
-      api.listRoles().catch(() => []),
+      api
+        .listRoles()
+        .then((page) => page.data)
+        .catch(() => []),
     ]);
     metrics = metricList;
     objects = objectList.data;

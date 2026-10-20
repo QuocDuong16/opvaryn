@@ -91,7 +91,26 @@ func (s *Store) ListObjectRecords(
 	if err := rows.Err(); err != nil {
 		return domain.Paged[domain.ObjectRecord]{}, classify(fmt.Errorf("iterate object records: %w", err))
 	}
+
+	// The file names of this page, so a list shows the name of a file instead of its
+	// identifier (ADR 0025).
+	names, err := s.ListAttachmentNamesForRecords(ctx, objectRecordIDs(records))
+	if err != nil {
+		return domain.Paged[domain.ObjectRecord]{}, err
+	}
+	for i := range records {
+		records[i].AttachmentNames = names[records[i].ID]
+	}
 	return domain.Paged[domain.ObjectRecord]{Items: records, Total: total}, nil
+}
+
+// objectRecordIDs returns the ids of a page of records.
+func objectRecordIDs(records []domain.ObjectRecord) []uuid.UUID {
+	ids := make([]uuid.UUID, 0, len(records))
+	for _, record := range records {
+		ids = append(ids, record.ID)
+	}
+	return ids
 }
 
 // CreateObjectRecord inserts one record and returns the stored row. The caller
@@ -378,6 +397,52 @@ func (s *Store) DeleteObjectRecord(ctx context.Context, id uuid.UUID, audit doma
 	return nil
 }
 
+// RecordLabelSources returns, for the given records, the values they hold and the fields
+// of the definition version they were created under. A list uses it to name each record
+// with the schema that record has (ADR 0006), instead of guessing from a sample.
+func (s *Store) RecordLabelSources(
+	ctx context.Context,
+	recordIDs []uuid.UUID,
+) (map[uuid.UUID]domain.RecordLabelSource, error) {
+	sources := map[uuid.UUID]domain.RecordLabelSource{}
+	if len(recordIDs) == 0 {
+		return sources, nil
+	}
+
+	rows, err := s.pool.Query(ctx, `
+		SELECT r.id, r.values, v.fields
+		  FROM business_object_records r
+		  JOIN business_object_versions v ON v.id = r.object_version_id
+		 WHERE r.id = ANY($1)`, recordIDs)
+	if err != nil {
+		return nil, classify(fmt.Errorf("read record label sources: %w", err))
+	}
+	defer rows.Close()
+
+	for rows.Next() {
+		var (
+			id     uuid.UUID
+			values []byte
+			fields []byte
+		)
+		if err := rows.Scan(&id, &values, &fields); err != nil {
+			return nil, classify(fmt.Errorf("scan record label source: %w", err))
+		}
+		source := domain.RecordLabelSource{}
+		if err := json.Unmarshal(values, &source.Values); err != nil {
+			return nil, classify(fmt.Errorf("decode record values: %w", err))
+		}
+		if err := json.Unmarshal(fields, &source.Fields); err != nil {
+			return nil, classify(fmt.Errorf("decode record fields: %w", err))
+		}
+		sources[id] = source
+	}
+	if err := rows.Err(); err != nil {
+		return nil, classify(fmt.Errorf("iterate record label sources: %w", err))
+	}
+	return sources, nil
+}
+
 // ListOpenTasksForRoles returns the open tasks of an instance the given user holds a
 // role on: the per-user inbox (ADR 0008), oldest first.
 func (s *Store) ListOpenTasksForRoles(
@@ -447,7 +512,31 @@ func (s *Store) ListOpenTasksForRoles(
 	if err := rows.Err(); err != nil {
 		return domain.Paged[domain.InboxItem]{}, classify(fmt.Errorf("iterate inbox items: %w", err))
 	}
+
+	// The record each task runs on, with the schema that record has, so the inbox can
+	// name it instead of leaving the screen to guess.
+	sources, err := s.RecordLabelSources(ctx, inboxRecordIDs(items))
+	if err != nil {
+		return domain.Paged[domain.InboxItem]{}, err
+	}
+	for i := range items {
+		items[i].RecordSource = sources[items[i].Instance.RecordID]
+	}
 	return domain.Paged[domain.InboxItem]{Items: items, Total: total}, nil
+}
+
+// inboxRecordIDs returns the record ids of a page of inbox items, without repeats.
+func inboxRecordIDs(items []domain.InboxItem) []uuid.UUID {
+	seen := map[uuid.UUID]struct{}{}
+	ids := make([]uuid.UUID, 0, len(items))
+	for _, item := range items {
+		if _, known := seen[item.Instance.RecordID]; known {
+			continue
+		}
+		seen[item.Instance.RecordID] = struct{}{}
+		ids = append(ids, item.Instance.RecordID)
+	}
+	return ids
 }
 
 func scanObjectRecord(row rowScanner) (domain.ObjectRecord, error) {

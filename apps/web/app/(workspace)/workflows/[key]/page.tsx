@@ -10,7 +10,6 @@ import {
 } from '@opvaryn/contracts';
 
 import { InstanceList } from '@/components/process/instance-list';
-import { recordLabels } from '@/components/objects/record-labels';
 import { ProcessCanvas } from '@/components/workflows/process-canvas';
 import { WorkflowEditor } from '@/components/workflows/workflow-editor';
 import { draftFromGraph } from '@/components/workflows/definition-draft-model';
@@ -52,7 +51,6 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
   let roleCatalogue: RoleEntry[] = [];
   let objectName = '';
   let objectFields: FieldDefinition[] = [];
-  let labels: Record<string, string> = {};
   let mayDesign = false;
   let roleName = 'vai trò thiết kế quy trình';
   let error: string | null = null;
@@ -65,7 +63,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
         { definitionKey: key },
         { limit: INSTANCES_PER_PAGE, offset: instanceOffset },
       ),
-      api.listRoles(),
+      api.listRoles().then((page) => page.data),
       api.getBusinessObject(definition.objectKey).catch(() => null),
       api.getMe().catch(() => null),
     ]);
@@ -83,17 +81,6 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
     // An instance row should name the record it runs on. Records are read per object
     // (the list is scoped like everything else), and the label uses each record's own
     // definition version — the same rule as the record table (ADR 0006).
-    const objectKeys = [...new Set(instances.map((summary) => summary.instance.objectKey))];
-    const perObject = await Promise.all(
-      objectKeys.map(async (objectKey) => {
-        const [objectVersions, records] = await Promise.all([
-          api.listBusinessObjectVersions(objectKey),
-          api.listObjectRecords(objectKey, { limit: 100 }).then((page) => page.data),
-        ]);
-        return recordLabels(records, objectVersions);
-      }),
-    );
-    labels = Object.assign({}, ...perObject);
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'not_found') {
       notFound();
@@ -285,7 +272,6 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
             </p>
             <InstanceList
               instances={instances}
-              recordLabels={labels}
               roleLabels={roleNames}
               definitionNames={{ [definition.key]: definition.name }}
               emptyHint="Chạy quy trình này từ màn hình của một bản ghi để thấy lần chạy ở đây."
