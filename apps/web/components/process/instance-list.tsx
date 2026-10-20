@@ -79,9 +79,7 @@ export function InstanceList({
                     href={`/tasks/${instance.id}`}
                     className="font-medium text-accent-strong hover:underline"
                   >
-                    {summary.recordName ??
-                      recordLabels[instance.recordId] ??
-                      'Bản ghi chưa có tên hiển thị'}
+                    {summary.recordName ?? 'Bản ghi chưa có tên hiển thị'}
                   </Link>
                 </td>
                 <td className="px-4 py-3 align-top text-xs">
