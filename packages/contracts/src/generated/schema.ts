@@ -779,6 +779,33 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/app-configs/{objectKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The configuration of the application view
+         * @description The name of the application, the field the kanban groups by, and the columns the list
+         *     shows (ADR 0033). Reading it is open to every signed-in person; changing it is
+         *     administration work.
+         */
+        get: operations["getAppConfig"];
+        /**
+         * Set the configuration of the application view
+         * @description Stores the configuration of one data definition. The fields it names have to exist in
+         *     that definition, and the kanban groups by a field of the type lựa chọn.
+         */
+        put: operations["saveAppConfig"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/metrics": {
         parameters: {
             query?: never;
@@ -1790,6 +1817,20 @@ export interface components {
             op: "eq" | "ne" | "gt" | "gte" | "lt" | "lte";
             /** @description The literal to compare against, typed by the field. */
             value: unknown;
+        };
+        AppConfig: {
+            objectKey: string;
+            /** @description The name of the application, as a person reads it. */
+            name: string;
+            /** @description The field the kanban groups by; empty means the kanban is not set up. */
+            kanbanField: string;
+            /** @description The fields the list shows, in order. */
+            listColumns: string[];
+        };
+        AppConfigRequest: {
+            name: string;
+            kanbanField: string;
+            listColumns: string[];
         };
         MetricDefinition: {
             /** Format: uuid */
@@ -3366,6 +3407,60 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getAppConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                objectKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The configuration */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppConfig"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    saveAppConfig: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                objectKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["AppConfigRequest"];
+            };
+        };
+        responses: {
+            /** @description The stored configuration */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AppConfig"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };

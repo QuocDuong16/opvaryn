@@ -70,7 +70,7 @@ const STATUS: readonly { title: string; body: string }[] = [
   },
   {
     title: 'Chưa có',
-    body: 'Đăng nhập qua OIDC/SSO (chờ IdP của tổ chức), kết nối hai chiều với hệ thống ngoài, tra cứu dữ liệu từ hệ thống ngoài, các dạng xem kanban/connector đang ở mức minh hoạ, và những phần của quy trình nhiều nhánh song song.',
+    body: 'Đăng nhập qua OIDC/SSO (chờ IdP của tổ chức), kết nối hai chiều với hệ thống ngoài, tra cứu dữ liệu từ hệ thống ngoài, kéo thả trong bản ứng dụng, và những phần của quy trình nhiều nhánh song song.',
   },
 ];
 

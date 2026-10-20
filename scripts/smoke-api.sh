@@ -39,6 +39,7 @@ trap cleanup EXIT
 
 fail() {
   echo "smoke: FAIL: $*" >&2
+  [[ -f "$log_file" ]] && tail -20 "$log_file" >&2
   if [[ -s "$log_file" ]]; then
     echo "--- server log (last 20 lines) ---" >&2
     tail -n 20 "$log_file" >&2
@@ -292,6 +293,23 @@ grep -q '"code":"invalid_request"' "$body_file" || fail "invalid update did not 
 status="$(request_as "$designer_jar" PUT /api/v1/business-objects/smoke_missing_key '{"name":"Không tồn tại"}')"
 [[ "$status" == "404" ]] || fail "updating an unknown object returned $status, expected 404"
 grep -q '"code":"not_found"' "$body_file" || fail "unknown object update did not return the not_found error code"
+
+echo "smoke: the configuration of the application view (ADR 0033)"
+status="$(request_as "$admin_jar" GET "/api/v1/app-configs/$object_key")"
+[[ "$status" == "200" ]] || fail "reading the app config returned $status, expected 200"
+status="$(request_as "$designer_jar" PUT "/api/v1/app-configs/$object_key" \
+  '{"name":"Smoke app","kanbanField":"","listColumns":["amount"]}')"
+[[ "$status" == "403" ]] || fail "a non-admin changed the app config (status $status), expected 403"
+status="$(request_as "$admin_jar" PUT "/api/v1/app-configs/$object_key" \
+  '{"name":"Smoke app","kanbanField":"","listColumns":["amount"]}')"
+[[ "$status" == "200" ]] || fail "an admin changed the app config (status $status), expected 200"
+grep -q '"kanbanField"' "$body_file" || fail "the app config did not answer with the grouping field"
+status="$(request_as "$admin_jar" PUT "/api/v1/app-configs/$object_key" \
+  '{"name":"Smoke app","kanbanField":"khong_ton_tai","listColumns":[]}')"
+[[ "$status" == "400" ]] || fail "a config naming an unknown field returned $status, expected 400"
+status="$(request_as "$admin_jar" PUT "/api/v1/app-configs/$object_key" \
+  '{"name":"Smoke app","kanbanField":"amount","listColumns":[]}')"
+[[ "$status" == "400" ]] || fail "a kanban grouping by a number returned $status, expected 400"
 
 echo "smoke: a computed field, a hidden field and a table (ADR 0032)"
 smart_key="smoke_smart_$stamp"

@@ -496,6 +496,26 @@ type AdminUserList struct {
 // AdminUserStatus A disabled account keeps its history but cannot sign in.
 type AdminUserStatus string
 
+// AppConfig defines model for AppConfig.
+type AppConfig struct {
+	// KanbanField The field the kanban groups by; empty means the kanban is not set up.
+	KanbanField string `json:"kanbanField"`
+
+	// ListColumns The fields the list shows, in order.
+	ListColumns []string `json:"listColumns"`
+
+	// Name The name of the application, as a person reads it.
+	Name      string `json:"name"`
+	ObjectKey string `json:"objectKey"`
+}
+
+// AppConfigRequest defines model for AppConfigRequest.
+type AppConfigRequest struct {
+	KanbanField string   `json:"kanbanField"`
+	ListColumns []string `json:"listColumns"`
+	Name        string   `json:"name"`
+}
+
 // Attachment defines model for Attachment.
 type Attachment struct {
 	// ContentType Sniffed from the bytes, not taken from the upload request.
@@ -1712,6 +1732,9 @@ type SetAdminUserPasswordJSONRequestBody = SetAdminUserPasswordRequest
 
 // ReplaceWorkingHoursJSONRequestBody defines body for ReplaceWorkingHours for application/json ContentType.
 type ReplaceWorkingHoursJSONRequestBody = WorkingHoursRequest
+
+// SaveAppConfigJSONRequestBody defines body for SaveAppConfig for application/json ContentType.
+type SaveAppConfigJSONRequestBody = AppConfigRequest
 
 // UploadAttachmentMultipartRequestBody defines body for UploadAttachment for multipart/form-data ContentType.
 type UploadAttachmentMultipartRequestBody UploadAttachmentMultipartBody

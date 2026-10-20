@@ -28,6 +28,7 @@ type Services struct {
 	Webhooks           *service.Webhooks
 	TwoFactor          *service.TwoFactor
 	WorkingHours       *service.WorkingHours
+	AppConfigs         *service.AppConfigs
 }
 
 // NewRouter builds the HTTP handler for the demo API.
@@ -159,6 +160,15 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 
 		r.Get("/process-metrics", handleGetProcessMetrics(services.ProcessMetrics, log))
 		r.Get("/webhook-deliveries", handleListWebhookDeliveries(services.Webhooks, log))
+
+		// The configuration of the application view (ADR 0033). Reading it is open to
+		// every signed-in person; changing it is administration work.
+		r.Route("/app-configs", func(r chi.Router) {
+			r.Route("/{objectKey}", func(r chi.Router) {
+				r.Get("/", handleGetAppConfig(services.AppConfigs, log))
+				r.Put("/", handleSaveAppConfig(services.AppConfigs, log))
+			})
+		})
 
 		r.Route("/metrics", func(r chi.Router) {
 			r.Get("/", handleListMetrics(services.Metrics, log))

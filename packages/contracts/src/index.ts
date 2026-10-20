@@ -97,6 +97,7 @@ export type WebhookDeliveryList = components['schemas']['WebhookDeliveryList'];
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 /** The signed-in user with roles and department. */
 export type Me = components['schemas']['Me'];
+export type AppConfig = components['schemas']['AppConfig'];
 export type FieldColumn = components['schemas']['FieldColumn'];
 export type FieldCondition = components['schemas']['FieldCondition'];
 export type WorkingHour = components['schemas']['WorkingHour'];
@@ -189,6 +190,13 @@ export interface ApiClient {
   enableMyTwoFactor(code: string): Promise<TwoFactorEnabled>;
   /** Switches the second step off. */
   disableMyTwoFactor(code: string): Promise<void>;
+  /** The configuration of the application view (ADR 0033). */
+  getAppConfig(objectKey: string): Promise<AppConfig>;
+  /** Stores the configuration of the application view. */
+  saveAppConfig(
+    objectKey: string,
+    config: { name: string; kanbanField: string; listColumns: readonly string[] },
+  ): Promise<AppConfig>;
   /** The organisation's working calendar (ADR 0031). */
   listWorkingHours(): Promise<WorkingHours>;
   /** Replaces the working calendar as a whole. */
@@ -395,6 +403,15 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
       request<void>('/api/v1/me/two-factor/disable', {
         method: 'POST',
         body: { code },
+      }),
+
+    getAppConfig: (objectKey) =>
+      request<AppConfig>(`/api/v1/app-configs/${encodeURIComponent(objectKey)}`),
+
+    saveAppConfig: (objectKey, config) =>
+      request<AppConfig>(`/api/v1/app-configs/${encodeURIComponent(objectKey)}`, {
+        method: 'PUT',
+        body: config,
       }),
 
     listWorkingHours: () => request<WorkingHours>('/api/v1/admin/working-hours'),
