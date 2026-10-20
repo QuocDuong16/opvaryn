@@ -19,10 +19,13 @@ async function loadStage(): Promise<string | null> {
 
 export async function Topbar({
   items,
+  counts = {},
   isAdminUser,
   showStage,
 }: {
   items: readonly NavItem[];
+  /** Small badges by href, e.g. how much work is waiting in the inbox. */
+  counts?: Record<string, number>;
   isAdminUser: boolean;
   showStage: boolean;
 }) {
@@ -44,7 +47,7 @@ export async function Topbar({
         </div>
       </div>
       <div className="px-3 lg:hidden">
-        <CompactNav items={items} />
+        <CompactNav items={items} counts={counts} />
       </div>
     </header>
   );

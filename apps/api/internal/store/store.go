@@ -15,6 +15,12 @@ var ErrConflict = errors.New("store: conflict")
 // ErrNotFound reports that the addressed row does not exist.
 var ErrNotFound = errors.New("store: not found")
 
+// ErrInUse reports that a row cannot be removed or changed because other data depends on it
+// (a department with people or records, a role still held or named by a published process,
+// the last active administrator). The message names what is in the way; the HTTP layer maps
+// it to a stable `in_use` code instead of a generic conflict.
+var ErrInUse = errors.New("store: in use")
+
 // ErrUnavailable reports that the database cannot serve the request.
 var ErrUnavailable = errors.New("store: unavailable")
 

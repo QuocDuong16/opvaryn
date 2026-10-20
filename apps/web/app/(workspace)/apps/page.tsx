@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { BusinessObject, ObjectRecord } from '@opvaryn/contracts';
+import type { BusinessObject, BusinessObjectVersion, ObjectRecord } from '@opvaryn/contracts';
 
 import { MiniApp, type MiniAppData } from '@/components/apps/mini-app';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
@@ -21,11 +21,14 @@ export default async function ApplicationsPage() {
     const objects: BusinessObject[] = (await api.listBusinessObjects({ limit: 100 })).data;
     const withRecords = await Promise.all(
       objects.map(async (object) => {
-        // The showcase shows a sample, not a dump: the API page is the sample.
-        const records: ObjectRecord[] = (
-          await api.listObjectRecords(object.key, { limit: RECORDS_PER_APP })
-        ).data;
-        return { object, records };
+        // The showcase shows a sample, not a dump: the API page is the sample. The
+        // published versions come along, because a record is read with the definition
+        // version it was created under (ADR 0006).
+        const [records, versions] = await Promise.all([
+          api.listObjectRecords(object.key, { limit: RECORDS_PER_APP }),
+          api.listBusinessObjectVersions(object.key),
+        ]);
+        return { object, records: records.data, versions };
       }),
     );
     apps = withRecords;

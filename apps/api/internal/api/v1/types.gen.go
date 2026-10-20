@@ -9,6 +9,24 @@ import (
 	openapi_types "github.com/oapi-codegen/runtime/types"
 )
 
+// Defines values for AdminUserStatus.
+const (
+	Active   AdminUserStatus = "active"
+	Disabled AdminUserStatus = "disabled"
+)
+
+// Valid indicates whether the value is a known member of the AdminUserStatus enum.
+func (e AdminUserStatus) Valid() bool {
+	switch e {
+	case Active:
+		return true
+	case Disabled:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for DecideProcessTaskRequestDecision.
 const (
 	Approve DecideProcessTaskRequestDecision = "approve"
@@ -294,6 +312,27 @@ func (e ProcessTaskStatus) Valid() bool {
 	}
 }
 
+// Defines values for RecordHistoryEntryAction.
+const (
+	Created RecordHistoryEntryAction = "created"
+	Deleted RecordHistoryEntryAction = "deleted"
+	Updated RecordHistoryEntryAction = "updated"
+)
+
+// Valid indicates whether the value is a known member of the RecordHistoryEntryAction enum.
+func (e RecordHistoryEntryAction) Valid() bool {
+	switch e {
+	case Created:
+		return true
+	case Deleted:
+		return true
+	case Updated:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for WebhookDeliveryStatus.
 const (
 	Delivered WebhookDeliveryStatus = "delivered"
@@ -313,6 +352,106 @@ func (e WebhookDeliveryStatus) Valid() bool {
 	default:
 		return false
 	}
+}
+
+// AdminDepartment defines model for AdminDepartment.
+type AdminDepartment struct {
+	CreatedAt time.Time `json:"createdAt"`
+
+	// Key Example: ky_thuat
+	Key string `json:"key"`
+
+	// Name Example: Kỹ thuật
+	Name string `json:"name"`
+
+	// UserCount People whose department is this one; a department with people cannot be deleted.
+	UserCount int `json:"userCount"`
+}
+
+// AdminDepartmentList defines model for AdminDepartmentList.
+type AdminDepartmentList struct {
+	Data  []AdminDepartment `json:"data"`
+	Total int               `json:"total"`
+}
+
+// AdminRole defines model for AdminRole.
+type AdminRole struct {
+	CreatedAt time.Time `json:"createdAt"`
+
+	// IsSystem Platform roles (admin, process_designer) may be renamed but not deleted.
+	IsSystem bool `json:"isSystem"`
+
+	// Key Example: truong_bo_phan
+	Key string `json:"key"`
+
+	// Label Display name.
+	//
+	// Example: Trưởng bộ phận
+	Label string `json:"label"`
+
+	// UserCount People holding the role; a held role cannot be deleted.
+	UserCount int `json:"userCount"`
+}
+
+// AdminRoleList defines model for AdminRoleList.
+type AdminRoleList struct {
+	Data  []AdminRole `json:"data"`
+	Total int         `json:"total"`
+}
+
+// AdminUser defines model for AdminUser.
+type AdminUser struct {
+	CreatedAt time.Time `json:"createdAt"`
+
+	// Department Department key (D09b scoping). Keys are for the engine, not for screens.
+	Department string `json:"department"`
+
+	// DepartmentName Display name of the department, for screens (ADR 0016).
+	//
+	// Example: Kỹ thuật
+	DepartmentName string             `json:"departmentName"`
+	Email          string             `json:"email"`
+	Id             openapi_types.UUID `json:"id"`
+
+	// LockedUntil When the sign-in cooldown of this address ends (ADR 0028). Absent when the account
+	// can sign in normally. Only the administration area reads it.
+	LockedUntil *time.Time `json:"lockedUntil,omitempty"`
+	Name        string     `json:"name"`
+
+	// RoleLabels Display name per role key. A role nobody has named is absent.
+	RoleLabels map[string]string `json:"roleLabels"`
+	Roles      []string          `json:"roles"`
+
+	// Status A disabled account keeps its history but cannot sign in.
+	Status    AdminUserStatus `json:"status"`
+	UpdatedAt time.Time       `json:"updatedAt"`
+}
+
+// AdminUserList defines model for AdminUserList.
+type AdminUserList struct {
+	// Data One page of accounts, ordered by email.
+	Data []AdminUser `json:"data"`
+
+	// Total Accounts behind the page.
+	Total int `json:"total"`
+}
+
+// AdminUserStatus A disabled account keeps its history but cannot sign in.
+type AdminUserStatus string
+
+// Attachment defines model for Attachment.
+type Attachment struct {
+	// ContentType Sniffed from the bytes, not taken from the upload request.
+	ContentType string    `json:"contentType"`
+	CreatedAt   time.Time `json:"createdAt"`
+
+	// FileName Sanitized name shown to people and sent back as the download name.
+	FileName  string             `json:"fileName"`
+	Id        openapi_types.UUID `json:"id"`
+	ObjectKey string             `json:"objectKey"`
+
+	// Size Size in bytes (the cap is 10 MB).
+	Size int64 `json:"size"`
 }
 
 // BusinessObject defines model for BusinessObject.
@@ -362,6 +501,53 @@ type BusinessObjectVersion struct {
 type BusinessObjectVersionList struct {
 	// Data Published versions, newest first.
 	Data []BusinessObjectVersion `json:"data"`
+}
+
+// ChangeMyPasswordRequest defines model for ChangeMyPasswordRequest.
+type ChangeMyPasswordRequest struct {
+	// CurrentPassword The password the person signs in with today.
+	CurrentPassword string `json:"currentPassword"`
+
+	// NewPassword At least 10 characters and different from the current one.
+	NewPassword string `json:"newPassword"`
+}
+
+// CreateAdminDepartmentRequest defines model for CreateAdminDepartmentRequest.
+type CreateAdminDepartmentRequest struct {
+	// Key Example: ky_thuat
+	Key string `json:"key"`
+
+	// Name Example: Kỹ thuật
+	Name string `json:"name"`
+}
+
+// CreateAdminRoleRequest defines model for CreateAdminRoleRequest.
+type CreateAdminRoleRequest struct {
+	// Key Example: truong_bo_phan
+	Key string `json:"key"`
+
+	// Label Example: Trưởng bộ phận
+	Label string `json:"label"`
+}
+
+// CreateAdminUserRequest defines model for CreateAdminUserRequest.
+type CreateAdminUserRequest struct {
+	// Department Key of an existing department.
+	//
+	// Example: ky_thuat
+	Department string `json:"department"`
+
+	// Email Example: lan@example.com
+	Email string `json:"email"`
+
+	// Name Example: Nguyễn Thị Lan
+	Name string `json:"name"`
+
+	// Password At least 10 characters; stored only as an argon2id PHC string.
+	Password string `json:"password"`
+
+	// Roles At least one role key.
+	Roles []string `json:"roles"`
 }
 
 // CreateBusinessObjectRequest defines model for CreateBusinessObjectRequest.
@@ -665,8 +851,23 @@ type MetricValueKind string
 
 // ObjectRecord defines model for ObjectRecord.
 type ObjectRecord struct {
-	CreatedAt time.Time          `json:"createdAt"`
-	Id        openapi_types.UUID `json:"id"`
+	// AttachmentNames File name per file-field key, so a screen names the attachment instead of showing
+	// its identifier. Filled when one record is read.
+	AttachmentNames *map[string]string `json:"attachmentNames,omitempty"`
+
+	// CanEdit Whether the signed-in caller satisfies the write rule of ADR 0023 (administrator,
+	// creator, or a member of the record's department). A display hint only: the API
+	// checks it again on every update and delete.
+	CanEdit   bool      `json:"canEdit"`
+	CreatedAt time.Time `json:"createdAt"`
+
+	// CreatedByName Display name of the person who entered the record, so a screen names them instead
+	// of printing an identifier (ADR 0016). Absent when the account is gone.
+	CreatedByName *string `json:"createdByName,omitempty"`
+
+	// DepartmentName Display name of the department the record belongs to; absent when none applies.
+	DepartmentName *string            `json:"departmentName,omitempty"`
+	Id             openapi_types.UUID `json:"id"`
 
 	// ObjectKey Key of the business object this record belongs to.
 	ObjectKey string `json:"objectKey"`
@@ -886,6 +1087,61 @@ type ProcessTask struct {
 // ProcessTaskStatus defines model for ProcessTaskStatus.
 type ProcessTaskStatus string
 
+// RecordHistoryChange defines model for RecordHistoryChange.
+type RecordHistoryChange struct {
+	// FieldLabel The field's name, not its key.
+	FieldLabel string `json:"fieldLabel"`
+
+	// From The value before the change; empty when the field was absent.
+	From string `json:"from"`
+
+	// To The value after the change; empty when the field was cleared.
+	To string `json:"to"`
+}
+
+// RecordHistoryEntry defines model for RecordHistoryEntry.
+type RecordHistoryEntry struct {
+	Action RecordHistoryEntryAction `json:"action"`
+
+	// ActorName The name at the time of the change (empty for the system or a gone account).
+	ActorName string                `json:"actorName"`
+	Changes   []RecordHistoryChange `json:"changes"`
+	CreatedAt time.Time             `json:"createdAt"`
+	Id        int64                 `json:"id"`
+}
+
+// RecordHistoryEntryAction defines model for RecordHistoryEntry.Action.
+type RecordHistoryEntryAction string
+
+// RecordHistoryList defines model for RecordHistoryList.
+type RecordHistoryList struct {
+	// Data Entries newest first.
+	Data  []RecordHistoryEntry `json:"data"`
+	Total int                  `json:"total"`
+}
+
+// RecordImportError defines model for RecordImportError.
+type RecordImportError struct {
+	Message string `json:"message"`
+	Row     int    `json:"row"`
+}
+
+// RecordImportResult defines model for RecordImportResult.
+type RecordImportResult struct {
+	// Created Rows actually stored; zero for a dry run and zero when any row failed.
+	Created int  `json:"created"`
+	DryRun  bool `json:"dryRun"`
+
+	// Errors `row` is the spreadsheet line number (the header is line 1).
+	Errors []RecordImportError `json:"errors"`
+
+	// Rows Data rows found in the file (excluding the header).
+	Rows int `json:"rows"`
+
+	// Valid Rows that passed every check.
+	Valid int `json:"valid"`
+}
+
 // RoleEntry defines model for RoleEntry.
 type RoleEntry struct {
 	// Key The key a process node assigns and authorization compares.
@@ -905,10 +1161,41 @@ type RoleList struct {
 	Data []RoleEntry `json:"data"`
 }
 
+// SetAdminUserPasswordRequest defines model for SetAdminUserPasswordRequest.
+type SetAdminUserPasswordRequest struct {
+	// Password At least 10 characters.
+	Password string `json:"password"`
+}
+
 // StartProcessInstanceRequest defines model for StartProcessInstanceRequest.
 type StartProcessInstanceRequest struct {
 	DefinitionKey string             `json:"definitionKey"`
 	RecordId      openapi_types.UUID `json:"recordId"`
+}
+
+// UpdateAdminDepartmentRequest defines model for UpdateAdminDepartmentRequest.
+type UpdateAdminDepartmentRequest struct {
+	// Name Example: Kỹ thuật và hạ tầng
+	Name string `json:"name"`
+}
+
+// UpdateAdminRoleRequest defines model for UpdateAdminRoleRequest.
+type UpdateAdminRoleRequest struct {
+	// Label Example: Trưởng bộ phận
+	Label string `json:"label"`
+}
+
+// UpdateAdminUserRequest defines model for UpdateAdminUserRequest.
+type UpdateAdminUserRequest struct {
+	Department string `json:"department"`
+	Email      string `json:"email"`
+	Name       string `json:"name"`
+
+	// Roles The complete role set; it replaces what the person held.
+	Roles []string `json:"roles"`
+
+	// Status A disabled account keeps its history but cannot sign in.
+	Status AdminUserStatus `json:"status"`
 }
 
 // UpdateBusinessObjectRequest defines model for UpdateBusinessObjectRequest.
@@ -963,6 +1250,12 @@ type WebhookDeliveryList struct {
 	Enabled bool `json:"enabled"`
 }
 
+// AdminKey defines model for AdminKey.
+type AdminKey = string
+
+// AttachmentId defines model for AttachmentId.
+type AttachmentId = openapi_types.UUID
+
 // DefinitionKey defines model for DefinitionKey.
 type DefinitionKey = string
 
@@ -975,8 +1268,14 @@ type MetricKey = string
 // ObjectKey defines model for ObjectKey.
 type ObjectKey = string
 
+// RecordId defines model for RecordId.
+type RecordId = openapi_types.UUID
+
 // TaskId defines model for TaskId.
 type TaskId = openapi_types.UUID
+
+// UserId defines model for UserId.
+type UserId = openapi_types.UUID
 
 // BadRequest Stable error envelope. `code` is a machine-readable identifier; clients switch on
 // it and never on the human-readable message.
@@ -985,6 +1284,10 @@ type BadRequest = ErrorResponse
 // Conflict Stable error envelope. `code` is a machine-readable identifier; clients switch on
 // it and never on the human-readable message.
 type Conflict = ErrorResponse
+
+// Forbidden Stable error envelope. `code` is a machine-readable identifier; clients switch on
+// it and never on the human-readable message.
+type Forbidden = ErrorResponse
 
 // NotFound Stable error envelope. `code` is a machine-readable identifier; clients switch on
 // it and never on the human-readable message.
@@ -997,6 +1300,53 @@ type ServiceUnavailable = ErrorResponse
 // Unauthorized Stable error envelope. `code` is a machine-readable identifier; clients switch on
 // it and never on the human-readable message.
 type Unauthorized = ErrorResponse
+
+// ListAdminDepartmentsParams defines parameters for ListAdminDepartments.
+type ListAdminDepartmentsParams struct {
+	// Q Search term matched against the name and the key.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Limit Rows per page (default 25, maximum 100).
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Rows to skip.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
+// ListAdminRolesParams defines parameters for ListAdminRoles.
+type ListAdminRolesParams struct {
+	// Q Search term matched against the key and the display name.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Limit Rows per page (default 25, maximum 100).
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Rows to skip.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
+// ListAdminUsersParams defines parameters for ListAdminUsers.
+type ListAdminUsersParams struct {
+	// Q Search term matched against the email and the name.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+
+	// Limit Rows per page (default 25, maximum 100).
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Rows to skip.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
+// UploadAttachmentMultipartBody defines parameters for UploadAttachment.
+type UploadAttachmentMultipartBody struct {
+	File openapi_types.File `json:"file"`
+}
+
+// UploadAttachmentParams defines parameters for UploadAttachment.
+type UploadAttachmentParams struct {
+	// ObjectKey The business object the file will belong to.
+	ObjectKey string `form:"objectKey" json:"objectKey"`
+}
 
 // ListBusinessObjectsParams defines parameters for ListBusinessObjects.
 type ListBusinessObjectsParams struct {
@@ -1015,6 +1365,32 @@ type ListObjectRecordsParams struct {
 	// Q Search term matched against the stored values. Empty means no filter.
 	Q *string `form:"q,omitempty" json:"q,omitempty"`
 
+	// Limit Rows per page (default 25, maximum 100).
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Rows to skip.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
+// ExportObjectRecordsParams defines parameters for ExportObjectRecords.
+type ExportObjectRecordsParams struct {
+	// Q Search term matched against the stored values. Empty means no filter.
+	Q *string `form:"q,omitempty" json:"q,omitempty"`
+}
+
+// ImportObjectRecordsMultipartBody defines parameters for ImportObjectRecords.
+type ImportObjectRecordsMultipartBody struct {
+	File openapi_types.File `json:"file"`
+}
+
+// ImportObjectRecordsParams defines parameters for ImportObjectRecords.
+type ImportObjectRecordsParams struct {
+	// DryRun Check the file and report per-row problems without writing anything.
+	DryRun *bool `form:"dryRun,omitempty" json:"dryRun,omitempty"`
+}
+
+// ListObjectRecordHistoryParams defines parameters for ListObjectRecordHistory.
+type ListObjectRecordHistoryParams struct {
 	// Limit Rows per page (default 25, maximum 100).
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 
@@ -1081,6 +1457,30 @@ type ListWebhookDeliveriesParams struct {
 	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
 }
 
+// CreateAdminDepartmentJSONRequestBody defines body for CreateAdminDepartment for application/json ContentType.
+type CreateAdminDepartmentJSONRequestBody = CreateAdminDepartmentRequest
+
+// UpdateAdminDepartmentJSONRequestBody defines body for UpdateAdminDepartment for application/json ContentType.
+type UpdateAdminDepartmentJSONRequestBody = UpdateAdminDepartmentRequest
+
+// CreateAdminRoleJSONRequestBody defines body for CreateAdminRole for application/json ContentType.
+type CreateAdminRoleJSONRequestBody = CreateAdminRoleRequest
+
+// UpdateAdminRoleJSONRequestBody defines body for UpdateAdminRole for application/json ContentType.
+type UpdateAdminRoleJSONRequestBody = UpdateAdminRoleRequest
+
+// CreateAdminUserJSONRequestBody defines body for CreateAdminUser for application/json ContentType.
+type CreateAdminUserJSONRequestBody = CreateAdminUserRequest
+
+// UpdateAdminUserJSONRequestBody defines body for UpdateAdminUser for application/json ContentType.
+type UpdateAdminUserJSONRequestBody = UpdateAdminUserRequest
+
+// SetAdminUserPasswordJSONRequestBody defines body for SetAdminUserPassword for application/json ContentType.
+type SetAdminUserPasswordJSONRequestBody = SetAdminUserPasswordRequest
+
+// UploadAttachmentMultipartRequestBody defines body for UploadAttachment for multipart/form-data ContentType.
+type UploadAttachmentMultipartRequestBody UploadAttachmentMultipartBody
+
 // LoginJSONRequestBody defines body for Login for application/json ContentType.
 type LoginJSONRequestBody = LoginRequest
 
@@ -1092,6 +1492,15 @@ type UpdateBusinessObjectJSONRequestBody = UpdateBusinessObjectRequest
 
 // CreateObjectRecordJSONRequestBody defines body for CreateObjectRecord for application/json ContentType.
 type CreateObjectRecordJSONRequestBody = CreateObjectRecordRequest
+
+// ImportObjectRecordsMultipartRequestBody defines body for ImportObjectRecords for multipart/form-data ContentType.
+type ImportObjectRecordsMultipartRequestBody ImportObjectRecordsMultipartBody
+
+// UpdateObjectRecordJSONRequestBody defines body for UpdateObjectRecord for application/json ContentType.
+type UpdateObjectRecordJSONRequestBody = CreateObjectRecordRequest
+
+// ChangeMyPasswordJSONRequestBody defines body for ChangeMyPassword for application/json ContentType.
+type ChangeMyPasswordJSONRequestBody = ChangeMyPasswordRequest
 
 // CreateMetricDefinitionJSONRequestBody defines body for CreateMetricDefinition for application/json ContentType.
 type CreateMetricDefinitionJSONRequestBody = CreateMetricDefinitionRequest

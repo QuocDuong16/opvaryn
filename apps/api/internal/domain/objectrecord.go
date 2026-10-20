@@ -28,6 +28,14 @@ type ObjectRecord struct {
 	// existed may have neither. Set from the session, never from the payload.
 	CreatedBy     uuid.UUID
 	DepartmentKey string
-	CreatedAt     time.Time
-	UpdatedAt     time.Time
+	// CreatedByName and DepartmentName are the display names a screen shows instead
+	// of the keys above (ADR 0016). Either may be empty when the row predates
+	// identity or the department no longer exists.
+	CreatedByName  string
+	DepartmentName string
+	// AttachmentNames maps a file field to the name of its attached file, so no screen has
+	// to show the stored identifier. Filled when one record is read, not for a whole page.
+	AttachmentNames map[string]string
+	CreatedAt       time.Time
+	UpdatedAt       time.Time
 }

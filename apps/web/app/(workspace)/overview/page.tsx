@@ -92,6 +92,12 @@ const SURFACES: readonly {
     body: 'Nhiều dạng xem trên cùng dữ liệu; kanban và panel tích hợp là minh hoạ.',
   },
   {
+    href: '/admin',
+    stage: 'live',
+    title: 'Quản trị',
+    body: 'Tài khoản, phòng ban và vai trò của tổ chức; chỉ người giữ vai trò quản trị thấy.',
+  },
+  {
     href: '/settings',
     stage: 'live',
     title: 'Vận hành',
@@ -156,6 +162,8 @@ interface Overview {
   /** Record id to the label that identifies it, built from the record's own version. */
   recordNames: Record<string, string>;
   error: string | null;
+  /** True when the inbox could not be read: an empty inbox and a failed read differ. */
+  inboxFailed: boolean;
 }
 
 async function loadOverview(): Promise<Overview> {
@@ -175,6 +183,7 @@ async function loadOverview(): Promise<Overview> {
         definitionNames: {},
         recordNames: {},
         error: 'Phiên làm việc đã hết hạn.',
+        inboxFailed: true,
       };
     }
     return {
@@ -184,20 +193,26 @@ async function loadOverview(): Promise<Overview> {
       definitionNames: {},
       recordNames: {},
       error: describeApiError(cause),
+      inboxFailed: true,
     };
   }
 
-  // Each part fails on its own: a slow list must not blank the whole page.
-  const [inbox, instances] = await Promise.all([
+  // Each part fails on its own: a slow list must not blank the whole page. A failed read
+  // is not an empty list, though — it is reported, so nobody is told "you have no work"
+  // when the truth is "the system could not answer".
+  const [inboxResult, instancesResult] = await Promise.all([
     api
       .listInboxTasks({ limit: RECENT_LIMIT })
       .then((page) => page.data)
-      .catch(() => []),
+      .catch(() => null),
     api
       .listProcessInstances({}, { limit: RECENT_LIMIT })
       .then((page) => page.data)
-      .catch(() => []),
+      .catch(() => null),
   ]);
+  const inbox = inboxResult ?? [];
+  const instances = instancesResult ?? [];
+  const inboxFailed = inboxResult === null;
 
   // A screen names things: the process by its name, the record by its own label (built from
   // the version it was created under, ADR 0006). Both lookups are best-effort — a missing
@@ -222,12 +237,12 @@ async function loadOverview(): Promise<Overview> {
   );
   const recordNames = Object.assign({}, ...perObject);
 
-  return { me, inbox, instances, definitionNames, recordNames, error: null };
+  return { me, inbox, instances, definitionNames, recordNames, error: null, inboxFailed };
 }
 
 export default async function OverviewPage() {
   const [overview, advanced] = await Promise.all([loadOverview(), getAdvancedMode()]);
-  const { me, inbox, instances, definitionNames, recordNames, error } = overview;
+  const { me, inbox, instances, definitionNames, recordNames, error, inboxFailed } = overview;
   const showAdvanced = advancedVisible(isAdmin(me?.roles), advanced);
 
   if (!me) {
@@ -277,7 +292,11 @@ export default async function OverviewPage() {
           </span>
         </div>
 
-        {inbox.length === 0 ? (
+        {inboxFailed ? (
+          <p className="mt-4 rounded-lg border border-warning/40 px-4 py-6 text-center text-sm text-on-surface-muted">
+            Không đọc được danh sách việc lúc này. Thử lại sau ít phút.
+          </p>
+        ) : inbox.length === 0 ? (
           <p className="mt-4 rounded-lg border border-dashed border-border-strong px-4 py-6 text-center text-sm text-on-surface-muted">
             Không có việc nào đang chờ bạn.
           </p>
@@ -292,7 +311,7 @@ export default async function OverviewPage() {
                   <span className="min-w-0">
                     <span className="block text-sm font-medium">{item.task.title}</span>
                     <span className="block text-xs text-on-surface-muted">
-                      {`${recordNames[item.instance.recordId] ?? 'Bản ghi bạn không đọc được'} · từ ${formatTimestamp(item.task.createdAt)}`}
+                      {`${recordNames[item.instance.recordId] ?? 'Bản ghi chưa có tên hiển thị'} · từ ${formatTimestamp(item.task.createdAt)}`}
                     </span>
                   </span>
                   <span className="text-xs font-medium">Xử lý →</span>
@@ -366,9 +385,7 @@ export default async function OverviewPage() {
                       {STATE_LABELS[summary.instance.state] ?? summary.instance.state}
                     </td>
                     <td className="px-4 py-3 text-xs text-on-surface-muted">
-                      {recordNames[summary.instance.recordId] ??
-                        recordNames[summary.instance.recordId] ??
-                        'Bản ghi bạn không đọc được'}
+                      {recordNames[summary.instance.recordId] ?? 'Bản ghi chưa có tên hiển thị'}
                     </td>
                     <td className="px-4 py-3 text-xs text-on-surface-muted">
                       {formatTimestamp(summary.instance.startedAt)}

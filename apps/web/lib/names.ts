@@ -23,6 +23,24 @@ export function nameLabels(items: readonly { key: string; name: string }[]): Map
 }
 
 /**
+ * OPERATOR_LABELS names the comparison operators the way a person reads them. The key is
+ * what a condition stores; the word is what the screen says (ADR 0018).
+ */
+export const OPERATOR_LABELS: Record<string, string> = {
+  eq: 'bằng',
+  ne: 'khác',
+  gt: 'lớn hơn',
+  gte: 'từ',
+  lt: 'nhỏ hơn',
+  lte: 'đến',
+};
+
+/** operatorLabel names one comparison; an unknown operator keeps its own key. */
+export function operatorLabel(op: string): string {
+  return OPERATOR_LABELS[op] ?? op;
+}
+
+/**
  * fieldNames maps a field key to the label a person reads, for one definition. The key is what
  * a condition or a metric stores; the label is what the screen says.
  */
@@ -88,8 +106,8 @@ export function keyFromLabel(label: string): string {
 
 /**
  * designerRoleName is what the interface calls the role that may change definitions. The name is
- * data (`role_labels`); when nobody has named it, the sentence reads as prose rather than as a
- * key (ADR 0016).
+ * data (the `roles` catalogue); when nobody has named it, the sentence reads as prose rather than
+ * as a key (ADR 0016).
  */
 export function designerRoleName(catalogue: readonly RoleEntry[]): string {
   return labelOrKey(

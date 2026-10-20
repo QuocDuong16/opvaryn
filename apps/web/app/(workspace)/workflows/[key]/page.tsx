@@ -139,6 +139,10 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
     ),
   ].sort();
   const named = roleLabels(roleCatalogue);
+  // A condition names the field it compares; the canvas shows the name, not the key.
+  const conditionFieldNames = Object.fromEntries(
+    objectFields.map((field) => [field.key, field.label]),
+  );
   const knownRoles: RoleEntry[] = [
     ...new Set([...roleCatalogue.map((entry) => entry.key), ...definitionRoles]),
   ]
@@ -250,6 +254,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
                 version={shown.version}
                 label={`${definition.name} v${shown.version}`}
                 roleLabels={roleNames}
+                fieldLabels={conditionFieldNames}
               />
               {isNewest ? (
                 <div className="mt-3">

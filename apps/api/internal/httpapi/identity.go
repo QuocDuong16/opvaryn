@@ -19,8 +19,14 @@ type userContextKey struct{}
 
 // sessionMiddleware resolves the session cookie once per request and puts the user
 // in the request context. Requests without a cookie stay anonymous; a database
-// failure is reported instead of silently degrading to anonymous.
-func sessionMiddleware(identity *service.Identity, log *slog.Logger) func(http.Handler) http.Handler {
+// failure is reported instead of silently degrading to anonymous. A session close to
+// expiry is slid forward, and the cookie is refreshed to match, so an active person is
+// not signed out mid-day.
+func sessionMiddleware(
+	identity *service.Identity,
+	secureCookies bool,
+	log *slog.Logger,
+) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			cookie, err := r.Cookie(SessionCookieName)
@@ -29,10 +35,14 @@ func sessionMiddleware(identity *service.Identity, log *slog.Logger) func(http.H
 				return
 			}
 
-			user, err := identity.Authenticate(r.Context(), cookie.Value)
+			user, renewed, err := identity.AuthenticateAndRenew(r.Context(), cookie.Value)
 			switch {
 			case err == nil:
 				r = r.WithContext(context.WithValue(r.Context(), userContextKey{}, user))
+				if renewed {
+					http.SetCookie(w, sessionCookie(secureCookies, cookie.Value,
+						int(service.SessionTTL.Seconds())))
+				}
 			case errors.Is(err, service.ErrUnauthorized):
 				// An expired or unknown session is simply an anonymous request.
 			default:
@@ -126,6 +136,35 @@ func handleMe(identity *service.Identity, log *slog.Logger) http.HandlerFunc {
 			return
 		}
 		writeJSON(w, log, http.StatusOK, meResponse(r.Context(), identity, user, log))
+	}
+}
+
+// handleChangeMyPassword lets the signed-in person replace their own password. The
+// current password is verified first; other sessions end, this one stays.
+func handleChangeMyPassword(identity *service.Identity, log *slog.Logger) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if _, ok := requireUser(w, log, r); !ok {
+			return
+		}
+		cookie, err := r.Cookie(SessionCookieName)
+		if err != nil || cookie.Value == "" {
+			writeError(w, log, http.StatusUnauthorized, codeUnauthorized, "sign in to continue")
+			return
+		}
+
+		var body apiv1.ChangeMyPasswordJSONRequestBody
+		if err := decodeJSON(w, r, &body); err != nil {
+			log.Warn("rejected request body", "error", err)
+			writeError(w, log, http.StatusBadRequest, codeInvalidRequest,
+				"request body must be a single JSON object matching the ChangeMyPasswordRequest schema")
+			return
+		}
+
+		if err := identity.ChangePassword(r.Context(), cookie.Value, body.CurrentPassword, body.NewPassword); err != nil {
+			writeStoreError(w, log, err, "change password")
+			return
+		}
+		w.WriteHeader(http.StatusNoContent)
 	}
 }
 

@@ -45,3 +45,7 @@ có số trang, không có tổng số.
   `offset` dịch trang, và `limit` ngoài khoảng / không phải số bị từ chối kèm lý do.
 - Thêm một danh sách mới sau này phải có `limit`/`offset` và `total`; một endpoint trả cả bảng là
   lỗi thiết kế, không phải lựa chọn.
+- **Ngoại lệ đã ghi nhận**: ba danh sách là *catalogue cố định*, không phải bảng dữ liệu người dùng,
+  nên chúng trả về toàn bộ và có trần riêng — `GET /api/v1/roles` (vai trò có ít nhất một người giữ),
+  `GET /api/v1/metrics` (định nghĩa chỉ số) và `GET /api/v1/webhook-deliveries` (nhật ký giao, có
+  `limit` tối đa 200 và chỉ đọc gần đây). Một danh sách *bản ghi* mới không được theo lối này.

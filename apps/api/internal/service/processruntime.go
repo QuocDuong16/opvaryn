@@ -44,6 +44,7 @@ type processRuntimeStore interface {
 	GetProcessDefinitionByKey(ctx context.Context, key string) (domain.ProcessDefinition, error)
 	GetProcessDefinitionVersionByID(ctx context.Context, id uuid.UUID) (domain.ProcessDefinitionVersion, error)
 	FindObjectRecord(ctx context.Context, id uuid.UUID) (domain.ObjectRecord, bool, error)
+	FindVisibleObjectRecord(ctx context.Context, id uuid.UUID, scope domain.RecordScope) (domain.ObjectRecord, bool, error)
 	StartProcessInstance(ctx context.Context, in domain.StartInstanceWrite) error
 	CompleteProcessTask(ctx context.Context, in domain.CompleteTaskWrite) error
 	GetProcessInstance(ctx context.Context, id uuid.UUID) (domain.ProcessInstance, error)
@@ -127,7 +128,11 @@ func (r *ProcessRuntime) Start(ctx context.Context, in StartInput) (InstanceView
 		return InstanceView{}, fmt.Errorf("look up process definition %q: %w", in.DefinitionKey, err)
 	}
 
-	record, found, err := r.store.FindObjectRecord(ctx, in.RecordID)
+	// Starting a process is an act on the record, so the caller must be able to read it.
+	// A record outside the caller's scope answers exactly like a missing one: the start
+	// endpoint must not confirm that a record the caller may not see exists (ADR 0008).
+	record, found, err := r.store.FindVisibleObjectRecord(
+		ctx, in.RecordID, domain.RecordScopeFor(in.Principal))
 	if err != nil {
 		return InstanceView{}, fmt.Errorf("look up record %s: %w", in.RecordID, err)
 	}

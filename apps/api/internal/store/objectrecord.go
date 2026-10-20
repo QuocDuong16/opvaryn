@@ -16,12 +16,17 @@ import (
 const objectRecordColumns = `id, object_id, object_version_id, values, created_by, department_key, created_at, updated_at`
 
 // objectRecordSelect reads records together with the definition version they were
-// created under, so a caller never has to guess which schema a record belongs to.
+// created under, so a caller never has to guess which schema a record belongs to. The two
+// joins are display only: a screen names the person and the department instead of printing
+// identifiers (ADR 0016), and a missing account or department simply leaves the name empty.
 const objectRecordSelect = `
 	SELECT r.id, r.object_id, r.object_version_id, v.version, r.values,
-	       r.created_by, r.department_key, r.created_at, r.updated_at
+	       r.created_by, r.department_key, u.name, d.name,
+	       r.created_at, r.updated_at
 	  FROM business_object_records r
-	  JOIN business_object_versions v ON v.id = r.object_version_id`
+	  JOIN business_object_versions v ON v.id = r.object_version_id
+	  LEFT JOIN users u ON u.id = r.created_by
+	  LEFT JOIN departments d ON d.key = r.department_key`
 
 // recordVisibleToScope is the department rule of ADR 0008: an administrator sees
 // everything; everyone else sees their own department's records, the records they
@@ -101,6 +106,61 @@ func (s *Store) CreateObjectRecord(
 	ctx context.Context,
 	record domain.ObjectRecord,
 	projection []domain.RecordFieldValue,
+	bindings []domain.AttachmentBinding,
+	audit domain.RecordAudit,
+	admin bool,
+) (domain.ObjectRecord, error) {
+	created := record
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		stored, err := insertObjectRecordTx(ctx, tx, record, projection)
+		if err != nil {
+			return err
+		}
+		created = stored
+		// The files were uploaded before the record existed; bind them in the same
+		// transaction, so a record never references a file that stayed unbound.
+		if err := bindAttachmentsTx(ctx, tx, record.ID, record.ObjectKey, record.CreatedBy, admin, bindings); err != nil {
+			return err
+		}
+		return insertRecordAuditTx(ctx, tx, audit)
+	})
+	if err != nil {
+		return domain.ObjectRecord{}, objectRecordWriteError(err, record.ObjectID)
+	}
+	return created, nil
+}
+
+// CreateObjectRecords inserts a batch of records in one transaction, with their
+// projections. The CSV import uses it: either every row is stored or none is, which is what
+// makes a per-row report honest.
+func (s *Store) CreateObjectRecords(
+	ctx context.Context,
+	records []domain.ObjectRecord,
+	projections [][]domain.RecordFieldValue,
+	audits []domain.RecordAudit,
+) error {
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		for i, record := range records {
+			if _, err := insertObjectRecordTx(ctx, tx, record, projections[i]); err != nil {
+				return err
+			}
+			if err := insertRecordAuditTx(ctx, tx, audits[i]); err != nil {
+				return err
+			}
+		}
+		return nil
+	})
+	if err != nil {
+		return objectRecordWriteError(err, uuid.Nil)
+	}
+	return nil
+}
+
+func insertObjectRecordTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	record domain.ObjectRecord,
+	projection []domain.RecordFieldValue,
 ) (domain.ObjectRecord, error) {
 	values, err := json.Marshal(record.Values)
 	if err != nil {
@@ -116,21 +176,134 @@ func (s *Store) CreateObjectRecord(
 		departmentKey = record.DepartmentKey
 	}
 
-	created := record
-	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		row := tx.QueryRow(ctx, `
-			INSERT INTO business_object_records
-			       (id, object_id, object_version_id, values, created_by, department_key)
-			VALUES ($1, $2, $3, $4, $5, $6)
-			RETURNING `+objectRecordColumns,
-			record.ID, record.ObjectID, record.ObjectVersionID, values, createdBy, departmentKey)
+	row := tx.QueryRow(ctx, `
+		INSERT INTO business_object_records
+		       (id, object_id, object_version_id, values, created_by, department_key)
+		VALUES ($1, $2, $3, $4, $5, $6)
+		RETURNING `+objectRecordColumns,
+		record.ID, record.ObjectID, record.ObjectVersionID, values, createdBy, departmentKey)
 
-		stored, err := scanObjectRecord(row)
-		if err != nil {
-			return err
+	stored, err := scanObjectRecord(row)
+	if err != nil {
+		return domain.ObjectRecord{}, err
+	}
+
+	for _, field := range projection {
+		var textValue, numberValue, dateValue any
+		switch field.Kind {
+		case domain.MetricNumber:
+			numberValue = field.Number
+		case domain.MetricDate:
+			dateValue = field.Date
+		default:
+			textValue = field.Text
 		}
-		created = stored
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO record_field_values
+			       (record_id, object_key, field_key, text_value, number_value, date_value)
+			VALUES ($1, $2, $3, $4, $5, $6)`,
+			record.ID, record.ObjectKey, field.FieldKey, textValue, numberValue, dateValue,
+		); err != nil {
+			return domain.ObjectRecord{}, fmt.Errorf("project field %s: %w", field.FieldKey, err)
+		}
+	}
+	return stored, nil
+}
 
+// objectRecordWriteError maps the two write failures a record insert can meet: a foreign
+// key failure means the addressed definition or version disappeared concurrently.
+func objectRecordWriteError(err error, objectID uuid.UUID) error {
+	var pgErr *pgconn.PgError
+	if errors.As(err, &pgErr) && pgErr.Code == "23503" {
+		return fmt.Errorf("%w: business object %s", ErrNotFound, objectID)
+	}
+	return classify(err)
+}
+
+// FindObjectRecord reads one stored record with the object key it belongs to, without a
+// scope check. Callers that act for a person use FindVisibleObjectRecord instead.
+func (s *Store) FindObjectRecord(ctx context.Context, id uuid.UUID) (domain.ObjectRecord, bool, error) {
+	return s.findObjectRecord(ctx, id, nil)
+}
+
+// FindVisibleObjectRecord reads one record only when the scope may read it: the same rule
+// the list applies (ADR 0008). A record the caller cannot read comes back as not found, so
+// the caller cannot tell "hidden" from "does not exist".
+func (s *Store) FindVisibleObjectRecord(
+	ctx context.Context,
+	id uuid.UUID,
+	scope domain.RecordScope,
+) (domain.ObjectRecord, bool, error) {
+	return s.findObjectRecord(ctx, id, &scope)
+}
+
+func (s *Store) findObjectRecord(
+	ctx context.Context,
+	id uuid.UUID,
+	scope *domain.RecordScope,
+) (domain.ObjectRecord, bool, error) {
+	query := `
+		SELECT r.id, r.object_id, r.object_version_id, v.version, o.key, r.values,
+		       r.created_by, r.department_key, u.name, d.name,
+		       r.created_at, r.updated_at
+		  FROM business_object_records r
+		  JOIN business_object_versions v ON v.id = r.object_version_id
+		  JOIN business_objects o ON o.id = r.object_id
+		  LEFT JOIN users u ON u.id = r.created_by
+		  LEFT JOIN departments d ON d.key = r.department_key
+		 WHERE r.id = $1`
+	args := []any{id}
+	if scope != nil {
+		query += ` AND ` + recordVisibleToScope
+		args = append(args, scope.All, scope.DepartmentKey, scope.UserID)
+	}
+
+	record, err := scanObjectRecordWithKey(s.pool.QueryRow(ctx, query, args...))
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.ObjectRecord{}, false, nil
+		}
+		return domain.ObjectRecord{}, false, classify(err)
+	}
+	return record, true, nil
+}
+
+// UpdateObjectRecord replaces a record's values and rewrites its typed projection in one
+// transaction. The object, the definition version and the creator are never touched: the
+// version the record was created under stays the schema it is read and validated with
+// (ADR 0006).
+func (s *Store) UpdateObjectRecord(
+	ctx context.Context,
+	record domain.ObjectRecord,
+	projection []domain.RecordFieldValue,
+	fileFieldKeys []string,
+	bindings []domain.AttachmentBinding,
+	editorID uuid.UUID,
+	audit domain.RecordAudit,
+	admin bool,
+) (domain.ObjectRecord, error) {
+	values, err := json.Marshal(record.Values)
+	if err != nil {
+		return domain.ObjectRecord{}, fmt.Errorf("encode values: %w", err)
+	}
+
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `
+			UPDATE business_object_records
+			   SET values = $2, updated_at = now()
+			 WHERE id = $1 AND object_id = $3`,
+			record.ID, values, record.ObjectID)
+		if err != nil {
+			return fmt.Errorf("update record values: %w", err)
+		}
+		if tag.RowsAffected() == 0 {
+			return fmt.Errorf("%w: record %s", ErrNotFound, record.ID)
+		}
+
+		if _, err := tx.Exec(ctx,
+			`DELETE FROM record_field_values WHERE record_id = $1`, record.ID); err != nil {
+			return fmt.Errorf("clear record projection: %w", err)
+		}
 		for _, field := range projection {
 			var textValue, numberValue, dateValue any
 			switch field.Kind {
@@ -145,61 +318,64 @@ func (s *Store) CreateObjectRecord(
 				INSERT INTO record_field_values
 				       (record_id, object_key, field_key, text_value, number_value, date_value)
 				VALUES ($1, $2, $3, $4, $5, $6)`,
-				record.ID, stored.ObjectKey, field.FieldKey, textValue, numberValue, dateValue,
+				record.ID, record.ObjectKey, field.FieldKey, textValue, numberValue, dateValue,
 			); err != nil {
 				return fmt.Errorf("project field %s: %w", field.FieldKey, err)
 			}
 		}
+		if err := replaceAttachmentsTx(ctx, tx, record.ID, record.ObjectKey, editorID, admin,
+			fileFieldKeys, bindings); err != nil {
+			return err
+		}
+		return insertRecordAuditTx(ctx, tx, audit)
+	})
+	if err != nil {
+		return domain.ObjectRecord{}, classify(err)
+	}
+
+	updated, found, err := s.FindObjectRecord(ctx, record.ID)
+	if err != nil {
+		return domain.ObjectRecord{}, err
+	}
+	if !found {
+		return domain.ObjectRecord{}, fmt.Errorf("%w: record %s", ErrNotFound, record.ID)
+	}
+	return updated, nil
+}
+
+// DeleteObjectRecord removes a record no process has ever run on. A record with a process
+// instance is refused: the runs and their audit trail are the history of decisions taken
+// on that record, and the foreign key would refuse the delete anyway.
+func (s *Store) DeleteObjectRecord(ctx context.Context, id uuid.UUID, audit domain.RecordAudit) error {
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		var used bool
+		if err := tx.QueryRow(ctx,
+			`SELECT EXISTS (SELECT 1 FROM process_instances WHERE record_id = $1)`, id,
+		).Scan(&used); err != nil {
+			return fmt.Errorf("check record usage: %w", err)
+		}
+		if used {
+			return fmt.Errorf("%w: record %s has a process instance", ErrInUse, id)
+		}
+
+		// The audit row is written before the delete and has no foreign key, so the
+		// history outlives the record.
+		if err := insertRecordAuditTx(ctx, tx, audit); err != nil {
+			return err
+		}
+		tag, err := tx.Exec(ctx, `DELETE FROM business_object_records WHERE id = $1`, id)
+		if err != nil {
+			return fmt.Errorf("delete record: %w", err)
+		}
+		if tag.RowsAffected() == 0 {
+			return fmt.Errorf("%w: record %s", ErrNotFound, id)
+		}
 		return nil
 	})
 	if err != nil {
-		var pgErr *pgconn.PgError
-		// The addressed object or version was deleted between the lookup and the
-		// insert (deleting an object cascades to its versions).
-		if errors.As(err, &pgErr) && pgErr.Code == "23503" {
-			return domain.ObjectRecord{}, fmt.Errorf("%w: business object %s", ErrNotFound, record.ObjectID)
-		}
-		return domain.ObjectRecord{}, classify(err)
+		return classify(err)
 	}
-	return created, nil
-}
-
-// FindObjectRecord reads one stored record with the object key it belongs to.
-func (s *Store) FindObjectRecord(ctx context.Context, id uuid.UUID) (domain.ObjectRecord, bool, error) {
-	row := s.pool.QueryRow(ctx, `
-		SELECT r.id, r.object_id, r.object_version_id, v.version, o.key,
-		       r.values, r.created_by, r.department_key, r.created_at, r.updated_at
-		  FROM business_object_records r
-		  JOIN business_object_versions v ON v.id = r.object_version_id
-		  JOIN business_objects o ON o.id = r.object_id
-		 WHERE r.id = $1`, id)
-
-	var (
-		record     domain.ObjectRecord
-		values     []byte
-		created    *uuid.UUID
-		department *string
-	)
-	err := row.Scan(
-		&record.ID, &record.ObjectID, &record.ObjectVersionID, &record.ObjectVersion,
-		&record.ObjectKey, &values, &created, &department, &record.CreatedAt, &record.UpdatedAt,
-	)
-	if err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return domain.ObjectRecord{}, false, nil
-		}
-		return domain.ObjectRecord{}, false, classify(err)
-	}
-	if err := json.Unmarshal(values, &record.Values); err != nil {
-		return domain.ObjectRecord{}, false, fmt.Errorf("decode values: %w", err)
-	}
-	if created != nil {
-		record.CreatedBy = *created
-	}
-	if department != nil {
-		record.DepartmentKey = *department
-	}
-	return record, true, nil
+	return nil
 }
 
 // ListOpenTasksForRoles returns the open tasks of an instance the given user holds a
@@ -308,10 +484,12 @@ func scanObjectRecord(row rowScanner) (domain.ObjectRecord, error) {
 
 func scanObjectRecordWithVersion(row rowScanner) (domain.ObjectRecord, error) {
 	var (
-		record     domain.ObjectRecord
-		values     []byte
-		created    *uuid.UUID
-		department *string
+		record      domain.ObjectRecord
+		values      []byte
+		created     *uuid.UUID
+		department  *string
+		creatorName *string
+		deptName    *string
 	)
 	err := row.Scan(
 		&record.ID,
@@ -321,6 +499,8 @@ func scanObjectRecordWithVersion(row rowScanner) (domain.ObjectRecord, error) {
 		&values,
 		&created,
 		&department,
+		&creatorName,
+		&deptName,
 		&record.CreatedAt,
 		&record.UpdatedAt,
 	)
@@ -335,6 +515,58 @@ func scanObjectRecordWithVersion(row rowScanner) (domain.ObjectRecord, error) {
 	}
 	if department != nil {
 		record.DepartmentKey = *department
+	}
+	if creatorName != nil {
+		record.CreatedByName = *creatorName
+	}
+	if deptName != nil {
+		record.DepartmentName = *deptName
+	}
+	return record, nil
+}
+
+// scanObjectRecordWithKey reads the columns of findObjectRecord, which adds the object key
+// to the record's own select.
+func scanObjectRecordWithKey(row rowScanner) (domain.ObjectRecord, error) {
+	var (
+		record      domain.ObjectRecord
+		values      []byte
+		created     *uuid.UUID
+		department  *string
+		creatorName *string
+		deptName    *string
+	)
+	err := row.Scan(
+		&record.ID,
+		&record.ObjectID,
+		&record.ObjectVersionID,
+		&record.ObjectVersion,
+		&record.ObjectKey,
+		&values,
+		&created,
+		&department,
+		&creatorName,
+		&deptName,
+		&record.CreatedAt,
+		&record.UpdatedAt,
+	)
+	if err != nil {
+		return domain.ObjectRecord{}, fmt.Errorf("scan object record: %w", err)
+	}
+	if err := json.Unmarshal(values, &record.Values); err != nil {
+		return domain.ObjectRecord{}, fmt.Errorf("decode values: %w", err)
+	}
+	if created != nil {
+		record.CreatedBy = *created
+	}
+	if department != nil {
+		record.DepartmentKey = *department
+	}
+	if creatorName != nil {
+		record.CreatedByName = *creatorName
+	}
+	if deptName != nil {
+		record.DepartmentName = *deptName
 	}
 	return record, nil
 }

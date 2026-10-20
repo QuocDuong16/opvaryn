@@ -21,9 +21,12 @@ Working agreement for agents and contributors in this repository.
   designer (drag-and-drop canvas over a browser-local draft, publish version, run a process from a
   record) and analytics (metrics over a
   typed projection, the dashboard layout, and the process operational read model of ADR 0011) are
-  `live` against PostgreSQL and the Go service, as is the outbound webhook integration (ADR 0012);
-  the kanban/connector panels are `mock` fixtures; conditional visibility, calculated fields and
-  SLA/escalation are `concept`.
+  `live` against PostgreSQL and the Go service, as is the outbound webhook integration (ADR 0012),
+  organisation administration — accounts, departments and the role catalogue (ADR 0022) — a
+  record's own screen with edit and delete under the write rule (ADR 0023), CSV export (ADR 0024)
+  and import (ADR 0026), file attachments with `file` fields (ADR 0025), the per-field change
+  history (ADR 0027) and the sign-in cooldown (ADR 0028); the kanban/connector panels are `mock`
+  fixtures; conditional visibility, calculated fields and SLA/escalation are `concept`.
 
 ## Working agreement
 
@@ -72,12 +75,35 @@ Working agreement for agents and contributors in this repository.
   PHC strings, session tokens are stored only as SHA-256 hashes, and login answers identically for
   an unknown email and a wrong password. The actor of a process transition is the signed-in user,
   never a value from the request body; a task is decided only with a role the user holds.
-  Accounts and departments are created with `make useradm` (the first user cannot come from the
-  API). Every endpoint requires a session except `/healthz`, `/readyz`, `/api/v1/meta` and
+  The first administrator is created with `make useradm` (the first user cannot come from the
+  API); after that, administrators manage accounts, departments and the role catalogue through
+  `/api/v1/admin/*` and the `/admin` screens (ADR 0022). Every endpoint requires a session except
+  `/healthz`, `/readyz`, `/api/v1/meta` and
   `/api/v1/auth/*`; authorisation lives in `internal/service/authz.go` and each service, never in
   the UI, and record visibility is the department rule of ADR 0008 (`RecordScope`). Adding an
   unprotected endpoint, or one that reads records without a scope, means updating that ADR first.
   There is deliberately no "admin may decide any task" rule: approvals belong to the role.
+  A record may be updated or deleted only by an administrator, its creator, or a member of its
+  department; a cross-department approver reads it through the task but never rewrites it. An
+  update is validated against the version the record was created under and rewrites the typed
+  projection in the same transaction; a delete is refused (`in_use`) while a process instance
+  refers to the record (ADR 0023).
+  Files are uploaded first and bound while the record is saved, in the same transaction; an
+  unbound file is visible only to its uploader (and admins), a bound one follows the record
+  scope; a download is always `application/octet-stream` with `Content-Disposition: attachment`
+  and `nosniff`, never rendered; the content type is sniffed from the bytes and the name is
+  sanitized (ADR 0025). CSV export answers the union of every published version's fields with
+  labels and a 10,000-row cap (ADR 0024); CSV import matches columns by key or label, converts
+  Vietnamese number/date formats, checks every row, writes all rows or none in one transaction,
+  supports a dry run, and rejects file fields (ADR 0026).
+  Every record write appends to `record_audit` in the same transaction: action, actor snapshot,
+  and only the fields whose values changed; the history has no foreign key to the record, is read
+  with the record's scope, and no endpoint modifies it (ADR 0027).
+  Sign-in failures are counted per address: 5 failures in 15 minutes trigger a 15-minute cooldown
+  that answers exactly like a wrong password; success clears the count, an administrator lifts it
+  from the `/admin` area (`POST /api/v1/admin/users/{userId}/unlock`, ADR 0029) and `useradm
+  -unlock` lifts it from the terminal when nobody can sign in (ADR 0028, which supersedes ADR
+  0008's "lockout is a manual action").
 
 ## Database and data safety
 
@@ -107,12 +133,13 @@ Working agreement for agents and contributors in this repository.
   screen inside the group that anonymous callers are meant to reach.
 - The front page may only state what the product does: no invented customers, logos,
   testimonials or prices, and the "not yet" list stays on it next to the capabilities.
-- Screens are built for the person using them: everyone signed in sees the product, while the
-  screens that describe how it is built or operated (`/settings`, `/roadmap`) are for an
-  administrator and only appear with advanced mode on — a browser cookie behind a server action
-  that grants nothing (`lib/advanced.ts`, ADR 0015). New nav entries pick an `audience`; the
-  default is `everyone`. The workspace home is a dashboard of the person's own work, never a
-  status board of the build.
+- Screens are built for the person using them: everyone signed in sees the product, the
+  organisation administration area (`/admin`) appears for an administrator, and the screens that
+  describe how it is built or operated (`/settings`, `/roadmap`) additionally need advanced mode
+  on — a browser cookie behind a server action that grants nothing (`lib/advanced.ts`, ADR 0015,
+  ADR 0022). New nav entries pick an `audience` (default `everyone`) and, for an admin screen,
+  whether it `requiresAdvanced`. The workspace home is a dashboard of the person's own work,
+  never a status board of the build.
 - A screen shows what the person using it needs to decide or act — never what only the system
   needs to see (ADR 0018): no field keys, node keys, record ids or table names in the interface,
   no internal vocabulary (`node`, `attempt`, `sum(amount)`, `gte`), and an unreadable record says
@@ -160,7 +187,14 @@ Working agreement for agents and contributors in this repository.
 - Screens that generate UI from a business object schema (record form, record table, mini-app
   views, configuration preview) must render from the definition, not from hard-coded field lists.
 - A record is rendered with its own definition version (`components/objects/record-grouping.ts`
-  groups them); rewriting old rows to match a new schema is not an option.
+  groups them); rewriting old rows to match a new schema is not an option. `/objects/{key}/records/{id}`
+  is the record's own screen: values, who entered it and from which department, its version, the
+  way to its runs, and the edit/delete controls only when the API says `canEdit` (ADR 0023).
+- A `file` field is the `FileField` control: the file uploads as soon as it is chosen, the form
+  carries its identifier, and a download goes through `/attachments/{id}` (never straight to the
+  API, ADR 0025). The records tab offers **Xuất CSV** only while the visible list is at most
+  10,000 rows (ADR 0024) and **Nhập từ CSV** with a dry run before writing (ADR 0026). The record
+  screen carries **Lịch sử thay đổi** from the append-only history endpoint (ADR 0027).
 
 ## Docker and operations
 
@@ -176,7 +210,9 @@ Working agreement for agents and contributors in this repository.
   mistake is fixed with a new file.
 - Backups are not backups until restored: `make backup` writes and re-reads a dump, and
   `make restore-drill` restores it into a scratch database, compares it with the source and proves
-  the API can sign in against it. Run the drill after schema/backup changes and before a pilot.
+  the API can sign in against it. Attachments are rows in PostgreSQL (ADR 0025), so a dump carries
+  them too — which is why the dump grows with files and why `make useradm
+  ARGS="-prune-orphan-attachments"` is part of housekeeping. Run the drill after schema/backup changes and before a pilot.
   `docs/ops-runbook.md` is the operator's page; ADR 0009 records why the topology is what it is.
 - Keep ports in the 21xxx range (documented in `.env.example`) to avoid collisions with
   other local projects. Secrets live in `.env` on the host, never in the repository.

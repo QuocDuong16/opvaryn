@@ -91,7 +91,16 @@ describe('layoutGraph', () => {
 describe('nodeSubtitle', () => {
   it('names the role of a human task and the condition of a condition step', () => {
     expect(nodeSubtitle(graph.nodes[1] as ProcessNode)).toBe('vai trò truong_bo_phan');
-    expect(nodeSubtitle(graph.nodes[2] as ProcessNode)).toBe('estimated_amount gte 20000000');
+    expect(nodeSubtitle(graph.nodes[2] as ProcessNode)).toBe('estimated_amount từ 20000000');
+  });
+
+  it('shows the name of the role and the field when the screen knows them', () => {
+    const labels = {
+      roles: new Map([['truong_bo_phan', 'Trưởng bộ phận']]),
+      fields: new Map([['estimated_amount', 'Giá trị dự kiến']]),
+    };
+    expect(nodeSubtitle(graph.nodes[1] as ProcessNode, labels)).toBe('vai trò Trưởng bộ phận');
+    expect(nodeSubtitle(graph.nodes[2] as ProcessNode, labels)).toBe('Giá trị dự kiến từ 20000000');
   });
 
   it('says a human task has no role yet instead of showing nothing', () => {
@@ -102,7 +111,7 @@ describe('nodeSubtitle', () => {
 describe('conditionSummary', () => {
   it('renders the literal as written', () => {
     expect(conditionSummary({ field: 'severity', op: 'eq', value: 'nghiem_trong' })).toBe(
-      'severity eq nghiem_trong',
+      'severity bằng nghiem_trong',
     );
     expect(conditionSummary(undefined)).toBe('—');
   });

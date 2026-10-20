@@ -48,13 +48,20 @@ describe('navigation', () => {
     expect(navItemFor('/unknown')).toBeUndefined();
   });
 
-  it('shows the product screens to everyone and the build screens only in advanced mode', () => {
-    const everyday = navItemsFor(false).map((item) => item.href);
+  it('shows the product screens to everyone and the administrator screens by role', () => {
+    const everyday = navItemsFor(false, false).map((item) => item.href);
     expect(everyday).toContain('/tasks');
+    expect(everyday).not.toContain('/admin');
     expect(everyday).not.toContain('/settings');
     expect(everyday).not.toContain('/roadmap');
 
-    const advanced = navItemsFor(true).map((item) => item.href);
+    const administrator = navItemsFor(true, false).map((item) => item.href);
+    expect(administrator).toContain('/admin');
+    expect(administrator).not.toContain('/settings');
+    expect(administrator).not.toContain('/roadmap');
+
+    const advanced = navItemsFor(true, true).map((item) => item.href);
+    expect(advanced).toContain('/admin');
     expect(advanced).toContain('/settings');
     expect(advanced).toContain('/roadmap');
   });
@@ -62,5 +69,7 @@ describe('navigation', () => {
   it('resolves nested routes to their area', () => {
     expect(navItemFor('/objects/asset')?.label).toBe('Dữ liệu');
     expect(navItemFor('/objects/asset')?.href).toBe('/objects');
+    expect(navItemFor('/admin/users')?.label).toBe('Quản trị');
+    expect(navItemFor('/admin/users')?.href).toBe('/admin');
   });
 });

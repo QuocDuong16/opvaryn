@@ -1,3 +1,4 @@
+import { operatorLabel } from '@/lib/names';
 import type { ProcessCondition, ProcessEdge, ProcessNode } from '@opvaryn/contracts';
 
 /**
@@ -129,12 +130,26 @@ export function layoutGraph(graph: ProcessGraph): GraphLayout {
   };
 }
 
+/**
+ * NodeLabels are the names a canvas needs: the field a condition compares and the role a
+ * step belongs to. A key nobody has named keeps its key (ADR 0016), but a named one is
+ * shown by its name, never as a key (ADR 0018).
+ */
+export interface NodeLabels {
+  fields?: ReadonlyMap<string, string>;
+  roles?: ReadonlyMap<string, string>;
+}
+
 /** conditionSummary renders the JSON condition (D04) as one readable line. */
-export function conditionSummary(condition: ProcessCondition | undefined): string {
+export function conditionSummary(
+  condition: ProcessCondition | undefined,
+  labels: NodeLabels = {},
+): string {
   if (!condition) {
     return '—';
   }
-  return `${condition.field} ${condition.op} ${formatLiteral(condition.value)}`;
+  const field = labels.fields?.get(condition.field) ?? condition.field;
+  return `${field} ${operatorLabel(condition.op)} ${formatLiteral(condition.value)}`;
 }
 
 function formatLiteral(value: unknown): string {
@@ -148,12 +163,17 @@ function formatLiteral(value: unknown): string {
 }
 
 /** nodeSubtitle is the second line inside a node box on the canvas. */
-export function nodeSubtitle(node: ProcessNode): string {
+export function nodeSubtitle(node: ProcessNode, labels: NodeLabels = {}): string {
   switch (node.type) {
-    case 'human_task':
-      return node.assigneeRole ? `vai trò ${node.assigneeRole}` : 'chưa gán vai trò';
+    case 'human_task': {
+      if (!node.assigneeRole) {
+        return 'chưa gán vai trò';
+      }
+      const role = labels.roles?.get(node.assigneeRole) ?? node.assigneeRole;
+      return `vai trò ${role}`;
+    }
     case 'condition':
-      return conditionSummary(node.condition);
+      return conditionSummary(node.condition, labels);
     default:
       return NODE_TYPE_LABELS[node.type];
   }

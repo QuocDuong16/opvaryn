@@ -9,7 +9,8 @@ Local development (`make docker-up` + `make dev`) không dùng trang này — xe
 
 ## 1. Thành phần chạy trên host
 
-`docker compose --profile pilot` (target `make pilot-up`) chạy 5 service:
+`docker compose --profile pilot` (target `make pilot-up`) dựng 6 container: 5 service thuộc profile
+`pilot` và `postgres`, vốn không có profile nên luôn chạy:
 
 | Service | Vai trò | Ghi chú |
 | --- | --- | --- |
@@ -20,7 +21,8 @@ Local development (`make docker-up` + `make dev`) không dùng trang này — xe
 | `caddy` | TLS terminator + reverse proxy | **Service duy nhất mở ra mạng**: `${CADDY_HTTP_PORT}` (21580) và `${CADDY_HTTPS_PORT}` (21443) → `web:21500` |
 | `backup` | Job `pg_dump` định kỳ | Vòng lặp `scripts/backup-db.sh`; dump ghi ra `${BACKUP_DIR}` |
 
-`postgres` **không** thuộc profile `pilot`, nên `make docker-up` vẫn chỉ dựng Postgres cho dev.
+`postgres` **không** thuộc profile `pilot` (nó không khai báo profile nào), nên `make docker-up` vẫn
+chỉ dựng Postgres cho dev, còn `make pilot-up` dựng nó cùng stack đầy đủ.
 API và web chỉ bind loopback: ops vào được từ chính host, còn mạng ngoài chỉ thấy Caddy.
 
 ## 2. Chuẩn bị host (một lần)
@@ -63,6 +65,13 @@ docker compose -f deployments/docker-compose.yml --profile pilot exec api \
 > Đặt tên hiển thị cho role để màn hình không in khoá máy (ADR 0016):
 > `/app/useradm -set-role-label -role truong_bo_phan -label 'Trưởng bộ phận'`. Role chưa đặt tên
 > vẫn dùng được — màn hình hiện khoá của nó.
+
+Sau khi có tài khoản quản trị đầu tiên, việc quản trị hằng ngày làm ngay trong sản phẩm tại khu vực
+**Quản trị** (`/admin`): tạo và sửa tài khoản, gán phòng ban và vai trò, khoá tài khoản, đặt lại mật
+khẩu, đăng xuất mọi phiên, mở khoá đăng nhập cho tài khoản đang bị tạm khoá sau nhiều lần gõ sai
+(ADR 0028), cùng danh mục phòng ban và vai trò (ADR 0022). CLI `useradm` vẫn giữ vai trò bootstrap và
+là đường phục hồi khi không còn ai đăng nhập được (tạo lại tài khoản quản trị, đổi mật khẩu, gán vai
+trò, mở khoá đăng nhập).
 
 ## 3. HTTPS, bí mật và cấu hình
 
@@ -169,12 +178,26 @@ và ghi lại thời điểm phục hồi vào nhật ký vận hành.
 # Dọn session hết hạn (API không có scheduler; chạy tay hoặc bằng cron trên host)
 docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/useradm -prune-sessions
 
+# Xoá tệp tải lên rồi bỏ dở, không bao giờ gắn vào bản ghi (quá 24 giờ)
+docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/useradm -prune-orphan-attachments
+
+# Xem những địa chỉ đang chờ hết thời gian tạm khoá sau 5 lần sai trong 15 phút
+docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/useradm -list-lockouts
+
+# Mở khoá đăng nhập ngay (sau 5 lần sai trong 15 phút, tài khoản bị tạm khoá 15 phút)
+docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/useradm -unlock -email user@congty.local
+
+# Dọn các lần đăng nhập sai đã hết cửa sổ cooldown
+docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/useradm -prune-login-failures
+
 # Xem tài khoản và role đang có
 docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/useradm -list
 ```
 
 Session hết hạn vốn đã không dùng được (truy vấn lọc theo `expires_at`), nên đây thuần là dọn dẹp —
-nhưng không dọn thì bảng chỉ lớn thêm. Một dòng cron mỗi ngày là đủ.
+nhưng không dọn thì bảng chỉ lớn thêm. Một dòng cron mỗi ngày là đủ. Tệp đính kèm nằm trong PostgreSQL
+(ADR 0025) nên `make backup` phủ luôn chúng: dump sẽ lớn dần theo số tệp, và người dùng tải lên rồi
+bỏ dở được dọn bằng lệnh trên.
 
 Trên môi trường dev, các lần chạy `make smoke-*` để lại object, định nghĩa, instance và tài khoản
 thử nghiệm; sau một ngày chúng đủ để màn Dữ liệu chỉ còn là rác. `make clean-smoke-data` xoá đúng
@@ -187,9 +210,11 @@ muốn dọn ngay. Chạy `make backup` trước nếu muốn có đường lùi
 - [ ] `.env` trên host: `POSTGRES_PASSWORD` đã đổi, `API_ENV=production`, `CORS_ALLOWED_ORIGINS` là
       origin thật.
 - [ ] HTTPS đã dựng trước mặt host (nếu chưa, xem ghi chú ở mục 3 — cookie `Secure` sẽ không được gửi).
-- [ ] Mỗi người dùng thật có tài khoản riêng qua `useradm` (không dùng chung, không dùng tài khoản
-      `seed_*`), và role của họ khớp với role mà quy trình giao việc — mở trang định nghĩa để xem
-      cảnh báo "role chưa có ai giữ".
+- [ ] Mỗi người dùng thật có tài khoản riêng (tạo qua khu vực **Quản trị**, không dùng chung, không
+      dùng tài khoản `seed_*`), và role của họ khớp với role mà quy trình giao việc — mở trang định
+      nghĩa để xem cảnh báo "role chưa có ai giữ".
+- [ ] Tài khoản quản trị đầu tiên được tạo bằng `useradm` và mật khẩu của nó đã đổi; quyền quản trị
+      chỉ giao cho người thật sự cần.
 - [ ] `make backup` chạy thành công và `BACKUP_DIR` trỏ ra **ngoài** host (ổ thứ hai hoặc thư mục
       đồng bộ).
 - [ ] `make restore-drill` **PASS** sau lần thay đổi schema/backup gần nhất.

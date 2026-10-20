@@ -23,6 +23,15 @@ import (
 // the cookie and the session row expire together.
 const SessionTTL = 12 * time.Hour
 
+// Repeated sign-in failures for one address trigger a short cooldown. The response stays
+// the same as a wrong password, so the cooldown is not an account oracle; a successful
+// sign-in clears the count, and the CLI can unlock an address early (ADR 0028).
+const (
+	loginFailureWindow = 15 * time.Minute
+	loginFailureLimit  = 5
+	LoginFailureWindow = loginFailureWindow
+)
+
 const (
 	minPasswordLength = 10
 	maxPasswordLength = 200
@@ -47,6 +56,11 @@ var ErrUnauthorized = errors.New("service: unauthorized")
 // ErrUserNotFound reports that the addressed user does not exist.
 var ErrUserNotFound = errors.New("service: user not found")
 
+// errAccountDisabled is an internal signal: the address exists but the account is off. The
+// caller still answers exactly like a wrong password, but the sign-in counter is left alone,
+// because an account that cannot sign in is not being guessed at.
+var errAccountDisabled = errors.New("service: account disabled")
+
 // identityStore is the persistence the identity service needs.
 type identityStore interface {
 	FindUserByEmail(ctx context.Context, email string) (domain.User, bool, error)
@@ -57,13 +71,20 @@ type identityStore interface {
 	UpsertRoleLabel(ctx context.Context, role string, label string) error
 	CreateUser(ctx context.Context, user domain.User, passwordHash string) (domain.User, error)
 	UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error
+	UpdatePasswordKeepingSession(ctx context.Context, userID uuid.UUID, passwordHash string, keepTokenHash []byte) error
 	FindDepartment(ctx context.Context, key string) (domain.Department, bool, error)
 	AddUserRoles(ctx context.Context, userID uuid.UUID, roles []string) (domain.User, error)
 	EnsureDepartment(ctx context.Context, key string, name string) (domain.Department, error)
 	CreateSession(ctx context.Context, session domain.Session) error
 	FindSession(ctx context.Context, tokenHash []byte, now time.Time) (domain.Session, bool, error)
+	TouchSession(ctx context.Context, tokenHash []byte, expiresAt time.Time) error
 	DeleteSession(ctx context.Context, tokenHash []byte) error
 	DeleteExpiredSessions(ctx context.Context, now time.Time) (int64, error)
+	RecordLoginFailure(ctx context.Context, email string, at time.Time) error
+	CountRecentLoginFailures(ctx context.Context, email string, since time.Time, limit int) (int, error)
+	ClearLoginFailures(ctx context.Context, email string) error
+	ListLockedAddresses(ctx context.Context, since time.Time, limit int) ([]string, error)
+	PruneLoginFailures(ctx context.Context, before time.Time) (int64, error)
 }
 
 // Credentials is what a provider needs to identify a person. Password auth uses
@@ -101,7 +122,12 @@ func (p *LocalProvider) Authenticate(ctx context.Context, credentials Credential
 		VerifyPassword(dummyHash(), credentials.Secret)
 		return domain.User{}, ErrInvalidCredentials
 	}
-	if !user.Active() || !VerifyPassword(user.PasswordHash, credentials.Secret) {
+	if !user.Active() {
+		// The work is still done, so the answer takes the same time as a wrong password.
+		VerifyPassword(dummyHash(), credentials.Secret)
+		return domain.User{}, errAccountDisabled
+	}
+	if !VerifyPassword(user.PasswordHash, credentials.Secret) {
 		return domain.User{}, ErrInvalidCredentials
 	}
 	return user, nil
@@ -157,9 +183,37 @@ func NormalizeEmail(email string) string {
 // Login verifies credentials and opens a session. The returned token is the only
 // copy: only its hash is stored.
 func (s *Identity) Login(ctx context.Context, email string, secret string) (string, domain.User, error) {
-	user, err := s.provider.Authenticate(ctx, Credentials{Email: email, Secret: secret})
+	normalized := NormalizeEmail(email)
+
+	blocked, err := s.loginBlocked(ctx, normalized)
 	if err != nil {
 		return "", domain.User{}, err
+	}
+	if blocked {
+		// Same answer as a wrong password, and the same work: the cooldown must not
+		// reveal that the address exists or that it is temporarily locked.
+		VerifyPassword(dummyHash(), secret)
+		return "", domain.User{}, ErrInvalidCredentials
+	}
+
+	user, err := s.provider.Authenticate(ctx, Credentials{Email: normalized, Secret: secret})
+	if err != nil {
+		switch {
+		case errors.Is(err, errAccountDisabled):
+			// A disabled account cannot be guessed at: the counter stays as it is and the
+			// answer is the same one a wrong password gets.
+			return "", domain.User{}, ErrInvalidCredentials
+		case errors.Is(err, ErrInvalidCredentials):
+			if recordErr := s.store.RecordLoginFailure(ctx, normalized, s.now().UTC()); recordErr != nil {
+				return "", domain.User{}, fmt.Errorf("record login failure: %w", recordErr)
+			}
+		}
+		return "", domain.User{}, err
+	}
+	// A successful sign-in starts the count over. This runs before the session is created:
+	// if it fails, no half-opened login is returned.
+	if err := s.store.ClearLoginFailures(ctx, normalized); err != nil {
+		return "", domain.User{}, fmt.Errorf("clear login failures: %w", err)
 	}
 
 	token, hash, err := newSessionToken()
@@ -204,6 +258,43 @@ func (s *Identity) Authenticate(ctx context.Context, token string) (domain.User,
 	return user, nil
 }
 
+// AuthenticateAndRenew resolves a session like Authenticate and, when less than half of the
+// TTL remains, moves the session's expiry forward. The caller refreshes the cookie so the
+// browser and the row agree; an idle session is not renewed and still ends on schedule.
+// It reports whether the expiry moved.
+func (s *Identity) AuthenticateAndRenew(ctx context.Context, token string) (domain.User, bool, error) {
+	if strings.TrimSpace(token) == "" {
+		return domain.User{}, false, ErrUnauthorized
+	}
+	now := s.now().UTC()
+	hash := sha256.Sum256([]byte(token))
+
+	session, found, err := s.store.FindSession(ctx, hash[:], now)
+	if err != nil {
+		return domain.User{}, false, fmt.Errorf("look up session: %w", err)
+	}
+	if !found {
+		return domain.User{}, false, ErrUnauthorized
+	}
+
+	user, found, err := s.store.FindUserByID(ctx, session.UserID)
+	if err != nil {
+		return domain.User{}, false, fmt.Errorf("look up session user: %w", err)
+	}
+	if !found || !user.Active() {
+		return domain.User{}, false, ErrUnauthorized
+	}
+
+	if session.ExpiresAt.Sub(now) >= SessionTTL/2 {
+		return user, false, nil
+	}
+	expiresAt := now.Add(SessionTTL)
+	if err := s.store.TouchSession(ctx, hash[:], expiresAt); err != nil {
+		return domain.User{}, false, fmt.Errorf("renew session: %w", err)
+	}
+	return user, true, nil
+}
+
 // Logout ends one session. An unknown token is not an error: the caller wanted the
 // session gone and it is.
 func (s *Identity) Logout(ctx context.Context, token string) error {
@@ -212,6 +303,35 @@ func (s *Identity) Logout(ctx context.Context, token string) error {
 	}
 	hash := sha256.Sum256([]byte(token))
 	return s.store.DeleteSession(ctx, hash[:])
+}
+
+// loginBlocked reports whether an address has failed too often inside the window.
+func (s *Identity) loginBlocked(ctx context.Context, email string) (bool, error) {
+	count, err := s.store.CountRecentLoginFailures(ctx, email,
+		s.now().UTC().Add(-loginFailureWindow), loginFailureLimit)
+	if err != nil {
+		return false, fmt.Errorf("count login failures: %w", err)
+	}
+	return count >= loginFailureLimit, nil
+}
+
+// UnlockEmail clears the cooldown of one address. The CLI uses it when a person has been
+// locked out by mistyping or when an account is handed over.
+func (s *Identity) UnlockEmail(ctx context.Context, email string) error {
+	return s.store.ClearLoginFailures(ctx, NormalizeEmail(email))
+}
+
+// LockedEmails lists the addresses that are waiting out a sign-in cooldown right now. The
+// CLI uses it when nobody knows which address is stuck (ADR 0028).
+func (s *Identity) LockedEmails(ctx context.Context) ([]string, error) {
+	return s.store.ListLockedAddresses(
+		ctx, s.now().UTC().Add(-loginFailureWindow), loginFailureLimit)
+}
+
+// PruneLoginFailures removes failures older than the cooldown; they can no longer affect a
+// decision. The CLI runs it, like session pruning.
+func (s *Identity) PruneLoginFailures(ctx context.Context, olderThan time.Duration) (int64, error) {
+	return s.store.PruneLoginFailures(ctx, s.now().UTC().Add(-olderThan))
 }
 
 // CreateUser validates and stores one user (an administrator action, or the CLI
@@ -301,6 +421,37 @@ func (s *Identity) SetPassword(ctx context.Context, email string, password strin
 	}
 	user.PasswordHash = ""
 	return user, nil
+}
+
+// ChangePassword replaces the signed-in person's own password. The current password must be
+// presented and verified first, so a stolen session alone cannot lock the owner out; every
+// other session of that person ends, while the session making the request keeps working.
+func (s *Identity) ChangePassword(ctx context.Context, token string, current string, next string) error {
+	user, err := s.Authenticate(ctx, token)
+	if err != nil {
+		return err
+	}
+	if !VerifyPassword(user.PasswordHash, current) {
+		return &ValidationError{Problems: []string{"currentPassword: is not the current password"}}
+	}
+
+	problems := validatePassword(next)
+	if next == current {
+		problems = append(problems, "newPassword: must be different from the current password")
+	}
+	if len(problems) > 0 {
+		return &ValidationError{Problems: problems}
+	}
+
+	hash, err := HashPassword(next)
+	if err != nil {
+		return fmt.Errorf("hash password: %w", err)
+	}
+	keep := sha256.Sum256([]byte(token))
+	if err := s.store.UpdatePasswordKeepingSession(ctx, user.ID, hash, keep[:]); err != nil {
+		return fmt.Errorf("change password: %w", err)
+	}
+	return nil
 }
 
 // AddRoles grants roles to an existing user and returns the updated user. Roles are

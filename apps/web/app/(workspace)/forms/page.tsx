@@ -32,8 +32,8 @@ const PLANNED_CAPABILITIES: readonly { title: string; body: string }[] = [
     body: 'Gợi ý dữ liệu từ hệ thống ngoài (danh mục nhà cung cấp, mã nhân viên) thuộc phạm vi Integration Hub.',
   },
   {
-    title: 'Upload tệp và repeating rows dạng bảng',
-    body: 'Trường tệp cần object storage; rows trong V1 nhập mỗi dòng một mục.',
+    title: 'Dòng lặp dạng bảng',
+    body: 'Mỗi mục của trường danh sách hiện nhập một dòng. Bảng có nút thêm và xoá dòng sẽ làm ở phiên bản sau.',
   },
 ];
 

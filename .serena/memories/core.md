@@ -55,8 +55,12 @@ open playbook decision), OIDC when the organisation has an IdP, and drag-and-dro
   (simulated), `concept` (vision). ADR 0002; where a screen mixes live and simulated parts,
   each part is labeled (ADR 0003).
 - Live slices are business object definitions and their records (schema → generated form →
-  service validation → JSONB), sign-in/permissions (ADR 0008) and the task inbox with its
-  approve/return/reject decisions (ADR 0007). Still fixtures: the workflow designer screen,
+  service validation → JSONB), including a record's own screen with edit/delete under the write
+  rule (ADR 0023), CSV export (ADR 0024) and import (ADR 0026), file attachments (ADR 0025), the
+  per-field change history (ADR 0027) and the sign-in cooldown (ADR 0028), sign-in/permissions
+  (ADR 0008), organisation administration
+  (`/admin` + `/api/v1/admin/*`: users, departments, the role catalogue — ADR 0022) and the task
+  inbox with its approve/return/reject decisions (ADR 0007). Still fixtures: the workflow designer screen,
   Analytics numbers and the kanban/connector panels (ADR 0003, updated 2026-10-14).
 - Applied migrations are immutable: the runner verifies sha256 per version and refuses a changed
   file. A feature adds a new migration; it never edits an applied one.

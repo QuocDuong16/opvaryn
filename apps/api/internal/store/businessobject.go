@@ -114,6 +114,28 @@ func (s *Store) ListBusinessObjectVersions(ctx context.Context, objectID uuid.UU
 	return versions, nil
 }
 
+// FindBusinessObjectVersion returns one published version by id. Updating a record needs it
+// to validate new values against the schema the record was created under, never the newest
+// one (ADR 0006).
+func (s *Store) FindBusinessObjectVersion(
+	ctx context.Context,
+	versionID uuid.UUID,
+) (domain.BusinessObjectVersion, bool, error) {
+	row := s.pool.QueryRow(ctx, `
+		SELECT `+businessObjectVersionColumns+`
+		  FROM business_object_versions
+		 WHERE id = $1`, versionID)
+
+	version, err := scanBusinessObjectVersion(row)
+	if err != nil {
+		if errors.Is(err, pgx.ErrNoRows) {
+			return domain.BusinessObjectVersion{}, false, nil
+		}
+		return domain.BusinessObjectVersion{}, false, classify(err)
+	}
+	return version, true, nil
+}
+
 // CreateBusinessObject inserts a definition and publishes its first version in one
 // transaction. It returns ErrConflict when the key already exists.
 func (s *Store) CreateBusinessObject(ctx context.Context, object domain.BusinessObject) (domain.BusinessObject, error) {

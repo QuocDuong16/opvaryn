@@ -4,6 +4,7 @@ import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import type { BusinessObject } from '@opvaryn/contracts';
 
+import { OPERATOR_LABELS } from '@/lib/names';
 import { createMetricAction } from '@/app/(workspace)/analytics/actions';
 import { INITIAL_CREATE_METRIC_STATE } from '@/components/analytics/create-metric-state';
 import { cn } from '@/lib/utils';
@@ -19,16 +20,6 @@ const AGGREGATIONS = [
 ] as const;
 
 const OPERATORS = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte'] as const;
-
-/** OPERATOR_LABELS names the comparisons the way a person reads them (ADR 0018). */
-const OPERATOR_LABELS: Record<(typeof OPERATORS)[number], string> = {
-  eq: 'bằng',
-  ne: 'khác',
-  gt: 'lớn hơn',
-  gte: 'từ',
-  lt: 'nhỏ hơn',
-  lte: 'đến',
-};
 
 /**
  * CreateMetricForm builds a metric from the object's own fields: the aggregation, an

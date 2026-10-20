@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"fmt"
 	"sort"
+	"strconv"
 	"strings"
 	"time"
 
@@ -22,6 +23,7 @@ const (
 // recordStore is the slice of the persistence layer this service needs.
 type recordStore interface {
 	GetBusinessObjectByKey(ctx context.Context, key string) (domain.BusinessObject, error)
+	ListBusinessObjectVersions(ctx context.Context, objectID uuid.UUID) ([]domain.BusinessObjectVersion, error)
 	ListObjectRecords(
 		ctx context.Context,
 		objectID uuid.UUID,
@@ -29,7 +31,44 @@ type recordStore interface {
 		query string,
 		page domain.Page,
 	) (domain.Paged[domain.ObjectRecord], error)
-	CreateObjectRecord(ctx context.Context, record domain.ObjectRecord, projection []domain.RecordFieldValue) (domain.ObjectRecord, error)
+	CreateObjectRecord(
+		ctx context.Context,
+		record domain.ObjectRecord,
+		projection []domain.RecordFieldValue,
+		bindings []domain.AttachmentBinding,
+		audit domain.RecordAudit,
+		admin bool,
+	) (domain.ObjectRecord, error)
+	CreateObjectRecords(
+		ctx context.Context,
+		records []domain.ObjectRecord,
+		projections [][]domain.RecordFieldValue,
+		audits []domain.RecordAudit,
+	) error
+	FindVisibleObjectRecord(ctx context.Context, id uuid.UUID, scope domain.RecordScope) (domain.ObjectRecord, bool, error)
+	FindBusinessObjectVersion(ctx context.Context, versionID uuid.UUID) (domain.BusinessObjectVersion, bool, error)
+	UpdateObjectRecord(
+		ctx context.Context,
+		record domain.ObjectRecord,
+		projection []domain.RecordFieldValue,
+		fileFieldKeys []string,
+		bindings []domain.AttachmentBinding,
+		editorID uuid.UUID,
+		audit domain.RecordAudit,
+		admin bool,
+	) (domain.ObjectRecord, error)
+	DeleteObjectRecord(ctx context.Context, id uuid.UUID, audit domain.RecordAudit) error
+	ListRecordAudit(ctx context.Context, recordID uuid.UUID, page domain.Page) (domain.Paged[domain.RecordAudit], error)
+	FindAttachmentForBinding(
+		ctx context.Context,
+		id uuid.UUID,
+		objectKey string,
+		recordID uuid.UUID,
+		uploaderID uuid.UUID,
+		admin bool,
+	) (bool, error)
+	ListAttachmentNames(ctx context.Context, recordID uuid.UUID) (map[string]string, error)
+	ListAttachmentNamesForRecords(ctx context.Context, recordIDs []uuid.UUID) (map[uuid.UUID]map[string]string, error)
 }
 
 // ObjectRecords stores and lists records of business object definitions. Every
@@ -79,6 +118,62 @@ func (s *ObjectRecords) List(
 	return records, nil
 }
 
+// Export returns the records of the addressed object the caller may read as a CSV file. It
+// uses the same scope and search as the list, and refuses a file larger than MaxExportRows
+// instead of shipping an unbounded response.
+func (s *ObjectRecords) Export(
+	ctx context.Context,
+	objectKey string,
+	principal domain.Principal,
+	query string,
+) ([]byte, error) {
+	if err := requireAuthenticated(principal); err != nil {
+		return nil, err
+	}
+	query = strings.TrimSpace(query)
+	if len(query) > maxSearchLength {
+		return nil, &ValidationError{
+			Problems: []string{fmt.Sprintf("q: must be at most %d characters", maxSearchLength)},
+		}
+	}
+	object, err := s.lookup(ctx, objectKey)
+	if err != nil {
+		return nil, err
+	}
+
+	page, err := s.store.ListObjectRecords(
+		ctx, object.ID, domain.RecordScopeFor(principal), query,
+		domain.Page{Limit: MaxExportRows + 1})
+	if err != nil {
+		return nil, err
+	}
+	if page.Total > MaxExportRows {
+		return nil, &ValidationError{Problems: []string{fmt.Sprintf(
+			"export: the list has %d rows and the maximum is %d; narrow the search",
+			page.Total, MaxExportRows)}}
+	}
+
+	// The columns come from every published version: a record created under an older schema
+	// is exported with the fields that schema had, not the newest one.
+	versions, err := s.store.ListBusinessObjectVersions(ctx, object.ID)
+	if err != nil {
+		return nil, err
+	}
+	// One batch read of file names, so a spreadsheet shows "báo giá.pdf" and not an id.
+	ids := make([]uuid.UUID, len(page.Items))
+	for i, record := range page.Items {
+		ids[i] = record.ID
+	}
+	names, err := s.store.ListAttachmentNamesForRecords(ctx, ids)
+	if err != nil {
+		return nil, err
+	}
+	for i := range page.Items {
+		page.Items[i].AttachmentNames = names[page.Items[i].ID]
+	}
+	return encodeRecordsCSV(versions, page.Items)
+}
+
 // Create validates values against the addressed definition and stores one record.
 func (s *ObjectRecords) Create(ctx context.Context, objectKey string, values map[string]any, principal domain.Principal) (domain.ObjectRecord, error) {
 	if err := requireAuthenticated(principal); err != nil {
@@ -106,7 +201,21 @@ func (s *ObjectRecords) Create(ctx context.Context, objectKey string, values map
 		DepartmentKey: principal.DepartmentKey,
 	}
 
-	created, err := s.store.CreateObjectRecord(ctx, record, projectRecordValues(object.Fields, record.Values))
+	bindings, _, err := s.fileBindings(ctx, object.Key, object.Fields, record.Values,
+		uuid.Nil, principal)
+	if err != nil {
+		return domain.ObjectRecord{}, err
+	}
+
+	created, err := s.store.CreateObjectRecord(ctx, record,
+		projectRecordValues(object.Fields, record.Values), bindings,
+		domain.RecordAudit{
+			RecordID:  record.ID,
+			ObjectKey: record.ObjectKey,
+			ActorID:   principal.UserID,
+			ActorName: principal.Name,
+			Action:    domain.RecordCreated,
+		}, principal.IsAdmin())
 	if err != nil {
 		return domain.ObjectRecord{}, err
 	}
@@ -115,6 +224,342 @@ func (s *ObjectRecords) Create(ctx context.Context, objectKey string, values map
 	created.ObjectKey = object.Key
 	created.ObjectVersion = object.Version
 	return created, nil
+}
+
+// Get returns one record of the addressed object that the caller may read. A record that is
+// hidden by the scope is reported as missing, never as forbidden: the API does not confirm
+// that a record the caller cannot read exists (ADR 0008).
+func (s *ObjectRecords) Get(
+	ctx context.Context,
+	objectKey string,
+	recordID uuid.UUID,
+	principal domain.Principal,
+) (domain.ObjectRecord, error) {
+	if err := requireAuthenticated(principal); err != nil {
+		return domain.ObjectRecord{}, err
+	}
+	record, err := s.getVisible(ctx, objectKey, recordID, principal)
+	if err != nil {
+		return domain.ObjectRecord{}, err
+	}
+	names, err := s.store.ListAttachmentNames(ctx, record.ID)
+	if err != nil {
+		return domain.ObjectRecord{}, err
+	}
+	record.AttachmentNames = names
+	return record, nil
+}
+
+// Update replaces one record's values. They are validated against the field definitions of
+// the version the record was created under — not the newest definition — and the typed
+// projection is rewritten with them, so a metric sees the same values the record shows.
+func (s *ObjectRecords) Update(
+	ctx context.Context,
+	objectKey string,
+	recordID uuid.UUID,
+	values map[string]any,
+	principal domain.Principal,
+) (domain.ObjectRecord, error) {
+	if err := requireAuthenticated(principal); err != nil {
+		return domain.ObjectRecord{}, err
+	}
+	record, err := s.getVisible(ctx, objectKey, recordID, principal)
+	if err != nil {
+		return domain.ObjectRecord{}, err
+	}
+	if !CanWriteRecord(principal, record) {
+		return domain.ObjectRecord{}, fmt.Errorf(
+			"%w: changing this record needs the %s role, its creator or its department",
+			ErrForbidden, domain.RoleAdmin)
+	}
+
+	version, found, err := s.store.FindBusinessObjectVersion(ctx, record.ObjectVersionID)
+	if err != nil {
+		return domain.ObjectRecord{}, fmt.Errorf("look up record version: %w", err)
+	}
+	if !found {
+		return domain.ObjectRecord{}, fmt.Errorf("%w: record version %s", ErrNotFound, record.ObjectVersionID)
+	}
+
+	// The version is the schema this record is read with, so it is also the schema its
+	// values are validated against (ADR 0006 invariant 1).
+	object := domain.BusinessObject{
+		ID:     record.ObjectID,
+		Key:    record.ObjectKey,
+		Fields: version.Fields,
+	}
+	if problems := validateRecordValues(object, values); len(problems) > 0 {
+		return domain.ObjectRecord{}, &ValidationError{Problems: problems}
+	}
+	previous := record.Values
+	record.Values = normalizeRecordValues(object, values)
+	changes := recordChanges(previous, record.Values, object.Fields)
+
+	bindings, fileFieldKeys, err := s.fileBindings(ctx, object.Key, object.Fields,
+		record.Values, record.ID, principal)
+	if err != nil {
+		return domain.ObjectRecord{}, err
+	}
+	audit := domain.RecordAudit{
+		RecordID:  record.ID,
+		ObjectKey: record.ObjectKey,
+		ActorID:   principal.UserID,
+		ActorName: principal.Name,
+	}
+	if len(changes) > 0 {
+		audit.Action = domain.RecordUpdated
+		audit.Changes = changes
+	}
+	updated, err := s.store.UpdateObjectRecord(ctx, record,
+		projectRecordValues(object.Fields, record.Values),
+		fileFieldKeys, bindings, principal.UserID, audit, principal.IsAdmin())
+	if err != nil {
+		return domain.ObjectRecord{}, err
+	}
+	names, err := s.store.ListAttachmentNames(ctx, updated.ID)
+	if err != nil {
+		return domain.ObjectRecord{}, err
+	}
+	updated.AttachmentNames = names
+	return updated, nil
+}
+
+// Delete removes a record that no process has run on. The same people who may change a
+// record may delete it; a record with a run is refused by the store with ErrInUse.
+func (s *ObjectRecords) Delete(
+	ctx context.Context,
+	objectKey string,
+	recordID uuid.UUID,
+	principal domain.Principal,
+) error {
+	if err := requireAuthenticated(principal); err != nil {
+		return err
+	}
+	record, err := s.getVisible(ctx, objectKey, recordID, principal)
+	if err != nil {
+		return err
+	}
+	if !CanWriteRecord(principal, record) {
+		return fmt.Errorf(
+			"%w: deleting this record needs the %s role, its creator or its department",
+			ErrForbidden, domain.RoleAdmin)
+	}
+	return s.store.DeleteObjectRecord(ctx, recordID, domain.RecordAudit{
+		RecordID:  record.ID,
+		ObjectKey: record.ObjectKey,
+		ActorID:   principal.UserID,
+		ActorName: principal.Name,
+		Action:    domain.RecordDeleted,
+	})
+}
+
+// getVisible reads one record and refuses one that belongs to a different object: the key in
+// the path and the record's own object must agree, otherwise a record could be edited
+// through an unrelated definition's address.
+func (s *ObjectRecords) getVisible(
+	ctx context.Context,
+	objectKey string,
+	recordID uuid.UUID,
+	principal domain.Principal,
+) (domain.ObjectRecord, error) {
+	record, found, err := s.store.FindVisibleObjectRecord(
+		ctx, recordID, domain.RecordScopeFor(principal))
+	if err != nil {
+		return domain.ObjectRecord{}, err
+	}
+	if !found || record.ObjectKey != objectKey {
+		return domain.ObjectRecord{}, fmt.Errorf("record %s: %w", recordID, ErrNotFound)
+	}
+	return record, nil
+}
+
+// History returns one page of a record's change history, with labels and values rendered
+// for a person. It uses the same visibility as reading the record (ADR 0008).
+func (s *ObjectRecords) History(
+	ctx context.Context,
+	objectKey string,
+	recordID uuid.UUID,
+	principal domain.Principal,
+	opts ListOptions,
+) (domain.Paged[domain.RecordHistoryEntry], error) {
+	if err := requireAuthenticated(principal); err != nil {
+		return domain.Paged[domain.RecordHistoryEntry]{}, err
+	}
+	opts, err := opts.normalized()
+	if err != nil {
+		return domain.Paged[domain.RecordHistoryEntry]{}, err
+	}
+	record, err := s.getVisible(ctx, objectKey, recordID, principal)
+	if err != nil {
+		return domain.Paged[domain.RecordHistoryEntry]{}, err
+	}
+	version, found, err := s.store.FindBusinessObjectVersion(ctx, record.ObjectVersionID)
+	if err != nil {
+		return domain.Paged[domain.RecordHistoryEntry]{}, fmt.Errorf("look up record version: %w", err)
+	}
+	if !found {
+		return domain.Paged[domain.RecordHistoryEntry]{}, fmt.Errorf(
+			"%w: record version %s", ErrNotFound, record.ObjectVersionID)
+	}
+
+	page, err := s.store.ListRecordAudit(ctx, record.ID, opts.Page)
+	if err != nil {
+		return domain.Paged[domain.RecordHistoryEntry]{}, err
+	}
+	fields := fieldIndex(version.Fields)
+	entries := make([]domain.RecordHistoryEntry, len(page.Items))
+	for i, audit := range page.Items {
+		changes := make([]domain.RecordHistoryChange, len(audit.Changes))
+		for j, change := range audit.Changes {
+			field, known := fields[change.Field]
+			label := change.Field
+			if known {
+				label = fieldLabel(field)
+			}
+			changes[j] = domain.RecordHistoryChange{
+				FieldLabel: label,
+				From:       formatAuditValue(field, change.From),
+				To:         formatAuditValue(field, change.To),
+			}
+		}
+		entries[i] = domain.RecordHistoryEntry{
+			ID:        audit.ID,
+			Action:    audit.Action,
+			ActorName: audit.ActorName,
+			Changes:   changes,
+			CreatedAt: audit.CreatedAt,
+		}
+	}
+	return domain.Paged[domain.RecordHistoryEntry]{Items: entries, Total: page.Total}, nil
+}
+
+// recordChanges lists the fields whose stored value changed, comparing the canonical JSON of
+// both sides so a []any from JSONB and a []string from normalization compare equal.
+func recordChanges(
+	previous map[string]any,
+	next map[string]any,
+	fields []domain.FieldDefinition,
+) []domain.RecordChange {
+	changes := make([]domain.RecordChange, 0)
+	for _, field := range fields {
+		from, hadFrom := previous[field.Key]
+		to, hasTo := next[field.Key]
+		if !hadFrom && !hasTo {
+			continue
+		}
+		if hadFrom && hasTo && sameJSON(from, to) {
+			continue
+		}
+		change := domain.RecordChange{Field: field.Key}
+		if hadFrom {
+			change.From = from
+		}
+		if hasTo {
+			change.To = to
+		}
+		changes = append(changes, change)
+	}
+	return changes
+}
+
+func sameJSON(left any, right any) bool {
+	encodedLeft, errLeft := json.Marshal(left)
+	encodedRight, errRight := json.Marshal(right)
+	return errLeft == nil && errRight == nil && string(encodedLeft) == string(encodedRight)
+}
+
+// formatAuditValue renders one side of a change for the history screen. A file is named by
+// what it is, not by its stored identifier.
+func formatAuditValue(field domain.FieldDefinition, value any) string {
+	if value == nil {
+		return ""
+	}
+	switch field.Type {
+	case domain.FieldTypeNumber:
+		if number, ok := numberValue(value); ok {
+			return strconv.FormatFloat(number, 'f', -1, 64)
+		}
+	case domain.FieldTypeSelect:
+		text, _ := value.(string)
+		for _, option := range field.Options {
+			if option.Value == text {
+				return option.Label
+			}
+		}
+	case domain.FieldTypeRows:
+		return strings.Join(rowItems(value), ", ")
+	case domain.FieldTypeFile:
+		return "Tệp đính kèm"
+	}
+	return fmt.Sprint(value)
+}
+
+// fileBindings checks the file fields of a write and returns the attachments to bind plus
+// the file field keys the update needs to remove replaced files. A file value is the
+// identifier of an upload; only the uploader (or an administrator) may bind it, and only
+// while it is unbound or already part of this record.
+func (s *ObjectRecords) fileBindings(
+	ctx context.Context,
+	objectKey string,
+	fields []domain.FieldDefinition,
+	values map[string]any,
+	recordID uuid.UUID,
+	principal domain.Principal,
+) ([]domain.AttachmentBinding, []string, error) {
+	bindings := make([]domain.AttachmentBinding, 0)
+	fileFieldKeys := make([]string, 0)
+	problems := make([]string, 0)
+
+	for _, field := range fields {
+		if field.Type != domain.FieldTypeFile {
+			continue
+		}
+		fileFieldKeys = append(fileFieldKeys, field.Key)
+
+		raw, present := values[field.Key]
+		if !present {
+			continue
+		}
+		text, ok := raw.(string)
+		if !ok {
+			continue
+		}
+		id, err := uuid.Parse(strings.TrimSpace(text))
+		if err != nil {
+			problems = append(problems,
+				fmt.Sprintf("values.%s: must be an uploaded file", field.Key))
+			continue
+		}
+		found, err := s.store.FindAttachmentForBinding(
+			ctx, id, objectKey, recordID, principal.UserID, principal.IsAdmin())
+		if err != nil {
+			return nil, nil, fmt.Errorf("look up attachment %s: %w", id, err)
+		}
+		if !found {
+			problems = append(problems, fmt.Sprintf(
+				"values.%s: the file is missing or was uploaded by somebody else", field.Key))
+			continue
+		}
+		bindings = append(bindings, domain.AttachmentBinding{ID: id, FieldKey: field.Key})
+	}
+	if len(problems) > 0 {
+		return nil, nil, &ValidationError{Problems: problems}
+	}
+	return bindings, fileFieldKeys, nil
+}
+
+// CanWriteRecord is the write rule of ADR 0023: an administrator, the person who created
+// the record, or a member of the record's department. A caller who can read a record only
+// through an open task (a cross-department approver) may decide the task but not rewrite
+// the request.
+func CanWriteRecord(principal domain.Principal, record domain.ObjectRecord) bool {
+	if principal.IsAdmin() {
+		return true
+	}
+	if record.CreatedBy != uuid.Nil && record.CreatedBy == principal.UserID {
+		return true
+	}
+	return record.DepartmentKey != "" && record.DepartmentKey == principal.DepartmentKey
 }
 
 // projectRecordValues turns stored values into the typed projection metrics read
@@ -229,13 +674,22 @@ func validateFieldValue(field domain.FieldDefinition, value any) string {
 	where := "values." + field.Key
 
 	switch field.Type {
-	case domain.FieldTypeText, domain.FieldTypeFile:
+	case domain.FieldTypeText:
 		text, ok := value.(string)
 		if !ok {
 			return fmt.Sprintf("%s: must be a string", where)
 		}
 		if len(text) > maxRecordTextLength {
 			return fmt.Sprintf("%s: must be at most %d characters", where, maxRecordTextLength)
+		}
+
+	case domain.FieldTypeFile:
+		text, ok := value.(string)
+		if !ok {
+			return fmt.Sprintf("%s: must be an uploaded file", where)
+		}
+		if _, err := uuid.Parse(strings.TrimSpace(text)); err != nil {
+			return fmt.Sprintf("%s: must be an uploaded file", where)
 		}
 
 	case domain.FieldTypeNumber:

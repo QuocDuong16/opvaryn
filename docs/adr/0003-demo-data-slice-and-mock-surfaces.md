@@ -1,9 +1,9 @@
 # 0003 — Lát cắt dữ liệu của demo: bản ghi business object và phân chia live/mock
 
 - **Ngày**: 2026-10-13
-- **Trạng thái**: Accepted (phạm vi bản demo); **mục 4 đã được thay thế** — Task Inbox giờ là `live`
-  trên workflow runtime thật (ADR 0005/0007) và đăng nhập theo người (ADR 0008). Workflow designer
-  và Analytics vẫn là màn hình mô phỏng như mục 4 mô tả.
+- **Trạng thái**: Accepted (phạm vi bản demo); **mục 3 và 4 đã được thay thế** — Task Inbox, Workflow
+  designer và Analytics giờ là `live` trên workflow runtime thật (ADR 0005/0007/0013), đăng nhập theo
+  người (ADR 0008) và read model có kiểu (ADR 0010). Upload tệp cũng đã `live` (ADR 0025).
 - **Liên quan**: [0002](0002-demo-scope-and-labels.md), playbook `demo-mvp.html` (kế hoạch 8 tuần),
   `modules.html` mục 01–07, `architecture.html` mục 04
 
@@ -28,10 +28,14 @@ Giới hạn đã biết: Process Execution Contract (D05/D08) cùng Rule DSL (D
    sửa schema sau khi tạo (thuộc MVP) nên một object đã tồn tại với schema khác sẽ không được seed
    bản ghi — script seed cảnh báo thay vì fail.
 3. **Form Builder là thật ở phần nhập liệu**: form nhập bản ghi được sinh trực tiếp từ schema và
-   dùng chung một component giữa màn hình object detail và trang Forms. Điều kiện hiển thị,
-   calculated field, upload tệp và lookup ngoài vẫn là `concept` vì phụ thuộc D04/D05 và object
-   storage.
-4. **Workflow, Task Inbox và Analytics là màn hình mô phỏng**: sơ đồ quy trình, inbox và dashboard
+   dùng chung một component giữa màn hình object detail và trang Forms. ~~Điều kiện hiển thị,
+   calculated field, upload tệp và lookup ngoài vẫn là `concept`~~ — **upload tệp đã `live`**
+   (ADR 0025: tệp nằm trong PostgreSQL, tải về luôn ở dạng tệp đính kèm); điều kiện hiển thị,
+   calculated field và lookup ngoài vẫn là `concept`.
+4. ~~**Workflow, Task Inbox và Analytics là màn hình mô phỏng**~~ **[Đã thay thế]**: cả ba đã là
+   `live` — quy trình, hộp việc và báo cáo đọc từ runtime và read model thật (ADR 0005/0007/0010).
+   Mô phỏng còn lại chỉ là bảng kanban và panel kết nối trong màn Ứng dụng. Bản gốc của mục này:
+   sơ đồ quy trình, inbox và dashboard
    đọc từ fixture trong mã nguồn web; thao tác duyệt/trả về/từ chối chỉ đổi state trong trình duyệt
    (reducer thuần, có unit test). Không có bảng process/task/event, không có state machine — đúng
    giới hạn ADR 0002.
@@ -52,5 +56,6 @@ Giới hạn đã biết: Process Execution Contract (D05/D08) cùng Rule DSL (D
   lời ở bất kỳ màn hình nào; người trình bày phải nói rõ khi dùng Tasks/Analytics.
 - Migration `0002_business_object_records.sql` đã áp dụng là bất biến. Khi runtime workflow bắt đầu,
   nó cần migration mới và một ADR mô tả execution contract đã chốt.
-- Read model có kiểu cho metric vẫn là việc của MVP: hiện chưa có projection từ `values` sang cột
-  hoặc bảng đo lường (bất biến 5).
+- ~~Read model có kiểu cho metric vẫn là việc của MVP: hiện chưa có projection từ `values` sang cột
+  hoặc bảng đo lường (bất biến 5)~~ — **đã có**: bảng `record_field_values` giữ projection có kiểu
+  (ADR 0010).

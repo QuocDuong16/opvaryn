@@ -25,6 +25,7 @@ function record(objectVersion: number, id = `r-${objectVersion}-${Math.random()}
     objectKey: 'purchase_request',
     objectVersion,
     values: { [`field_v${objectVersion}`]: `giá trị v${objectVersion}` },
+    canEdit: false,
     createdAt: '2026-10-13T12:00:00Z',
     updatedAt: '2026-10-13T12:00:00Z',
   };
@@ -79,12 +80,12 @@ describe('recordLabels', () => {
     expect(labels).toEqual({ old: 'giá trị v1', new: 'giá trị v2' });
   });
 
-  it('falls back to the record id when the version or a text field is missing', () => {
+  it('says the record has no name instead of printing its id', () => {
     const versions = [version(2)];
     const orphan = { ...record(9, 'orphan'), values: {} };
     const labels = recordLabels([orphan], versions);
 
-    expect(labels.orphan).toBe('orphan');
+    expect(labels.orphan).toBe('Bản ghi chưa có tên');
   });
 
   it('finds a version by number', () => {

@@ -36,6 +36,7 @@ export function ProcessCanvas({
   version,
   label,
   roleLabels = {},
+  fieldLabels = {},
 }: {
   graph: ProcessGraph;
   version: number;
@@ -43,8 +44,16 @@ export function ProcessCanvas({
   label: string;
   /** Role key to display name; a role nobody has named keeps its key. */
   roleLabels?: Record<string, string>;
+  /** Field key to display name; a condition reads the name, not the key. */
+  fieldLabels?: Record<string, string>;
 }) {
   const layout = layoutGraph(graph);
+  // The canvas names the things a step mentions: the role it belongs to, the field a
+  // condition compares (ADR 0016, ADR 0018).
+  const nodeLabels = {
+    roles: new Map(Object.entries(roleLabels)),
+    fields: new Map(Object.entries(fieldLabels)),
+  };
   const [selectedKey, setSelectedKey] = useState(graph.nodes[0]?.key ?? '');
   const selected = layout.nodes.find((item) => item.node.key === selectedKey) ?? layout.nodes[0];
 
@@ -149,7 +158,7 @@ export function ProcessCanvas({
                     {clipTitle(node.title)}
                   </text>
                   <text x={x + 12} y={y + 41} className="fill-on-surface-muted text-[10px]">
-                    {nodeSubtitle(node)}
+                    {nodeSubtitle(node, nodeLabels)}
                   </text>
                 </g>
               );
@@ -224,7 +233,7 @@ export function ProcessCanvas({
                   Điều kiện
                 </dt>
                 <dd className="mt-0.5 font-mono text-sm">
-                  {conditionSummary(selected.node.condition)}
+                  {conditionSummary(selected.node.condition, nodeLabels)}
                 </dd>
               </div>
             ) : null}

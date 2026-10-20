@@ -2,9 +2,13 @@
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import type { BusinessObject, FieldDefinition } from '@opvaryn/contracts';
+import type { BusinessObject, FieldDefinition, ObjectRecord } from '@opvaryn/contracts';
 
-import { createObjectRecordAction } from '@/app/(workspace)/objects/actions';
+import {
+  createObjectRecordAction,
+  updateObjectRecordAction,
+} from '@/app/(workspace)/objects/actions';
+import { FileField } from '@/components/forms/file-field';
 import { INITIAL_CREATE_RECORD_STATE } from '@/components/forms/object-form-state';
 
 const INPUT_CLASS =
@@ -13,32 +17,49 @@ const INPUT_CLASS =
 
 /**
  * ObjectForm is the data-entry form generated from a business object schema. It is
- * the same component behind the object detail screen and the Forms preview, so
- * what the Form Builder shows is exactly what a user fills in.
+ * the same component behind the object detail screen, the Forms preview and the record
+ * edit page, so what the Form Builder shows is exactly what a user fills in.
+ *
+ * Pass `record` to edit an existing record: the fields come from the version that record
+ * was created under, and the values are prefilled from it.
  */
-export function ObjectForm({ object }: { object: BusinessObject }) {
-  const [state, formAction] = useActionState(createObjectRecordAction, INITIAL_CREATE_RECORD_STATE);
+export function ObjectForm({ object, record }: { object: BusinessObject; record?: ObjectRecord }) {
+  const [state, formAction] = useActionState(
+    record ? updateObjectRecordAction : createObjectRecordAction,
+    INITIAL_CREATE_RECORD_STATE,
+  );
 
   return (
     <form
-      key={state.recordId ?? 'initial'}
+      key={record?.id ?? state.recordId ?? 'initial'}
       action={formAction}
       className="space-y-4"
-      aria-label={`Nhập bản ghi ${object.name}`}
+      aria-label={record ? `Sửa bản ghi ${object.name}` : `Nhập bản ghi ${object.name}`}
     >
       <input type="hidden" name="objectKey" value={object.key} />
+      {record ? <input type="hidden" name="recordId" value={record.id} /> : null}
 
       {object.fields.map((field) => (
-        <FieldControl key={field.key} field={field} />
+        <FieldControl
+          key={field.key}
+          field={field}
+          objectKey={object.key}
+          defaultValue={record?.values[field.key]}
+          attachmentNames={record?.attachmentNames}
+        />
       ))}
 
       {object.fields.length === 0 ? (
         <p className="rounded-lg border border-dashed border-border-strong px-3 py-2 text-sm text-on-surface-muted">
-          Object chưa có field nào nên chưa có gì để nhập. Bổ sung field trong schema ở cột bên.
+          Loại dữ liệu này chưa có trường nào nên chưa có gì để nhập. Thêm trường trong phần định
+          nghĩa ở cột bên.
         </p>
       ) : null}
 
-      <SubmitButton disabled={object.fields.length === 0} />
+      <SubmitButton
+        disabled={object.fields.length === 0}
+        label={record ? 'Lưu thay đổi' : 'Lưu bản ghi'}
+      />
 
       {state.status === 'error' && state.message ? (
         <p
@@ -60,9 +81,20 @@ export function ObjectForm({ object }: { object: BusinessObject }) {
   );
 }
 
-function FieldControl({ field }: { field: FieldDefinition }) {
+function FieldControl({
+  field,
+  objectKey,
+  defaultValue,
+  attachmentNames,
+}: {
+  field: FieldDefinition;
+  objectKey: string;
+  defaultValue?: unknown;
+  attachmentNames?: Record<string, string>;
+}) {
   const controlId = `field-${field.key}`;
   const describedBy = `field-${field.key}-hint`;
+  const attachmentId = typeof defaultValue === 'string' ? defaultValue : '';
 
   return (
     <div>
@@ -75,7 +107,21 @@ function FieldControl({ field }: { field: FieldDefinition }) {
         ) : null}
       </label>
 
-      {renderControl(field, controlId, describedBy)}
+      {field.type === 'file' ? (
+        <div className="mt-1.5">
+          <FileField
+            objectKey={objectKey}
+            field={field}
+            initial={
+              attachmentId
+                ? { id: attachmentId, fileName: attachmentNames?.[field.key] ?? 'Tệp đính kèm' }
+                : undefined
+            }
+          />
+        </div>
+      ) : (
+        renderControl(field, controlId, describedBy, defaultValue)
+      )}
 
       {/* The key stays in the API payload; a person filling the form needs the rule, not
           the column name (ADR 0016). Only hints that change what they type are shown. */}
@@ -103,13 +149,34 @@ function fieldHint(field: FieldDefinition): string {
     case 'date':
       return 'Chọn ngày.';
     case 'file':
-      return 'Chưa hỗ trợ tệp đính kèm trong bản này.';
+      return 'Tối đa 10 MB. Tệp luôn được tải về, không mở trực tiếp trong trình duyệt.';
     default:
       return '';
   }
 }
 
-function renderControl(field: FieldDefinition, controlId: string, describedBy: string) {
+/**
+ * defaultValue renders a stored value back into the control it came from: a select gets
+ * the stored option value, a rows field one item per line, everything else its text form.
+ */
+function defaultValueFor(field: FieldDefinition, value: unknown): string {
+  if (value === undefined || value === null) {
+    return '';
+  }
+  if (field.type === 'rows' && Array.isArray(value)) {
+    return value.map((item) => String(item)).join('\n');
+  }
+  return String(value);
+}
+
+function renderControl(
+  field: FieldDefinition,
+  controlId: string,
+  describedBy: string,
+  defaultValue?: unknown,
+) {
+  const initial = defaultValueFor(field, defaultValue);
+
   switch (field.type) {
     case 'number':
       return (
@@ -118,6 +185,7 @@ function renderControl(field: FieldDefinition, controlId: string, describedBy: s
           name={field.key}
           type="number"
           step="any"
+          defaultValue={initial}
           aria-describedby={describedBy}
           className={INPUT_CLASS}
         />
@@ -129,6 +197,7 @@ function renderControl(field: FieldDefinition, controlId: string, describedBy: s
           id={controlId}
           name={field.key}
           type="date"
+          defaultValue={initial}
           aria-describedby={describedBy}
           className={INPUT_CLASS}
         />
@@ -139,6 +208,7 @@ function renderControl(field: FieldDefinition, controlId: string, describedBy: s
         <select
           id={controlId}
           name={field.key}
+          defaultValue={initial}
           aria-describedby={describedBy}
           className={INPUT_CLASS}
         >
@@ -157,27 +227,11 @@ function renderControl(field: FieldDefinition, controlId: string, describedBy: s
           id={controlId}
           name={field.key}
           rows={3}
+          defaultValue={initial}
           placeholder={'Mỗi dòng một mục'}
           aria-describedby={describedBy}
           className={`${INPUT_CLASS} font-mono text-xs`}
         />
-      );
-
-    case 'file':
-      return (
-        <div>
-          <input
-            id={controlId}
-            type="text"
-            disabled
-            placeholder="Tải tệp thuộc phạm vi MVP"
-            aria-describedby={describedBy}
-            className={`${INPUT_CLASS} cursor-not-allowed opacity-60`}
-          />
-          <p className="mt-1 text-xs text-warning">
-            Trường tệp chưa có trong demo — bỏ trống khi nhập bản ghi.
-          </p>
-        </div>
       );
 
     default:
@@ -186,6 +240,7 @@ function renderControl(field: FieldDefinition, controlId: string, describedBy: s
           id={controlId}
           name={field.key}
           rows={2}
+          defaultValue={initial}
           aria-describedby={describedBy}
           className={INPUT_CLASS}
         />
@@ -193,7 +248,7 @@ function renderControl(field: FieldDefinition, controlId: string, describedBy: s
   }
 }
 
-function SubmitButton({ disabled }: { disabled: boolean }) {
+function SubmitButton({ disabled, label }: { disabled: boolean; label: string }) {
   const { pending } = useFormStatus();
 
   return (
@@ -202,7 +257,7 @@ function SubmitButton({ disabled }: { disabled: boolean }) {
       disabled={pending || disabled}
       className="w-full rounded-lg bg-accent px-4 py-2 text-sm font-medium text-on-accent transition-opacity hover:opacity-90 disabled:opacity-60"
     >
-      {pending ? 'Đang lưu…' : 'Lưu bản ghi'}
+      {pending ? 'Đang lưu…' : label}
     </button>
   );
 }

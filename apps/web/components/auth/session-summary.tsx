@@ -1,6 +1,7 @@
 import Link from 'next/link';
 
 import { logoutAction } from '@/app/login/actions';
+import { PasswordForm } from '@/components/auth/password-form';
 import { createServerApiClient } from '@/lib/api/server';
 import { labelOrKey } from '@/lib/names';
 
@@ -62,7 +63,14 @@ export async function SessionSummary() {
           </div>
         </dl>
 
-        <form action={logoutAction} className="mt-4">
+        <details className="mt-3 border-t border-border pt-3">
+          <summary className="cursor-pointer text-xs font-medium text-on-surface-muted hover:text-on-surface">
+            Đổi mật khẩu
+          </summary>
+          <PasswordForm />
+        </details>
+
+        <form action={logoutAction} className="mt-3">
           <button
             type="submit"
             name="logout"

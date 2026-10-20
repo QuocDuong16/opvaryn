@@ -6,10 +6,16 @@ export interface NavItem {
   label: string;
   description: string;
   /**
-   * Who the entry is for. Everything the product does is for everyone signed in; the screens
-   * that describe how it is built or operated are for the administrator (ADR 0015).
+   * Who the entry is for. Everything the product does is for everyone signed in; organisation
+   * administration and the screens that describe how it is built or operated are for the
+   * administrator (ADR 0015, ADR 0022).
    */
   audience: Audience;
+  /**
+   * Administrator entries that describe how the system is built or operated also require
+   * advanced mode. Organisation administration (`/admin`) is product work and does not.
+   */
+  requiresAdvanced?: boolean;
 }
 
 /**
@@ -68,28 +74,45 @@ export const NAV_ITEMS: readonly NavItem[] = [
     audience: 'everyone',
   },
   {
-    href: '/roadmap',
+    href: '/admin',
     index: '08',
-    label: 'Lộ trình',
-    description: 'Kế hoạch các mốc tiếp theo',
+    label: 'Quản trị',
+    description: 'Tài khoản, phòng ban và vai trò',
     audience: 'admin',
   },
   {
-    href: '/settings',
+    href: '/roadmap',
     index: '09',
+    label: 'Lộ trình',
+    description: 'Kế hoạch các mốc tiếp theo',
+    audience: 'admin',
+    requiresAdvanced: true,
+  },
+  {
+    href: '/settings',
+    index: '10',
     label: 'Vận hành',
     description: 'Endpoint, cổng và nhật ký tích hợp',
     audience: 'admin',
+    requiresAdvanced: true,
   },
 ];
 
 /**
- * navItemsFor returns the entries one person should see. `showAdvanced` is true only for an
- * administrator who turned advanced mode on; without it they see the product screens, exactly
- * like everyone else.
+ * navItemsFor returns the entries one person should see. Organisation administration appears
+ * for every administrator; the build and operations screens need advanced mode on as well
+ * (ADR 0015, ADR 0022). A non-administrator sees the product screens only.
  */
-export function navItemsFor(showAdvanced: boolean): readonly NavItem[] {
-  return NAV_ITEMS.filter((item) => item.audience === 'everyone' || showAdvanced);
+export function navItemsFor(isAdminUser: boolean, showAdvanced: boolean): readonly NavItem[] {
+  return NAV_ITEMS.filter((item) => {
+    if (item.audience === 'everyone') {
+      return true;
+    }
+    if (!isAdminUser) {
+      return false;
+    }
+    return !item.requiresAdvanced || showAdvanced;
+  });
 }
 
 /**

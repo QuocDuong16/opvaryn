@@ -30,9 +30,10 @@
   yêu cầu session, và role để quyết định task lấy từ **user đã xác thực** thay vì `actorRole` do
   client khai báo. Các trường `actorRole` và `actor` biến mất khỏi request body — đó là khoảng trống
   mà ADR 0007 đánh dấu.
-- Các endpoint đọc/ghi định nghĩa (business object, process definition) **chưa** được bảo vệ trong
-  bước này; chúng được ghi rõ là chưa bảo vệ trong tài liệu cho tới khi ma trận quyền được áp đủ.
-  Luật: không được thêm endpoint mới nào *không* xác thực, trừ khi ADR này được cập nhật.
+- ~~Các endpoint đọc/ghi định nghĩa (business object, process definition) **chưa** được bảo vệ trong
+  bước này~~ **[Đã sửa]**: mọi endpoint cần session, trừ `/healthz`, `/readyz`, `/api/v1/meta` và
+  `/api/v1/auth/*` (xem phần "Ma trận đang chạy" bên dưới). Luật vẫn giữ: không được thêm endpoint
+  mới nào *không* xác thực, trừ khi ADR này được cập nhật.
 
 ### Phân quyền (D09b) — đã áp dụng
 
@@ -87,9 +88,12 @@
 
 ## Việc chưa làm ở bước này (để không tự lừa mình)
 
-- Trình thiết kế quy trình là biểu mẫu (node/edge + publish version), không phải canvas kéo thả:
-  canvas chỉ vẽ phiên bản đã publish. Kéo thả và chỉnh trực tiếp trên sơ đồ vẫn chưa có.
-- OIDC: chỉ có interface (`service.Provider`), chưa có provider nào cắm vào.
-- Reset mật khẩu tự phục vụ (email), khoá tài khoản sau nhiều lần sai, và xoay session: hiện là
-  thao tác của admin qua `make useradm`.
+- ~~Trình thiết kế quy trình là biểu mẫu (node/edge + publish version), không phải canvas kéo thả~~
+  **[Đã có]**: canvas kéo thả trên bản nháp trong trình duyệt, phát hành thành phiên bản mới
+  (ADR 0013).
+- OIDC: chỉ có interface (`service.Provider`), chưa có provider nào cắm vào. Vẫn chưa có.
+- ~~Reset mật khẩu tự phục vụ (email), khoá tài khoản sau nhiều lần sai, và xoay session: hiện là
+  thao tác của admin qua `make useradm`~~ **[Đã có phần lớn]**: khu vực quản trị đặt lại mật khẩu,
+  thu hồi phiên và mở khoá đăng nhập trong sản phẩm (ADR 0022, ADR 0029); CLI `useradm` giữ vai trò
+  đường phục hồi. Đặt lại mật khẩu **tự phục vụ qua email** vẫn chưa có.
 - Chưa có ScheduledJob dọn session hết hạn: chúng chỉ đơn giản là không tìm thấy khi đã hết hạn.
