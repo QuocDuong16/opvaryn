@@ -253,6 +253,10 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   transaction: the old task is cancelled, the new one created for the other role, and a
   `task_escalated` event appended. `process_tasks.escalated` keeps a step from bouncing
   between roles.
+- The external options of a select field (ADR 0034) live in `lookup_sources` (object key,
+  field key, URL). The **server** fetches the source (`service.Lookups`, 5s, 1 MB, 200 options,
+  http/https only) and answers `GET /api/v1/lookups/{key}` with the options; a source that
+  cannot be reached is reported per field instead of pretending the field has no options.
 - The policy of each kind of work (ADR 0035) lives in `work_policies`: the default deadline
   (working hours), the default priority (`low`/`normal`/`high`/`urgent`) and the escalation
   role. A step of a process may declare its own `dueInWorkingHours`, `escalateToRole` and

@@ -779,6 +779,48 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/lookups/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The external options of the fields that take them from another system
+         * @description A select field can take its options from another system (ADR 0034). The source is a
+         *     URL the organisation configures; the answer is a small JSON document with the options.
+         */
+        get: operations["listLookups"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/lookups/{key}/{fieldKey}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Point a field at an external catalogue
+         * @description Stores the source of one field. An empty address removes the source. Reading it is open
+         *     to every signed-in person; changing it is administration work.
+         */
+        put: operations["saveLookupSource"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/work-policies/{key}": {
         parameters: {
             query?: never;
@@ -1845,6 +1887,17 @@ export interface components {
             op: "eq" | "ne" | "gt" | "gte" | "lt" | "lte";
             /** @description The literal to compare against, typed by the field. */
             value: unknown;
+        };
+        LookupOption: {
+            value: string;
+            label: string;
+        };
+        LookupField: {
+            fieldKey: string;
+            url: string;
+            options: components["schemas"]["LookupOption"][];
+            /** @description Why the source could not be read; the field then offers no options. */
+            error?: string;
         };
         WorkPolicy: {
             objectKey: string;
@@ -3453,6 +3506,66 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listLookups: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The fields and their options */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": {
+                        data: components["schemas"]["LookupField"][];
+                    };
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    saveLookupSource: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
+                fieldKey: string;
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": {
+                    /** @description The address of the catalogue; empty removes the source. */
+                    url: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The source is stored */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };

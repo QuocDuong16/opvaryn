@@ -99,6 +99,8 @@ export type ErrorResponse = components['schemas']['ErrorResponse'];
 export type Me = components['schemas']['Me'];
 export type AppConfig = components['schemas']['AppConfig'];
 export type WorkPolicy = components['schemas']['WorkPolicy'];
+export type LookupField = components['schemas']['LookupField'];
+export type LookupOption = components['schemas']['LookupOption'];
 export type FieldColumn = components['schemas']['FieldColumn'];
 export type FieldCondition = components['schemas']['FieldCondition'];
 export type WorkingHour = components['schemas']['WorkingHour'];
@@ -191,6 +193,10 @@ export interface ApiClient {
   enableMyTwoFactor(code: string): Promise<TwoFactorEnabled>;
   /** Switches the second step off. */
   disableMyTwoFactor(code: string): Promise<void>;
+  /** The external options of the fields that take them from another system (ADR 0034). */
+  listLookups(objectKey: string): Promise<{ data: LookupField[] }>;
+  /** Points one field at an external catalogue; an empty address removes the source. */
+  saveLookupSource(objectKey: string, fieldKey: string, url: string): Promise<void>;
   /** The policy of one kind of work: the default deadline, priority and escalation. */
   getWorkPolicy(objectKey: string): Promise<WorkPolicy>;
   /** Stores the policy of one kind of work. */
@@ -416,6 +422,15 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
         method: 'POST',
         body: { code },
       }),
+
+    listLookups: (objectKey) =>
+      request<{ data: LookupField[] }>(`/api/v1/lookups/${encodeURIComponent(objectKey)}`),
+
+    saveLookupSource: (objectKey, fieldKey, url) =>
+      request<void>(
+        `/api/v1/admin/lookups/${encodeURIComponent(objectKey)}/${encodeURIComponent(fieldKey)}`,
+        { method: 'PUT', body: { url } },
+      ),
 
     getWorkPolicy: (objectKey) =>
       request<WorkPolicy>(`/api/v1/admin/work-policies/${encodeURIComponent(objectKey)}`),

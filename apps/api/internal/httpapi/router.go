@@ -30,6 +30,7 @@ type Services struct {
 	WorkingHours       *service.WorkingHours
 	AppConfigs         *service.AppConfigs
 	WorkPolicies       *service.WorkPolicies
+	Lookups            *service.Lookups
 }
 
 // NewRouter builds the HTTP handler for the demo API.
@@ -113,6 +114,10 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 					r.Delete("/", handleDeleteAdminDepartment(services.Admin, log))
 				})
 			})
+			// The source of one field's external catalogue (ADR 0034).
+			r.Route("/lookups", func(r chi.Router) {
+				r.Put("/{key}/{fieldKey}", handleSaveLookupSource(services.Lookups, log))
+			})
 			// The policy of each kind of work (ADR 0035).
 			r.Route("/work-policies", func(r chi.Router) {
 				r.Route("/{key}", func(r chi.Router) {
@@ -171,6 +176,8 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 
 		// The configuration of the application view (ADR 0033). Reading it is open to
 		// every signed-in person; changing it is administration work.
+		// The external options of the fields that take them from another system (ADR 0034).
+		r.Get("/lookups/{key}", handleListLookups(services.Lookups, log))
 		r.Route("/app-configs", func(r chi.Router) {
 			r.Route("/{key}", func(r chi.Router) {
 				r.Get("/", handleGetAppConfig(services.AppConfigs, log))

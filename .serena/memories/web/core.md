@@ -159,7 +159,8 @@
 - `/admin` **live** (ADR 0022, ADR 0029, ADR 0031, ADR 0035): the areas are Tổng quan ·
   Người dùng · Phòng ban · Vai trò · **Giờ làm việc** (the calendar that decides what a
   deadline means) · **Chính sách việc** (the deadline, priority and escalation role of each
-  kind of work).
+  kind of work) · **Tra cứu ngoài** (the external catalogue a select field takes its options
+  from).
   The workflow inspector carries two fields on a human step: the deadline in working hours
   and the role that takes the step over; the inbox shows the deadline and marks a task late.
 - `/admin` **live** (ADR 0022, ADR 0029): an account that is waiting out a sign-in cooldown

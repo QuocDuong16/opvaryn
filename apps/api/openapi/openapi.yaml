@@ -1481,6 +1481,75 @@ paths:
                 $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/lookups/{key}:
+    get:
+      operationId: listLookups
+      tags: [applications]
+      summary: The external options of the fields that take them from another system
+      description: |
+        A select field can take its options from another system (ADR 0034). The source is a
+        URL the organisation configures; the answer is a small JSON document with the options.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/ObjectKey'
+      responses:
+        '200':
+          description: The fields and their options
+          content:
+            application/json:
+              schema:
+                type: object
+                required: [data]
+                properties:
+                  data:
+                    type: array
+                    items:
+                      $ref: '#/components/schemas/LookupField'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/admin/lookups/{key}/{fieldKey}:
+    put:
+      operationId: saveLookupSource
+      tags: [administration]
+      summary: Point a field at an external catalogue
+      description: |
+        Stores the source of one field. An empty address removes the source. Reading it is open
+        to every signed-in person; changing it is administration work.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/ObjectKey'
+        - name: fieldKey
+          in: path
+          required: true
+          schema:
+            type: string
+            pattern: '^[a-z][a-z0-9_]{1,63}$'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [url]
+              properties:
+                url:
+                  type: string
+                  description: The address of the catalogue; empty removes the source.
+      responses:
+        '204':
+          description: The source is stored
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/admin/work-policies/{key}:
     get:
       operationId: getWorkPolicy
@@ -3506,6 +3575,29 @@ components:
         value:
           description: The literal to compare against, typed by the field.
       description: The single filter a metric carries, using the D04 condition shape.
+    LookupOption:
+      type: object
+      required: [value, label]
+      properties:
+        value:
+          type: string
+        label:
+          type: string
+    LookupField:
+      type: object
+      required: [fieldKey, url, options]
+      properties:
+        fieldKey:
+          type: string
+        url:
+          type: string
+        options:
+          type: array
+          items:
+            $ref: '#/components/schemas/LookupOption'
+        error:
+          type: string
+          description: Why the source could not be read; the field then offers no options.
     WorkPolicy:
       type: object
       required: [objectKey, defaultDueHours, defaultPriority, escalationRole]

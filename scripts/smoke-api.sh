@@ -324,6 +324,26 @@ status="$(request_as "$admin_jar" PUT "/api/v1/admin/work-policies/$object_key" 
   '{"defaultDueHours":8,"defaultPriority":"khong_hop_le","escalationRole":""}')"
 [[ "$status" == "400" ]] || fail "a policy with an unknown priority returned $status, expected 400"
 
+echo "smoke: a field takes its options from another system (ADR 0034)"
+status="$(request_as "$admin_jar" GET "/api/v1/lookups/$object_key")"
+[[ "$status" == "200" ]] || fail "reading the lookups returned $status, expected 200"
+grep -q '"data"' "$body_file" || fail "the lookups did not answer with a list"
+status="$(request_as "$designer_jar" PUT "/api/v1/admin/lookups/$object_key/priority" \
+  '{"url":"https://example.invalid/danh-muc"}')"
+[[ "$status" == "403" ]] || fail "a non-admin changed a lookup source (status $status), expected 403"
+status="$(request_as "$admin_jar" PUT "/api/v1/admin/lookups/$object_key/priority" \
+  '{"url":"not-an-address"}')"
+[[ "$status" == "400" ]] || fail "a lookup source with a bad address returned $status, expected 400"
+status="$(request_as "$admin_jar" PUT "/api/v1/admin/lookups/$object_key/priority" \
+  '{"url":"https://example.invalid/danh-muc"}')"
+[[ "$status" == "204" ]] || fail "an admin changed a lookup source (status $status), expected 204"
+# The source cannot be reached here, and the field says so instead of pretending.
+status="$(request_as "$admin_jar" GET "/api/v1/lookups/$object_key")"
+[[ "$status" == "200" ]] || fail "reading the lookups returned $status, expected 200"
+grep -q '"error"' "$body_file" || fail "a source that cannot be reached must say so"
+status="$(request_as "$admin_jar" PUT "/api/v1/admin/lookups/$object_key/priority" '{"url":""}')"
+[[ "$status" == "204" ]] || fail "removing a lookup source returned $status, expected 204"
+
 echo "smoke: a computed field, a hidden field and a table (ADR 0032)"
 smart_key="smoke_smart_$stamp"
 smart_body="$(printf '{"key":"%s","name":"Smoke smart form","fields":[{"key":"so_luong","label":"Số lượng","type":"number"},{"key":"don_gia","label":"Đơn giá","type":"number"},{"key":"thanh_tien","label":"Thành tiền","type":"formula","formula":"so_luong * don_gia"},{"key":"ghi_chu","label":"Ghi chú gấp","type":"text","visibleWhen":{"field":"so_luong","op":"gt","value":10}},{"key":"items","label":"Danh sách món","type":"table","columns":[{"key":"ten_mon","label":"Tên món","type":"text"},{"key":"gia","label":"Giá","type":"number"}]}]}' "$smart_key")"

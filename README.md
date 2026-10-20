@@ -78,8 +78,10 @@ tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
   trường gom cột kanban, các cột của danh sách; người quản trị sửa, người khác xem (ADR 0033).
 - **Live (MVP)**: chính sách việc theo từng loại việc — hạn mặc định, mức ưu tiên và vai trò nhận
   việc khi quá hạn; bước của quy trình vẫn khai riêng được (ADR 0035).
-- **Concept**: tra cứu dữ liệu từ hệ thống ngoài, kéo thả trong màn Ứng dụng, template library,
-  và nội dung Roadmap — các phần phụ thuộc quyết định còn mở hoặc thuộc V1.x.
+- **Live (MVP)**: một trường lựa chọn lấy danh sách của mình từ hệ thống khác — nguồn là một URL
+  do quản trị trỏ tới, có giới hạn thời gian và kích thước (ADR 0034).
+- **Concept**: ghi ngược lại hệ thống ngoài, kéo thả trong màn Ứng dụng, template library, và nội
+  dung Roadmap — các phần phụ thuộc quyết định còn mở hoặc thuộc V1.x.
 
 Toàn bộ D04–D10 đã chốt và đang chạy trong code (ADR 0005–0010). Chi tiết phạm vi demo ở
 [ADR 0002](docs/adr/0002-demo-scope-and-labels.md),
