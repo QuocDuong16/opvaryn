@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import type { BusinessObjectVersion, ObjectRecord } from '@opvaryn/contracts';
 
-import {
-  fieldsForVersion,
-  fieldsForVersionNumber,
-  groupRecordsByVersion,
-} from '@/components/objects/record-grouping';
+import { fieldsForVersion, groupRecordsByVersion } from '@/components/objects/record-grouping';
 
 function version(number: number, id = `v${number}-id`): BusinessObjectVersion {
   return {

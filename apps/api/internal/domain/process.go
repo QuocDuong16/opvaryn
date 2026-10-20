@@ -51,6 +51,12 @@ type ProcessNode struct {
 	AssigneeRole string `json:"assigneeRole,omitempty"`
 	// Condition is required on condition nodes.
 	Condition *ProcessCondition `json:"condition,omitempty"`
+	// DueInWorkingHours is how many working hours the step has (ADR 0031). Zero means
+	// the step has no deadline and is never escalated.
+	DueInWorkingHours int `json:"dueInWorkingHours,omitempty"`
+	// EscalateToRole is the role that takes the step over when it runs out of time
+	// (ADR 0031). Empty means nobody takes over: the step is only reported as late.
+	EscalateToRole string `json:"escalateToRole,omitempty"`
 }
 
 // ProcessEdge connects two nodes. On a condition node, `when` is "true" or
@@ -146,6 +152,34 @@ type ProcessTask struct {
 	DecidedBy    string
 	CreatedAt    time.Time
 	DecidedAt    *time.Time
+	// DueAt is when the step runs out of time, counted in working hours (ADR 0031).
+	// Nil means the step has no deadline.
+	DueAt *time.Time
+	// Escalated marks a task that was already taken over once: it is never escalated
+	// again, so a step that nobody finishes does not bounce between roles forever.
+	Escalated bool
+}
+
+// WorkingHour is one stretch of working time in a weekday (ADR 0031). Weekday 0 is Sunday,
+// and the minutes count from midnight in the organisation's timezone.
+type WorkingHour struct {
+	Weekday int `json:"weekday"`
+	Start   int `json:"start"`
+	End     int `json:"end"`
+}
+
+// EscalationCandidate is a task that ran out of time and whose step names a role to take
+// over (ADR 0031).
+type EscalationCandidate struct {
+	TaskID            uuid.UUID
+	InstanceID        uuid.UUID
+	NodeKey           string
+	Title             string
+	Attempt           int
+	CurrentRole       string
+	EscalateToRole    string
+	DueInWorkingHours int
+	DueAt             time.Time
 }
 
 // ProcessEventType enumerates the append-only audit trail (ADR 0007 §10).
@@ -159,6 +193,7 @@ const (
 	EventTaskReturned       ProcessEventType = "task_returned"
 	EventTaskRejected       ProcessEventType = "task_rejected"
 	EventTaskCancelled      ProcessEventType = "task_cancelled"
+	EventTaskEscalated      ProcessEventType = "task_escalated"
 	EventInstanceReturned   ProcessEventType = "instance_returned"
 	EventInstanceFinished   ProcessEventType = "instance_completed"
 	EventInstanceRejected   ProcessEventType = "instance_rejected"

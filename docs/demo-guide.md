@@ -77,7 +77,7 @@ Thứ tự gợi ý, kèm phần cần nói rõ để không trình bày quá:
 | 6 | **Tasks** `/tasks` | Inbox thật theo role của người đang đăng nhập; mở một việc để xem bản ghi, event log và **duyệt / trả về / từ chối**; thử bằng hai tài khoản khác role để thấy việc chuyển người | **live** |
 | 7 | **Analytics** `/analytics` | Metric thật trên dữ liệu thật: tạo metric từ field của object (đếm/tổng/trung bình, lọc, nhóm), thấy con số và phân rã ngay; kéo–thả sắp widget, **Lưu bố cục**, F5 để thấy còn nguyên | **live** |
 | 8 | **Applications** `/apps` | Danh sách và chi tiết đọc bản ghi thật; kanban; tab **Cấu hình** (các ô đều bị khoá); panel tích hợp | live + mock + concept |
-| 9 | **Quản trị** `/admin` | Danh mục tài khoản, phòng ban, vai trò; tạo người, gán vai trò, khoá tài khoản, đặt lại mật khẩu, mở khoá đăng nhập khi tài khoản bị tạm khoá sau nhiều lần gõ sai. Chỉ tài khoản giữ vai trò quản trị hệ thống thấy khu vực này | **live** |
+| 9 | **Quản trị** `/admin` | Danh mục tài khoản, phòng ban, vai trò, giờ làm việc; tạo người, gán vai trò, khoá tài khoản, đặt lại mật khẩu, mở khoá đăng nhập khi tài khoản bị tạm khoá sau nhiều lần gõ sai, bật xác thực hai bước. Chỉ tài khoản giữ vai trò quản trị hệ thống thấy khu vực này | **live** |
 | 10 | **Roadmap** `/roadmap` | Bốn phase, điều kiện nghiệm thu MVP, quyết định đang mở chặn tiến độ và các quyết định đã chốt | concept |
 | 11 | **Cài đặt** `/settings` | Danh sách endpoint, cổng, lệnh seed/smoke; **nhật ký giao webhook** (bật/tắt, số lần thử, lỗi cuối) | live |
 

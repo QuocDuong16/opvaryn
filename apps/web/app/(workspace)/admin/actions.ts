@@ -121,6 +121,29 @@ export async function unlockAdminUserAction(
   redirect(`/admin/users/${userId}?unlocked=1`);
 }
 
+// ------------------------------------------------------- working hours ----
+
+export async function replaceWorkingHoursAction(
+  _previous: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  let hours: { weekday: number; start: number; end: number }[] = [];
+  try {
+    const raw = String(formData.get('data') ?? '[]');
+    const parsed = JSON.parse(raw);
+    hours = Array.isArray(parsed) ? parsed : [];
+  } catch {
+    return { status: 'error', message: 'Lịch giờ làm việc không đọc được.' };
+  }
+  try {
+    await createServerApiClient().replaceWorkingHours(hours);
+    revalidatePath('/admin/working-hours');
+    return { status: 'success', message: 'Đã lưu lịch giờ làm việc.' };
+  } catch (cause) {
+    return failure(cause);
+  }
+}
+
 // ---------------------------------------------------------- two factor ----
 
 /**

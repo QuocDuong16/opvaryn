@@ -396,10 +396,11 @@ func insertProcessTasks(ctx context.Context, tx pgx.Tx, tasks []domain.ProcessTa
 	for _, task := range tasks {
 		if _, err := tx.Exec(ctx, `
 			INSERT INTO process_tasks
-			       (id, instance_id, node_key, title, assignee_role, attempt, status)
-			VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+			       (id, instance_id, node_key, title, assignee_role, attempt, status,
+			        due_at, escalated)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 			task.ID, task.InstanceID, task.NodeKey, task.Title, task.AssigneeRole,
-			task.Attempt, string(task.Status),
+			task.Attempt, string(task.Status), task.DueAt, task.Escalated,
 		); err != nil {
 			return fmt.Errorf("insert process task: %w", err)
 		}
@@ -570,7 +571,7 @@ func (s *Store) ListVisibleProcessInstances(
 	// say who holds each one up without loading every task and event of every row.
 	taskRows, err := s.pool.Query(ctx, `
 		SELECT id, instance_id, node_key, title, assignee_role, attempt,
-		       status, reason, decided_by, created_at, decided_at
+		       status, reason, decided_by, created_at, decided_at, due_at, escalated
 		  FROM process_tasks
 		 WHERE instance_id = ANY($1) AND status = 'open'
 		 ORDER BY created_at, id`, instanceIDs(summaries))
@@ -588,6 +589,7 @@ func (s *Store) ListVisibleProcessInstances(
 		if err := taskRows.Scan(
 			&task.ID, &task.InstanceID, &task.NodeKey, &task.Title, &task.AssigneeRole,
 			&task.Attempt, &status, &task.Reason, &decidedBy, &task.CreatedAt, &task.DecidedAt,
+			&task.DueAt, &task.Escalated,
 		); err != nil {
 			return domain.Paged[domain.ProcessInstanceSummary]{}, classify(fmt.Errorf("scan open task of instance: %w", err))
 		}
@@ -635,7 +637,7 @@ func scanProcessInstance(row rowScanner) (domain.ProcessInstance, error) {
 func (s *Store) ListProcessTasks(ctx context.Context, instanceID uuid.UUID) ([]domain.ProcessTask, error) {
 	rows, err := s.pool.Query(ctx, `
 		SELECT id, instance_id, node_key, title, assignee_role, attempt,
-		       status, reason, decided_by, created_at, decided_at
+		       status, reason, decided_by, created_at, decided_at, due_at, escalated
 		  FROM process_tasks
 		 WHERE instance_id = $1
 		 ORDER BY created_at, id`, instanceID)
@@ -654,6 +656,7 @@ func (s *Store) ListProcessTasks(ctx context.Context, instanceID uuid.UUID) ([]d
 		if err := rows.Scan(
 			&task.ID, &task.InstanceID, &task.NodeKey, &task.Title, &task.AssigneeRole,
 			&task.Attempt, &status, &task.Reason, &decidedBy, &task.CreatedAt, &task.DecidedAt,
+			&task.DueAt, &task.Escalated,
 		); err != nil {
 			return nil, classify(fmt.Errorf("scan process task: %w", err))
 		}

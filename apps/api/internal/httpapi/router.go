@@ -27,6 +27,7 @@ type Services struct {
 	ProcessMetrics     *service.ProcessMetrics
 	Webhooks           *service.Webhooks
 	TwoFactor          *service.TwoFactor
+	WorkingHours       *service.WorkingHours
 }
 
 // NewRouter builds the HTTP handler for the demo API.
@@ -109,6 +110,11 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 					r.Put("/", handleUpdateAdminDepartment(services.Admin, log))
 					r.Delete("/", handleDeleteAdminDepartment(services.Admin, log))
 				})
+			})
+			// The organisation's working calendar (ADR 0031).
+			r.Route("/working-hours", func(r chi.Router) {
+				r.Get("/", handleListWorkingHours(services.WorkingHours, log))
+				r.Put("/", handleReplaceWorkingHours(services.WorkingHours, log))
 			})
 			r.Route("/roles", func(r chi.Router) {
 				r.Get("/", handleListAdminRoles(services.Admin, log))

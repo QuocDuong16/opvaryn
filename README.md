@@ -62,6 +62,9 @@ tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
 - **Live (MVP)**: lịch sử thay đổi từng trường của bản ghi — ai sửa, trường nào, từ giá trị nào sang
   giá trị nào — chỉ ghi thêm và đọc theo đúng phạm vi bản ghi (ADR 0027). Màn hình đọc tên bản ghi
   từ chính API theo đúng phiên bản định nghĩa của bản ghi, không đoán từ một mẫu bản ghi.
+- **Live (MVP)**: giờ làm việc của tổ chức quyết định hạn xử lý — mỗi bước có thể khai số
+  giờ làm việc và vai trò nhận việc khi quá hạn; việc quá hạn được chuyển cấp, hộp việc hiện
+  mốc hạn (ADR 0031).
 - **Live (MVP)**: xác thực hai bước cho tài khoản quản trị — mã TOTP từ ứng dụng xác thực
   cùng mật khẩu, mã cứu hộ dùng một lần, và đường gỡ khi mất thiết bị (ADR 0030).
 - **Live (MVP)**: cooldown đăng nhập sau 5 lần sai trong 15 phút, trả lời giống hệt sai mật khẩu;
@@ -89,8 +92,9 @@ Toàn bộ D04–D10 đã chốt và đang chạy trong code (ADR 0005–0010). 
 [ADR 0026](docs/adr/0026-record-csv-import.md),
 [ADR 0027](docs/adr/0027-record-audit.md),
 [ADR 0028](docs/adr/0028-login-cooldown.md),
-[ADR 0029](docs/adr/0029-unlock-sign-in-from-the-admin-area.md) và
-[ADR 0030](docs/adr/0030-two-step-verification-for-administrators.md).
+[ADR 0029](docs/adr/0029-unlock-sign-in-from-the-admin-area.md),
+[ADR 0030](docs/adr/0030-two-step-verification-for-administrators.md) và
+[ADR 0031](docs/adr/0031-working-hours-and-due-dates.md).
 
 ## Bắt đầu nhanh
 

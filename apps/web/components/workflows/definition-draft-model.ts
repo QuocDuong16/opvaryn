@@ -21,6 +21,10 @@ export interface DraftNode {
   title: string;
   assigneeRole?: string;
   condition?: ProcessCondition;
+  /** How many working hours the step has (ADR 0031). Zero means no deadline. */
+  dueInWorkingHours?: number;
+  /** The role that takes the step over when it runs out of time (ADR 0031). */
+  escalateToRole?: string;
   x: number;
   y: number;
 }
@@ -79,6 +83,8 @@ export function draftFromGraph(
         title: node.title,
         ...(node.assigneeRole ? { assigneeRole: node.assigneeRole } : {}),
         ...(node.condition ? { condition: { ...node.condition } } : {}),
+        ...(node.dueInWorkingHours ? { dueInWorkingHours: node.dueInWorkingHours } : {}),
+        ...(node.escalateToRole ? { escalateToRole: node.escalateToRole } : {}),
         x: positioned?.x ?? 0,
         y: positioned?.y ?? 0,
       };
@@ -186,6 +192,8 @@ export function serializeDraft(draft: WorkflowDraft): string {
       title: node.title,
       ...(node.assigneeRole ? { assigneeRole: node.assigneeRole } : {}),
       ...(node.condition ? { condition: node.condition } : {}),
+      ...(node.dueInWorkingHours ? { dueInWorkingHours: node.dueInWorkingHours } : {}),
+      ...(node.escalateToRole ? { escalateToRole: node.escalateToRole } : {}),
       x: Math.round(node.x),
       y: Math.round(node.y),
     })),
@@ -283,7 +291,9 @@ export function addNode(
 export function updateNode(
   draft: WorkflowDraft,
   key: string,
-  patch: Partial<Pick<DraftNode, 'title' | 'assigneeRole' | 'condition'>>,
+  patch: Partial<
+    Pick<DraftNode, 'title' | 'assigneeRole' | 'condition' | 'dueInWorkingHours' | 'escalateToRole'>
+  >,
 ): WorkflowDraft {
   return {
     ...draft,

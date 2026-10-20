@@ -15,6 +15,7 @@
 //	useradm -unlock -email lan@example.com
 //	useradm -list-lockouts
 //	useradm -reset-2fa -email lan@example.com
+//	useradm -escalate
 //	useradm -prune-login-failures
 //	useradm -list
 package main
@@ -56,6 +57,8 @@ func run() error {
 			"list the addresses that are waiting out a sign-in cooldown")
 		resetTwoFactor = flag.Bool("reset-2fa", false,
 			"turn the two-step verification of an account off (the device was lost)")
+		escalate = flag.Bool("escalate", false,
+			"hand overdue tasks over to the role their step names (ADR 0031)")
 		pruneFailures = flag.Bool("prune-login-failures", false,
 			"delete sign-in failures older than the cooldown window")
 		setRoleLabel = flag.Bool("set-role-label", false, "name a role for the interface")
@@ -178,6 +181,20 @@ func run() error {
 		}
 		return nil
 
+	case *escalate:
+		location, locationErr := time.LoadLocation("Asia/Ho_Chi_Minh")
+		if locationErr != nil {
+			return fmt.Errorf("load the organisation's timezone: %w", locationErr)
+		}
+		workingHours := service.NewWorkingHours(st, location)
+		escalation := service.NewEscalation(st, workingHours, nil)
+		escalated, err := escalation.RunOnce(ctx)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("escalated %d overdue task(s)\n", escalated)
+		return nil
+
 	case *resetTwoFactor:
 		if *email == "" {
 			return fmt.Errorf("reset-2fa needs -email")
@@ -209,7 +226,7 @@ func run() error {
 
 	default:
 		flag.Usage()
-		return fmt.Errorf("nothing to do: pass -create, -add-role, -set-password, -create-department, -set-role-label, -prune-sessions, -prune-orphan-attachments, -unlock, -list-lockouts, -reset-2fa, -prune-login-failures or -list")
+		return fmt.Errorf("nothing to do: pass -create, -add-role, -set-password, -create-department, -set-role-label, -prune-sessions, -prune-orphan-attachments, -unlock, -list-lockouts, -reset-2fa, -escalate, -prune-login-failures or -list")
 	}
 }
 

@@ -1087,8 +1087,22 @@ type ProcessNode struct {
 	// an allowlisted operator and a literal. Validated against the field definition
 	// when the definition is published.
 	Condition *ProcessCondition `json:"condition,omitempty"`
-	Key       string            `json:"key"`
-	Title     string            `json:"title"`
+
+	// DueInWorkingHours How many working hours the step has (ADR 0031). Zero means the step has no
+	// deadline and is never escalated.
+	//
+	//
+	// Example: 8
+	DueInWorkingHours *int `json:"dueInWorkingHours,omitempty"`
+
+	// EscalateToRole The role that takes the step over when it runs out of time (ADR 0031). Empty
+	// means nobody takes over: the step is only reported as late.
+	//
+	//
+	// Example: giam_doc
+	EscalateToRole *string `json:"escalateToRole,omitempty"`
+	Key            string  `json:"key"`
+	Title          string  `json:"title"`
 
 	// Type Node kinds of the MVP graph (ADR 0007). Other kinds belong to V1.x.
 	Type ProcessNodeType `json:"type"`
@@ -1099,16 +1113,23 @@ type ProcessNodeType string
 
 // ProcessTask defines model for ProcessTask.
 type ProcessTask struct {
-	AssigneeRole string             `json:"assigneeRole"`
-	Attempt      int                `json:"attempt"`
-	CreatedAt    time.Time          `json:"createdAt"`
-	DecidedAt    *time.Time         `json:"decidedAt,omitempty"`
-	DecidedBy    *string            `json:"decidedBy,omitempty"`
-	Id           openapi_types.UUID `json:"id"`
-	NodeKey      string             `json:"nodeKey"`
-	Reason       *string            `json:"reason,omitempty"`
-	Status       ProcessTaskStatus  `json:"status"`
-	Title        string             `json:"title"`
+	AssigneeRole string     `json:"assigneeRole"`
+	Attempt      int        `json:"attempt"`
+	CreatedAt    time.Time  `json:"createdAt"`
+	DecidedAt    *time.Time `json:"decidedAt,omitempty"`
+	DecidedBy    *string    `json:"decidedBy,omitempty"`
+
+	// DueAt When the step runs out of time, counted in the organisation's working hours
+	// (ADR 0031). Absent when the step has no deadline.
+	DueAt *time.Time `json:"dueAt,omitempty"`
+
+	// Escalated Whether the step was already taken over once (ADR 0031).
+	Escalated *bool              `json:"escalated,omitempty"`
+	Id        openapi_types.UUID `json:"id"`
+	NodeKey   string             `json:"nodeKey"`
+	Reason    *string            `json:"reason,omitempty"`
+	Status    ProcessTaskStatus  `json:"status"`
+	Title     string             `json:"title"`
 }
 
 // ProcessTaskStatus defines model for ProcessTaskStatus.
@@ -1312,6 +1333,36 @@ type WebhookDeliveryList struct {
 	//
 	// Example: 120
 	Total int `json:"total"`
+}
+
+// WorkingHour defines model for WorkingHour.
+type WorkingHour struct {
+	// End When the stretch ends, in minutes from midnight.
+	//
+	// Example: 1020
+	End int `json:"end"`
+
+	// Start When the stretch starts, in minutes from midnight.
+	//
+	// Example: 540
+	Start int `json:"start"`
+
+	// Weekday The day of the week; 0 is Sunday.
+	//
+	// Example: 1
+	Weekday int `json:"weekday"`
+}
+
+// WorkingHours defines model for WorkingHours.
+type WorkingHours struct {
+	// Data The stretches of the week, ordered by day.
+	Data []WorkingHour `json:"data"`
+}
+
+// WorkingHoursRequest defines model for WorkingHoursRequest.
+type WorkingHoursRequest struct {
+	// Data The stretches of the week; the calendar is replaced as a whole.
+	Data []WorkingHour `json:"data"`
 }
 
 // AdminKey defines model for AdminKey.
@@ -1562,6 +1613,9 @@ type UpdateAdminUserJSONRequestBody = UpdateAdminUserRequest
 
 // SetAdminUserPasswordJSONRequestBody defines body for SetAdminUserPassword for application/json ContentType.
 type SetAdminUserPasswordJSONRequestBody = SetAdminUserPasswordRequest
+
+// ReplaceWorkingHoursJSONRequestBody defines body for ReplaceWorkingHours for application/json ContentType.
+type ReplaceWorkingHoursJSONRequestBody = WorkingHoursRequest
 
 // UploadAttachmentMultipartRequestBody defines body for UploadAttachment for multipart/form-data ContentType.
 type UploadAttachmentMultipartRequestBody UploadAttachmentMultipartBody

@@ -1,5 +1,5 @@
 import Link from 'next/link';
-import type { BusinessObject, BusinessObjectVersion, ObjectRecord } from '@opvaryn/contracts';
+import type { BusinessObject } from '@opvaryn/contracts';
 
 import { MiniApp, type MiniAppData } from '@/components/apps/mini-app';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';

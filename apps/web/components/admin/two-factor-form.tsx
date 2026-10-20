@@ -20,6 +20,10 @@ import { INPUT_CLASS, LABEL_CLASS, SUBMIT_CLASS } from '@/components/admin/form-
  */
 export function TwoFactorForm({ enabled }: { enabled: boolean }) {
   const [state, formAction] = useActionState(enableMyTwoFactorAction, INITIAL_ADMIN_STATE);
+  const [disableState, disableFormAction] = useActionState(
+    disableMyTwoFactorAction,
+    INITIAL_ADMIN_STATE,
+  );
   const [setupState, setSetupState] = useState<{ secret?: string; uri?: string }>({});
 
   return (
@@ -32,7 +36,7 @@ export function TwoFactorForm({ enabled }: { enabled: boolean }) {
       </CardDescription>
 
       {enabled ? (
-        <form action={formAction} className="mt-4 space-y-3">
+        <form action={disableFormAction} className="mt-4 space-y-3">
           <div>
             <label htmlFor="two-factor-code" className={LABEL_CLASS}>
               Mã xác thực
@@ -48,7 +52,7 @@ export function TwoFactorForm({ enabled }: { enabled: boolean }) {
             />
           </div>
           <Submit label="Tắt xác thực hai bước" secondary />
-          <StateMessage state={state} />
+          <StateMessage state={disableState} />
         </form>
       ) : (
         <div className="mt-4 space-y-3">
