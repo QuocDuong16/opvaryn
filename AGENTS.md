@@ -120,7 +120,9 @@ Working agreement for agents and contributors in this repository.
 ## Database and data safety
 
 - Storage is PostgreSQL. Dynamic payloads are JSONB, but every field that is filtered,
-  joined or measured gets a typed projection or read model.
+  joined or measured gets a typed projection or read model. A table field has several
+  rows, so its cells are projected apart (`record_table_values`, ADR 0036); a computed
+  field holds a number and is projected like a number field.
 - `business_object_records.values` is the JSONB payload of one record, keyed by field key and
   validated in the service against the object's definition before insert. Each record also stores
   the definition version it was created under and is always read with that version's schema.

@@ -63,14 +63,20 @@ func recordVisibleToScopeAt(base int) string {
 //
 // The search reads the typed projection (`record_field_values`), not the raw JSONB: a field
 // that is filtered gets a projection instead of being expanded at query time (AGENTS.md), and
-// the projection's index serves the lookup.
+// the projection's index serves the lookup. The cells of a table are searched the same way,
+// through their own projection (ADR 0036).
 var objectRecordFilter = `
 		 WHERE r.object_id = $1 AND ` + recordVisibleToScope + `
 		   AND ($5 = '' OR EXISTS (
 		         SELECT 1 FROM record_field_values f
 		          WHERE f.record_id = r.id
 		            AND (f.text_value ILIKE '%' || $5 || '%' ESCAPE '\'
-		                 OR f.number_value::text ILIKE '%' || $5 || '%' ESCAPE '\')))`
+		                 OR f.number_value::text ILIKE '%' || $5 || '%' ESCAPE '\'))
+		        OR EXISTS (
+		         SELECT 1 FROM record_table_values t
+		          WHERE t.record_id = r.id
+		            AND (t.text_value ILIKE '%' || $5 || '%' ESCAPE '\'
+		                 OR t.number_value::text ILIKE '%' || $5 || '%' ESCAPE '\')))`
 
 // ListObjectRecords returns one page of the records of one object that the scope may see,
 // newest first, with the total behind the page.
@@ -143,13 +149,14 @@ func (s *Store) CreateObjectRecord(
 	ctx context.Context,
 	record domain.ObjectRecord,
 	projection []domain.RecordFieldValue,
+	tableProjection []domain.RecordTableValue,
 	bindings []domain.AttachmentBinding,
 	audit domain.RecordAudit,
 	admin bool,
 ) (domain.ObjectRecord, error) {
 	created := record
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		stored, err := insertObjectRecordTx(ctx, tx, record, projection)
+		stored, err := insertObjectRecordTx(ctx, tx, record, projection, tableProjection)
 		if err != nil {
 			return err
 		}
@@ -174,11 +181,12 @@ func (s *Store) CreateObjectRecords(
 	ctx context.Context,
 	records []domain.ObjectRecord,
 	projections [][]domain.RecordFieldValue,
+	tableProjections [][]domain.RecordTableValue,
 	audits []domain.RecordAudit,
 ) error {
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		for i, record := range records {
-			if _, err := insertObjectRecordTx(ctx, tx, record, projections[i]); err != nil {
+			if _, err := insertObjectRecordTx(ctx, tx, record, projections[i], tableProjections[i]); err != nil {
 				return err
 			}
 			if err := insertRecordAuditTx(ctx, tx, audits[i]); err != nil {
@@ -198,6 +206,7 @@ func insertObjectRecordTx(
 	tx pgx.Tx,
 	record domain.ObjectRecord,
 	projection []domain.RecordFieldValue,
+	tableProjection []domain.RecordTableValue,
 ) (domain.ObjectRecord, error) {
 	values, err := json.Marshal(record.Values)
 	if err != nil {
@@ -244,7 +253,43 @@ func insertObjectRecordTx(
 			return domain.ObjectRecord{}, fmt.Errorf("project field %s: %w", field.FieldKey, err)
 		}
 	}
+	if err := insertTableValuesTx(ctx, tx, record, tableProjection); err != nil {
+		return domain.ObjectRecord{}, err
+	}
 	return stored, nil
+}
+
+// insertTableValuesTx writes the typed projection of the cells of a table field
+// (ADR 0036). It runs in the same transaction as the record, so a cell is never
+// measurable without the record it belongs to.
+func insertTableValuesTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	record domain.ObjectRecord,
+	projection []domain.RecordTableValue,
+) error {
+	for _, cell := range projection {
+		var textValue, numberValue, dateValue any
+		switch cell.Kind {
+		case domain.MetricNumber:
+			numberValue = cell.Number
+		case domain.MetricDate:
+			dateValue = cell.Date
+		default:
+			textValue = cell.Text
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO record_table_values
+			       (record_id, object_key, field_key, column_key, row_index,
+			        text_value, number_value, date_value)
+			VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+			record.ID, record.ObjectKey, cell.FieldKey, cell.ColumnKey, cell.RowIndex,
+			textValue, numberValue, dateValue,
+		); err != nil {
+			return fmt.Errorf("project table cell %s.%s: %w", cell.FieldKey, cell.ColumnKey, err)
+		}
+	}
+	return nil
 }
 
 // objectRecordWriteError maps the two write failures a record insert can meet: a foreign
@@ -313,6 +358,7 @@ func (s *Store) UpdateObjectRecord(
 	ctx context.Context,
 	record domain.ObjectRecord,
 	projection []domain.RecordFieldValue,
+	tableProjection []domain.RecordTableValue,
 	fileFieldKeys []string,
 	bindings []domain.AttachmentBinding,
 	editorID uuid.UUID,
@@ -341,6 +387,12 @@ func (s *Store) UpdateObjectRecord(
 			`DELETE FROM record_field_values WHERE record_id = $1`, record.ID); err != nil {
 			return fmt.Errorf("clear record projection: %w", err)
 		}
+		// The cells of a table are projected apart, so they are cleared apart too
+		// (ADR 0036).
+		if _, err := tx.Exec(ctx,
+			`DELETE FROM record_table_values WHERE record_id = $1`, record.ID); err != nil {
+			return fmt.Errorf("clear record table projection: %w", err)
+		}
 		for _, field := range projection {
 			var textValue, numberValue, dateValue any
 			switch field.Kind {
@@ -359,6 +411,9 @@ func (s *Store) UpdateObjectRecord(
 			); err != nil {
 				return fmt.Errorf("project field %s: %w", field.FieldKey, err)
 			}
+		}
+		if err := insertTableValuesTx(ctx, tx, record, tableProjection); err != nil {
+			return err
 		}
 		if err := replaceAttachmentsTx(ctx, tx, record.ID, record.ObjectKey, editorID, admin,
 			fileFieldKeys, bindings); err != nil {
@@ -461,8 +516,26 @@ func (s *Store) RecordLabelSources(
 	return sources, nil
 }
 
+// inboxTaskOrder is the order of the inbox (ADR 0036): the most urgent work first,
+// then the work that runs out of time soonest, then the oldest. The priority is a word,
+// so it is ranked here rather than sorted as text — "urgent" would otherwise sort
+// between "normal" and "low".
+const inboxTaskOrder = `
+		 CASE t.priority
+		      WHEN 'urgent' THEN 0
+		      WHEN 'high'   THEN 1
+		      WHEN 'normal' THEN 2
+		      WHEN 'low'    THEN 3
+		      ELSE 4
+		 END,
+		 t.due_at ASC NULLS LAST,
+		 t.created_at,
+		 t.id`
+
 // ListOpenTasksForRoles returns the open tasks of an instance the given user holds a
-// role on: the per-user inbox (ADR 0008), oldest first.
+// role on: the per-user inbox (ADR 0008). The order is what a person waiting for work
+// needs: the most urgent first, then the one that runs out of time soonest, then the
+// oldest (ADR 0036).
 func (s *Store) ListOpenTasksForRoles(
 	ctx context.Context,
 	userID uuid.UUID,
@@ -494,7 +567,7 @@ func (s *Store) ListOpenTasksForRoles(
 	}
 
 	rows, err := s.pool.Query(ctx, columns+filter+`
-		 ORDER BY t.created_at, t.id
+		 ORDER BY `+inboxTaskOrder+`
 		 LIMIT $3 OFFSET $4`, userID, term, page.Limit, page.Offset)
 	if err != nil {
 		return domain.Paged[domain.InboxItem]{}, classify(fmt.Errorf("query inbox tasks: %w", err))

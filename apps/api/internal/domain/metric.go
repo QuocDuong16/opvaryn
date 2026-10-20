@@ -28,10 +28,14 @@ const (
 )
 
 // MetricFieldRef is one field of the bound business object, with the kind it had when
-// the metric was defined.
+// the metric was defined. A column of a table field is addressed by the field it
+// belongs to plus the column key (ADR 0036).
 type MetricFieldRef struct {
 	Key  string
 	Kind MetricValueKind
+	// Column is the key of a column inside a table field. It is empty for a plain
+	// field.
+	Column string
 }
 
 // MetricFilter is the single filter a metric may carry: the same JSON condition shape
@@ -93,6 +97,21 @@ type MetricResult struct {
 // JSONB (AGENTS.md: a measured field gets a typed projection).
 type RecordFieldValue struct {
 	FieldKey string
+	Kind     MetricValueKind
+	// Exactly one of these carries the value, following Kind.
+	Text   string
+	Number float64
+	Date   time.Time
+}
+
+// RecordTableValue is one cell of a table field projected into typed columns. A table
+// has several rows, so its cells cannot live in RecordFieldValue (one row per field);
+// they have their own projection (ADR 0036).
+type RecordTableValue struct {
+	FieldKey  string
+	ColumnKey string
+	// RowIndex is the position of the row inside the table, counting from zero.
+	RowIndex int
 	Kind     MetricValueKind
 	// Exactly one of these carries the value, following Kind.
 	Text   string

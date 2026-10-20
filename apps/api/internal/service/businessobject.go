@@ -280,6 +280,18 @@ func validateComputedField(
 				fmt.Sprintf("%s.formula: %q is not a number field, so it cannot be used in an expression", where, key))
 		}
 	}
+	// A computed field holds a number (ADR 0036): that is what makes it measurable.
+	// A comparison answers yes or no, so it belongs inside a choice, not on its own.
+	kind, err := formula.ResultKind(expression)
+	if err != nil {
+		problems = append(problems, fmt.Sprintf("%s.formula: %v", where, err))
+		return problems
+	}
+	if kind != formula.KindNumber {
+		problems = append(problems, fmt.Sprintf(
+			"%s.formula: must produce a number (a comparison answers yes or no; use a choice to turn it into one)",
+			where))
+	}
 	return problems
 }
 
@@ -342,14 +354,24 @@ func validateVisibleWhen(
 		return []string{fmt.Sprintf("%s.visibleWhen.field: a field cannot depend on itself", where)}
 	}
 	known := false
+	computed := false
 	for _, other := range fields {
 		if other.Key == condition.Field {
 			known = true
+			computed = other.Type == domain.FieldTypeFormula
 			break
 		}
 	}
 	if !known {
 		return []string{fmt.Sprintf("%s.visibleWhen.field: reads the unknown field %q", where, condition.Field)}
+	}
+	if computed {
+		// A computed field is only known after the record is saved, so a condition on
+		// it would never hold. Saying so here beats a field that silently never
+		// appears.
+		return []string{fmt.Sprintf(
+			"%s.visibleWhen.field: reads the computed field %q, whose value is only known after saving",
+			where, condition.Field)}
 	}
 	switch condition.Op {
 	case "eq", "ne", "gt", "gte", "lt", "lte":

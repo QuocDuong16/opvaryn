@@ -75,7 +75,7 @@ export function TableField({
                   {columns.map((column) => (
                     <td key={column.key} className="px-2 py-1.5">
                       <input
-                        type={column.type === 'number' ? 'number' : 'text'}
+                        type={inputTypeFor(column.type)}
                         value={row[column.key] ?? ''}
                         onChange={(event) => update(rowIndex, column.key, event.target.value)}
                         className={INPUT_CLASS}
@@ -106,6 +106,21 @@ export function TableField({
       </button>
     </div>
   );
+}
+
+/**
+ * inputTypeFor picks the control of a cell from the kind of its column (ADR 0036): a
+ * number column asks for a number, a date column for a date, a text column for text.
+ */
+function inputTypeFor(type: string): 'text' | 'number' | 'date' {
+  switch (type) {
+    case 'number':
+      return 'number';
+    case 'date':
+      return 'date';
+    default:
+      return 'text';
+  }
 }
 
 /** rowsFromValue reads the stored rows of a table field. */

@@ -16,7 +16,13 @@ import {
   formatRate,
   reworkedLabel,
 } from '@/components/analytics/process-metrics';
-import { fieldNames, labelOrKey, optionValueNames, OPERATOR_LABELS } from '@/lib/names';
+import {
+  columnNames,
+  fieldNames,
+  labelOrKey,
+  optionValueNames,
+  OPERATOR_LABELS,
+} from '@/lib/names';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { DesignerNotice } from '@/components/ui/role-notice';
 import { PageHeader } from '@/components/ui/page-header';
@@ -40,14 +46,23 @@ const AGGREGATION_LABELS: Record<string, string> = {
   avg: 'Trung bình',
 };
 
-/** aggregationLabel says what the metric does, in words: "Tổng của Giá trị dự kiến". */
-function aggregationLabel(metric: MetricDefinition, fields: ReadonlyMap<string, string>): string {
+/**
+ * aggregationLabel says what the metric does, in words: "Tổng của Giá trị dự kiến". A
+ * metric that measures a column of a table names the column (ADR 0036).
+ */
+function aggregationLabel(
+  metric: MetricDefinition,
+  fields: ReadonlyMap<string, string>,
+  columns: ReadonlyMap<string, string>,
+): string {
   const label = AGGREGATION_LABELS[metric.aggregation] ?? metric.aggregation;
   if (!metric.measure) {
     return `${label} bản ghi`;
   }
-  const field = labelOrKey(fields.get(metric.measure.key), metric.measure.key);
-  return `${label} của ${field}`;
+  const measured = metric.measure.column
+    ? labelOrKey(columns.get(metric.measure.column), metric.measure.column)
+    : labelOrKey(fields.get(metric.measure.key), metric.measure.key);
+  return `${label} của ${measured}`;
 }
 
 export default async function AnalyticsPage({ searchParams }: PageProps) {
@@ -127,6 +142,10 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
     const object = objects.find((candidate) => candidate.key === objectKey);
     return object ? fieldNames(object) : new Map();
   };
+  const columnNameFor = (objectKey: string): Map<string, string> => {
+    const object = objects.find((candidate) => candidate.key === objectKey);
+    return object ? columnNames(object) : new Map();
+  };
 
   return (
     <>
@@ -176,6 +195,9 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
               initialWidgets={widgets}
               fieldNames={Object.fromEntries(
                 objects.map((object) => [object.key, Object.fromEntries(fieldNames(object))]),
+              )}
+              columnNames={Object.fromEntries(
+                objects.map((object) => [object.key, Object.fromEntries(columnNames(object))]),
               )}
               optionNames={Object.fromEntries(
                 objects.map((object) => [
@@ -254,7 +276,11 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
                             </span>
                           </td>
                           <td className="px-4 py-3 align-top text-xs">
-                            {aggregationLabel(metric, fieldNameFor(metric.objectKey))}
+                            {aggregationLabel(
+                              metric,
+                              fieldNameFor(metric.objectKey),
+                              columnNameFor(metric.objectKey),
+                            )}
                           </td>
                           <td className="px-4 py-3 align-top text-xs text-on-surface-muted">
                             {metric.filter
@@ -405,11 +431,11 @@ export default async function AnalyticsPage({ searchParams }: PageProps) {
             </dl>
 
             <Card className="mt-4 border-warning/40">
-              <CardTitle className="text-warning">SLA chưa có</CardTitle>
+              <CardTitle className="text-warning">Tỉ lệ vi phạm hạn chưa có</CardTitle>
               <CardDescription>
-                Tỉ lệ vi phạm SLA cần một chính sách thời gian làm việc (giờ hành chính, ngày nghỉ)
-                mà hệ thống chưa có. Vì vậy bảng này không hiển thị hạn giả: chỉ những gì đo được
-                mới xuất hiện.
+                Mỗi loại việc đã có hạn xử lý tính theo giờ làm việc, nhưng bảng này chưa đếm được
+                bao nhiêu việc hoàn thành quá hạn. Vì vậy bảng này không hiển thị hạn giả: chỉ những
+                gì đo được mới xuất hiện.
               </CardDescription>
             </Card>
           </>

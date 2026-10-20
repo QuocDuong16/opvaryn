@@ -1004,9 +1004,10 @@ export interface paths {
         };
         /**
          * Open tasks of the signed-in user
-         * @description One page of the open tasks whose role the signed-in user holds, oldest first,
-         *     together with the instance it belongs to, and the total behind the page. `q`
-         *     searches the task title and the process name.
+         * @description One page of the open tasks whose role the signed-in user holds, together with the
+         *     instance it belongs to, and the total behind the page. The order is the most
+         *     urgent work first, then the work that runs out of time soonest, then the oldest.
+         *     `q` searches the task title and the process name.
          */
         get: operations["listInboxTasks"];
         put?: never;
@@ -1878,6 +1879,11 @@ export interface components {
         MetricFieldRef: {
             key: string;
             kind: components["schemas"]["MetricValueKind"];
+            /**
+             * @description The key of a column inside a table field. When it is present, the metric
+             *     measures the cells of that column rather than the field itself (ADR 0036).
+             */
+            column?: string;
         };
         /** @description The single filter a metric carries, using the D04 condition shape. */
         MetricFilter: {
@@ -2044,6 +2050,11 @@ export interface components {
             aggregation: components["schemas"]["MetricAggregation"];
             /** @description The numeric field to measure; must be empty for count. */
             field?: string;
+            /**
+             * @description The column of a table field to measure, when the metric measures the cells
+             *     of a table column (ADR 0036). Empty for a plain field.
+             */
+            column?: string;
             /** @description Optional filter with the same shape process branches use. */
             filter?: components["schemas"]["ProcessCondition"];
             /** @description Optional select, text or date field to group by. */

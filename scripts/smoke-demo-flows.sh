@@ -597,7 +597,7 @@ assert_contains "$tmp_dir/analytics.html" "Lưu bố cục" "analytics page"
 assert_contains "$tmp_dir/analytics.html" "Vận hành quy trình" "the operational section is rendered"
 assert_contains "$tmp_dir/analytics.html" "Tỉ lệ duyệt" "the approval rate is shown"
 assert_contains "$tmp_dir/analytics.html" "Tỉ lệ phải chạy lại" "the rework rate is shown"
-assert_contains "$tmp_dir/analytics.html" "SLA chưa có" "the missing SLA policy is stated, not faked"
+assert_contains "$tmp_dir/analytics.html" "Tỉ lệ vi phạm hạn chưa có" "the missing violation rate is stated, not faked"
 assert_contains "$tmp_dir/analytics.html" "Tổng giá trị luồng demo" "the live metric is listed"
 assert_contains "$tmp_dir/analytics.html" "1700000" "the metric table shows the real value"
 

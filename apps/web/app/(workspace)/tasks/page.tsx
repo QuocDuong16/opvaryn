@@ -20,12 +20,12 @@ const RUNTIME_GAPS: readonly { title: string; body: string }[] = [
     body: 'Việc giao theo vai trò; hai người quyết cùng lúc thì người sau được báo là việc đã được xử lý; mọi quyết định đều ghi lại kèm người thực hiện và lý do; từ chối là kết thúc, còn trả về thì mở lại từ đầu.',
   },
   {
-    title: 'Chưa có: song song và join',
-    body: 'Chưa hỗ trợ nhiều nhánh chạy song song và gộp nhánh.',
+    title: 'Đã có',
+    body: 'Hạn xử lý tính theo giờ làm việc của từng loại việc, và việc quá hạn được chuyển cho vai trò tiếp quản.',
   },
   {
-    title: 'Chưa có: SLA và escalation',
-    body: 'Hạn xử lý và tự động chuyển cấp chưa có, nên màn hình này không hiển thị hạn giả.',
+    title: 'Chưa có: song song và join',
+    body: 'Chưa hỗ trợ nhiều nhánh chạy song song và gộp nhánh.',
   },
   {
     title: 'Chưa có: uỷ quyền và huỷ một lần chạy',
@@ -149,7 +149,9 @@ export default async function TasksPage({ searchParams }: PageProps) {
               <dd className="text-xs">{me.departmentName || '—'}</dd>
             </div>
           </dl>
-          <p className="text-xs text-on-surface-muted">Việc cũ nhất ở trên đầu.</p>
+          <p className="text-xs text-on-surface-muted">
+            Việc khẩn nhất ở trên đầu, việc sắp đến hạn thì trước.
+          </p>
         </div>
       ) : null}
 

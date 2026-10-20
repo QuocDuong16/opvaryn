@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  columnNames,
   designerRoleName,
   fieldNames,
   joinLabels,
@@ -60,6 +61,30 @@ describe('fieldNames', () => {
 
     expect(names.get('estimated_amount')).toBe('Giá trị dự kiến (VND)');
     expect(labelOrKey(names.get('nope'), 'nope')).toBe('nope');
+  });
+});
+
+describe('columnNames', () => {
+  it('names the columns of a table, so a metric reads in words', () => {
+    const names = columnNames({
+      fields: [
+        {
+          key: 'items',
+          columns: [
+            { key: 'name', label: 'Tên món' },
+            { key: 'price', label: 'Giá' },
+          ],
+        },
+      ],
+    });
+
+    expect(names.get('price')).toBe('Giá');
+    expect(labelOrKey(names.get('nope'), 'nope')).toBe('nope');
+  });
+
+  it('copes with a field that has no table', () => {
+    const names = columnNames({ fields: [{ key: 'title' }] });
+    expect(names.size).toBe(0);
   });
 });
 

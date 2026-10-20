@@ -186,6 +186,31 @@ func toAPIFieldDefinitions(fields []domain.FieldDefinition) []apiv1.FieldDefinit
 			}
 			converted.Options = &options
 		}
+		// The computed expression, the visibility rule and the table columns are part
+		// of the definition, so they travel back with it: a designer who opens an
+		// existing definition to publish the next version must find it whole
+		// (ADR 0032, ADR 0036).
+		if formula := strings.TrimSpace(field.Formula); formula != "" {
+			converted.Formula = &formula
+		}
+		if field.VisibleWhen != nil {
+			converted.VisibleWhen = &apiv1.FieldCondition{
+				Field: field.VisibleWhen.Field,
+				Op:    apiv1.FieldConditionOp(field.VisibleWhen.Op),
+				Value: field.VisibleWhen.Value,
+			}
+		}
+		if len(field.Columns) > 0 {
+			columns := make([]apiv1.FieldColumn, len(field.Columns))
+			for j, column := range field.Columns {
+				columns[j] = apiv1.FieldColumn{
+					Key:   column.Key,
+					Label: column.Label,
+					Type:  apiv1.FieldColumnType(column.Type),
+				}
+			}
+			converted.Columns = &columns
+		}
 		result[i] = converted
 	}
 	return result

@@ -93,7 +93,16 @@ func prepareValues(
 				"values.%s: the formula of this field could not be computed: %v", field.Key, err))
 			continue
 		}
-		prepared[field.Key] = formulaValue(result)
+		number, ok := result.(formula.Number)
+		if !ok {
+			// A computed field holds a number (ADR 0036). A definition that answers
+			// yes or no is refused when it is published, so reaching this means the
+			// definition was published before that rule existed.
+			problems = append(problems, fmt.Sprintf(
+				"values.%s: the formula of this field must produce a number", field.Key))
+			continue
+		}
+		prepared[field.Key] = float64(number)
 	}
 
 	for _, field := range object.Fields {
@@ -107,20 +116,6 @@ func prepareValues(
 		problems = append(problems, validateTableValue(field, value)...)
 	}
 	return prepared, problems
-}
-
-// formulaValue turns the result of an expression into a value the record can hold.
-func formulaValue(result any) any {
-	switch typed := result.(type) {
-	case formula.Number:
-		return float64(typed)
-	case formula.Bool:
-		return bool(typed)
-	case formula.Text:
-		return string(typed)
-	default:
-		return result
-	}
 }
 
 // validateTableValue checks the rows of a table field against its columns.
@@ -188,4 +183,77 @@ func validateColumnValue(column domain.FieldColumn, value any) string {
 		}
 	}
 	return ""
+}
+
+// projectTableValues turns the cells of the table fields into their typed projection
+// (ADR 0036). A cell is projected in the kind of its column, so a number column can be
+// summed and a text column can be searched.
+func projectTableValues(
+	fields []domain.FieldDefinition,
+	values map[string]any,
+) []domain.RecordTableValue {
+	projected := make([]domain.RecordTableValue, 0)
+	for _, field := range fields {
+		if field.Type != domain.FieldTypeTable {
+			continue
+		}
+		rows, ok := values[field.Key].([]any)
+		if !ok {
+			continue
+		}
+		for index, row := range rows {
+			cells, ok := row.(map[string]any)
+			if !ok {
+				continue
+			}
+			for _, column := range field.Columns {
+				cell, present := cells[column.Key]
+				if !present || isAbsentValue(cell) {
+					continue
+				}
+				projected = append(projected, tableCellValue(field, column, index, cell))
+			}
+		}
+	}
+	return projected
+}
+
+// tableCellValue projects one cell in the kind of its column.
+func tableCellValue(
+	field domain.FieldDefinition,
+	column domain.FieldColumn,
+	index int,
+	cell any,
+) domain.RecordTableValue {
+	projected := domain.RecordTableValue{
+		FieldKey:  field.Key,
+		ColumnKey: column.Key,
+		RowIndex:  index,
+	}
+	switch column.Type {
+	case domain.FieldTypeNumber:
+		if number, ok := numberFromForm(cell); ok {
+			projected.Kind = domain.MetricNumber
+			projected.Number = number
+		}
+	case domain.FieldTypeDate:
+		text, ok := cell.(string)
+		if !ok {
+			return projected
+		}
+		date, err := time.Parse(time.DateOnly, strings.TrimSpace(text))
+		if err != nil {
+			return projected
+		}
+		projected.Kind = domain.MetricDate
+		projected.Date = date
+	default:
+		text, ok := cell.(string)
+		if !ok {
+			return projected
+		}
+		projected.Kind = domain.MetricText
+		projected.Text = text
+	}
+	return projected
 }

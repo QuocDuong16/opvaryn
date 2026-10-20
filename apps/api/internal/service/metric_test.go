@@ -333,9 +333,107 @@ func TestMetricResolvesFieldKindsAndAnswersScoped(t *testing.T) {
 	}
 }
 
-func TestMetricKeyCannotBeChanged(t *testing.T) {
+// A metric may measure a number column of a table (ADR 0036): the column is named
+// apart from the field it belongs to, and its kind is resolved on save.
+func TestMetricMeasuresAColumnOfATable(t *testing.T) {
 	t.Parallel()
 
+	object := metricsObject()
+	object.Fields = append(object.Fields, domain.FieldDefinition{
+		Key: "lines", Label: "Dòng hàng", Type: domain.FieldTypeTable,
+		Columns: []domain.FieldColumn{
+			{Key: "name", Label: "Tên", Type: domain.FieldTypeText},
+			{Key: "price", Label: "Giá", Type: domain.FieldTypeNumber},
+		},
+	})
+	metrics, store := newMetricService(object)
+
+	created, err := metrics.Create(context.Background(), NewMetricInput{
+		Key:         "lines_total",
+		Name:        "Tổng giá các dòng",
+		ObjectKey:   "purchase_request",
+		Aggregation: "sum",
+		Field:       "lines",
+		Column:      "price",
+	}, testPrincipal())
+	if err != nil {
+		t.Fatalf("Create returned error: %v", err)
+	}
+	if created.Measure == nil || created.Measure.Column != "price" ||
+		created.Measure.Kind != domain.MetricNumber {
+		t.Fatalf("expected the measure to name the column, got %+v", created.Measure)
+	}
+	if _, err := metrics.Result(context.Background(), created.Key, managerPrincipal()); err != nil {
+		t.Fatalf("Result returned error: %v", err)
+	}
+	if store.query.Measure == nil || store.query.Measure.Column != "price" {
+		t.Fatalf("the resolved query must carry the column, got %+v", store.query.Measure)
+	}
+}
+
+// A column that is not a number, or not a column at all, is refused by name.
+func TestMetricRefusesAColumnItCannotMeasure(t *testing.T) {
+	t.Parallel()
+
+	object := metricsObject()
+	object.Fields = append(object.Fields, domain.FieldDefinition{
+		Key: "lines", Label: "Dòng hàng", Type: domain.FieldTypeTable,
+		Columns: []domain.FieldColumn{
+			{Key: "name", Label: "Tên", Type: domain.FieldTypeText},
+			{Key: "price", Label: "Giá", Type: domain.FieldTypeNumber},
+		},
+	})
+	metrics, _ := newMetricService(object)
+
+	cases := []struct {
+		name   string
+		input  NewMetricInput
+		reason string
+	}{
+		{
+			name: "a text column",
+			input: NewMetricInput{
+				Key: "total_lines", Name: "Tổng", ObjectKey: "purchase_request",
+				Aggregation: "sum", Field: "lines", Column: "name",
+			},
+			reason: "only a number column can be measured",
+		},
+		{
+			name: "a column that does not exist",
+			input: NewMetricInput{
+				Key: "total_lines", Name: "Tổng", ObjectKey: "purchase_request",
+				Aggregation: "sum", Field: "lines", Column: "missing",
+			},
+			reason: "is not a column of the table",
+		},
+		{
+			name: "a column of a field that is not a table",
+			input: NewMetricInput{
+				Key: "total_lines", Name: "Tổng", ObjectKey: "purchase_request",
+				Aggregation: "sum", Field: "estimated_amount", Column: "price",
+			},
+			reason: "is not a table",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			_, err := metrics.Create(context.Background(), testCase.input, testPrincipal())
+			var validation *ValidationError
+			if !errors.As(err, &validation) {
+				t.Fatalf("expected a validation error, got %v", err)
+			}
+			if !strings.Contains(validation.Problems[0], testCase.reason) {
+				t.Fatalf("expected the problem to explain %q, got %q",
+					testCase.reason, validation.Problems[0])
+			}
+		})
+	}
+}
+
+func TestMetricKeyCannotBeChanged(t *testing.T) {
+	t.Parallel()
 	metrics, _ := newMetricService(metricsObject())
 	_, err := metrics.Update(context.Background(), "purchase_count", NewMetricInput{
 		Key: "other_key", Name: "x", ObjectKey: "purchase_request", Aggregation: "count",

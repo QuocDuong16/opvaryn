@@ -54,6 +54,7 @@ export function DashboardStudio({
   results,
   initialWidgets,
   fieldNames,
+  columnNames,
   optionNames,
 }: {
   metrics: readonly MetricDefinition[];
@@ -62,12 +63,16 @@ export function DashboardStudio({
   initialWidgets: readonly DashboardWidget[];
   /** Field key to label, per object, so a widget says what it measures (ADR 0018). */
   fieldNames: Record<string, Record<string, string>>;
+  /** Column key to label, per object, for a metric that measures a table column (ADR 0036). */
+  columnNames: Record<string, Record<string, string>>;
   /** Select value to label, per object and field, so a breakdown names its groups (ADR 0016). */
   optionNames: Record<string, Record<string, Record<string, string>>>;
 }) {
   const allowed = metrics.map((metric) => metric.key);
   const namesFor = (objectKey: string): Map<string, string> =>
     new Map(Object.entries(fieldNames[objectKey] ?? {}));
+  const columnNamesFor = (objectKey: string): Map<string, string> =>
+    new Map(Object.entries(columnNames[objectKey] ?? {}));
   const [widgets, setWidgets] = useState<DashboardWidget[]>(() => [...initialWidgets]);
   const [dragging, setDragging] = useState<number | null>(null);
   const [saveState, saveAction] = useActionState(saveDashboardAction, INITIAL_SAVE_DASHBOARD_STATE);
@@ -164,7 +169,17 @@ export function DashboardStudio({
                   <p className="mt-0.5 text-[11px] text-on-surface-muted">
                     {`${AGGREGATION_LABELS[metric.aggregation] ?? metric.aggregation}${
                       metric.measure
-                        ? ` của ${labelOrKey(namesFor(metric.objectKey).get(metric.measure.key), metric.measure.key)}`
+                        ? ` của ${
+                            metric.measure.column
+                              ? labelOrKey(
+                                  columnNamesFor(metric.objectKey).get(metric.measure.column),
+                                  metric.measure.column,
+                                )
+                              : labelOrKey(
+                                  namesFor(metric.objectKey).get(metric.measure.key),
+                                  metric.measure.key,
+                                )
+                          }`
                         : ' bản ghi'
                     }${
                       metric.groupBy

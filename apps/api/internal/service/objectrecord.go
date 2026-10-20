@@ -38,6 +38,7 @@ type recordStore interface {
 		ctx context.Context,
 		record domain.ObjectRecord,
 		projection []domain.RecordFieldValue,
+		tableProjection []domain.RecordTableValue,
 		bindings []domain.AttachmentBinding,
 		audit domain.RecordAudit,
 		admin bool,
@@ -46,6 +47,7 @@ type recordStore interface {
 		ctx context.Context,
 		records []domain.ObjectRecord,
 		projections [][]domain.RecordFieldValue,
+		tableProjections [][]domain.RecordTableValue,
 		audits []domain.RecordAudit,
 	) error
 	FindVisibleObjectRecord(ctx context.Context, id uuid.UUID, scope domain.RecordScope) (domain.ObjectRecord, bool, error)
@@ -54,6 +56,7 @@ type recordStore interface {
 		ctx context.Context,
 		record domain.ObjectRecord,
 		projection []domain.RecordFieldValue,
+		tableProjection []domain.RecordTableValue,
 		fileFieldKeys []string,
 		bindings []domain.AttachmentBinding,
 		editorID uuid.UUID,
@@ -213,7 +216,9 @@ func (s *ObjectRecords) Create(ctx context.Context, objectKey string, values map
 	}
 
 	created, err := s.store.CreateObjectRecord(ctx, record,
-		projectRecordValues(object.Fields, record.Values), bindings,
+		projectRecordValues(object.Fields, record.Values),
+		projectTableValues(object.Fields, record.Values),
+		bindings,
 		domain.RecordAudit{
 			RecordID:  record.ID,
 			ObjectKey: record.ObjectKey,
@@ -319,6 +324,7 @@ func (s *ObjectRecords) Update(
 	}
 	updated, err := s.store.UpdateObjectRecord(ctx, record,
 		projectRecordValues(object.Fields, record.Values),
+		projectTableValues(object.Fields, record.Values),
 		fileFieldKeys, bindings, principal.UserID, audit, principal.IsAdmin())
 	if err != nil {
 		return domain.ObjectRecord{}, err
@@ -582,7 +588,9 @@ func projectRecordValues(fields []domain.FieldDefinition, values map[string]any)
 			continue
 		}
 		switch field.Type {
-		case domain.FieldTypeNumber:
+		case domain.FieldTypeNumber, domain.FieldTypeFormula:
+			// A computed field holds a number (ADR 0036), so it is measured like a
+			// number field: the projection is what makes it count.
 			number, ok := numberValue(value)
 			if !ok {
 				continue
@@ -835,6 +843,35 @@ func numberValue(value any) (float64, bool) {
 	}
 }
 
+// normalizeTableCell stores one cell of a table row in the kind of its column
+// (ADR 0036): a number column holds a number, a date column holds a date string, a text
+// column holds trimmed text. The value was already checked against the column, so a
+// cell that does not fit its column keeps what it came as rather than being replaced by
+// an empty one.
+func normalizeTableCell(column domain.FieldColumn, cell any) any {
+	switch column.Type {
+	case domain.FieldTypeNumber:
+		if number, ok := numberFromForm(cell); ok {
+			return number
+		}
+		return cell
+	case domain.FieldTypeDate:
+		text, ok := cell.(string)
+		if !ok {
+			return cell
+		}
+		return strings.TrimSpace(text)
+	case domain.FieldTypeText:
+		text, ok := cell.(string)
+		if !ok {
+			return cell
+		}
+		return strings.TrimSpace(text)
+	default:
+		return cell
+	}
+}
+
 // normalizeRecordValues trims text values and drops absent ones, so what is stored
 // matches what a user meant to enter.
 func normalizeRecordValues(object domain.BusinessObject, values map[string]any) map[string]any {
@@ -857,6 +894,10 @@ func normalizeRecordValues(object domain.BusinessObject, values map[string]any) 
 			if !ok {
 				continue
 			}
+			columns := make(map[string]domain.FieldColumn, len(field.Columns))
+			for _, column := range field.Columns {
+				columns[column.Key] = column
+			}
 			rows := make([]any, 0, len(items))
 			for _, item := range items {
 				cells, ok := item.(map[string]any)
@@ -865,16 +906,14 @@ func normalizeRecordValues(object domain.BusinessObject, values map[string]any) 
 				}
 				row := make(map[string]any, len(cells))
 				for key, cell := range cells {
-					switch typed := cell.(type) {
-					case string:
-						row[key] = strings.TrimSpace(typed)
-					case float64:
-						row[key] = typed
-					case int:
-						row[key] = float64(typed)
-					default:
+					column, known := columns[key]
+					if !known {
+						// An unknown cell was already refused; keep it as it came so
+						// nothing is silently rewritten.
 						row[key] = cell
+						continue
 					}
+					row[key] = normalizeTableCell(column, cell)
 				}
 				rows = append(rows, row)
 			}
