@@ -11,6 +11,10 @@
 //	useradm -add-role -email lan@example.com -roles process_designer
 //	useradm -set-password -email lan@example.com -password '...'
 //	useradm -prune-sessions
+//	useradm -prune-orphan-attachments
+//	useradm -unlock -email lan@example.com
+//	useradm -list-lockouts
+//	useradm -prune-login-failures
 //	useradm -list
 package main
 
@@ -44,8 +48,15 @@ func run() error {
 		setPassword      = flag.Bool("set-password", false, "replace a user's password")
 		addRole          = flag.Bool("add-role", false, "grant roles to an existing user")
 		pruneSessions    = flag.Bool("prune-sessions", false, "delete expired sessions")
-		setRoleLabel     = flag.Bool("set-role-label", false, "name a role for the interface")
-		list             = flag.Bool("list", false, "list users")
+		pruneFiles       = flag.Bool("prune-orphan-attachments", false,
+			"delete uploads that were never attached to a record (older than 24h)")
+		unlock       = flag.Bool("unlock", false, "clear the sign-in cooldown of an address")
+		listLockouts = flag.Bool("list-lockouts", false,
+			"list the addresses that are waiting out a sign-in cooldown")
+		pruneFailures = flag.Bool("prune-login-failures", false,
+			"delete sign-in failures older than the cooldown window")
+		setRoleLabel = flag.Bool("set-role-label", false, "name a role for the interface")
+		list         = flag.Bool("list", false, "list users")
 
 		email      = flag.String("email", "", "user email (normalised to lower case)")
 		name       = flag.String("name", "", "display name")
@@ -132,6 +143,46 @@ func run() error {
 		fmt.Printf("removed %d expired session(s)\n", removed)
 		return nil
 
+	case *pruneFiles:
+		removed, err := service.NewAttachments(st).PruneOrphans(ctx, 24*time.Hour)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("removed %d orphan attachment(s)\n", removed)
+		return nil
+
+	case *unlock:
+		if *email == "" {
+			return fmt.Errorf("unlock needs -email")
+		}
+		if err := identity.UnlockEmail(ctx, *email); err != nil {
+			return err
+		}
+		fmt.Printf("cleared the sign-in cooldown of %s\n", service.NormalizeEmail(*email))
+		return nil
+
+	case *listLockouts:
+		addresses, err := identity.LockedEmails(ctx)
+		if err != nil {
+			return err
+		}
+		if len(addresses) == 0 {
+			fmt.Println("no address is waiting out a sign-in cooldown")
+			return nil
+		}
+		for _, address := range addresses {
+			fmt.Printf("%s\n", address)
+		}
+		return nil
+
+	case *pruneFailures:
+		removed, err := identity.PruneLoginFailures(ctx, service.LoginFailureWindow)
+		if err != nil {
+			return err
+		}
+		fmt.Printf("removed %d sign-in failure(s)\n", removed)
+		return nil
+
 	case *list:
 		users, err := identity.ListUsers(ctx)
 		if err != nil {
@@ -145,7 +196,7 @@ func run() error {
 
 	default:
 		flag.Usage()
-		return fmt.Errorf("nothing to do: pass -create, -add-role, -set-password, -create-department, -set-role-label, -prune-sessions or -list")
+		return fmt.Errorf("nothing to do: pass -create, -add-role, -set-password, -create-department, -set-role-label, -prune-sessions, -prune-orphan-attachments, -unlock, -list-lockouts, -prune-login-failures or -list")
 	}
 }
 

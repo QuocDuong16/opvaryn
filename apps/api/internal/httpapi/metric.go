@@ -28,16 +28,16 @@ func handleListMetrics(metrics *service.Metrics, log *slog.Logger) http.HandlerF
 
 func handleCreateMetricDefinition(metrics *service.Metrics, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
+
 		var body apiv1.CreateMetricDefinitionJSONRequestBody
 		if err := decodeJSON(w, r, &body); err != nil {
 			log.Warn("rejected request body", "error", err)
 			writeError(w, log, http.StatusBadRequest, codeInvalidRequest,
 				"request body must be a single JSON object matching the CreateMetricDefinitionRequest schema")
-			return
-		}
-
-		user, ok := requireUser(w, log, r)
-		if !ok {
 			return
 		}
 
@@ -76,16 +76,16 @@ func handleGetMetricDefinition(metrics *service.Metrics, log *slog.Logger) http.
 
 func handleUpdateMetricDefinition(metrics *service.Metrics, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
+
 		var body apiv1.UpdateMetricDefinitionJSONRequestBody
 		if err := decodeJSON(w, r, &body); err != nil {
 			log.Warn("rejected request body", "error", err)
 			writeError(w, log, http.StatusBadRequest, codeInvalidRequest,
 				"request body must be a single JSON object matching the UpdateMetricDefinitionRequest schema")
-			return
-		}
-
-		user, ok := requireUser(w, log, r)
-		if !ok {
 			return
 		}
 

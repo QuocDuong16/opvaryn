@@ -209,6 +209,10 @@ func handleGetProcessInstance(runtime *service.ProcessRuntime, log *slog.Logger)
 
 func handleDecideProcessTask(runtime *service.ProcessRuntime, log *slog.Logger) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		user, ok := requireUser(w, log, r)
+		if !ok {
+			return
+		}
 		var body apiv1.DecideProcessTaskJSONRequestBody
 		if err := decodeJSON(w, r, &body); err != nil {
 			log.Warn("rejected request body", "error", err)
@@ -217,10 +221,6 @@ func handleDecideProcessTask(runtime *service.ProcessRuntime, log *slog.Logger) 
 			return
 		}
 
-		user, ok := requireUser(w, log, r)
-		if !ok {
-			return
-		}
 		instanceID, ok := parseUUIDParam(w, log, r, "instanceId", "process instance id")
 		if !ok {
 			return

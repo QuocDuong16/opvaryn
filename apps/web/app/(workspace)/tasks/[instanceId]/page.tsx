@@ -29,7 +29,7 @@ interface PageProps {
 
 export async function generateMetadata({ params }: PageProps) {
   const { instanceId } = await params;
-  return { title: `Lần chạy ${instanceId.slice(0, 8)}` };
+  return { title: 'Lần chạy' };
 }
 
 const STATE_STYLES: Record<string, string> = {

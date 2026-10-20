@@ -3,8 +3,7 @@
 import { useCallback, useRef, useState, type PointerEvent } from 'react';
 import type { FieldDefinition, ProcessCondition, RoleEntry } from '@opvaryn/contracts';
 
-import { labelOrKey, roleLabels as indexRoleLabels } from '@/lib/names';
-import { OPERATOR_LABELS } from '@/components/process/process-timeline';
+import { labelOrKey, OPERATOR_LABELS, roleLabels as indexRoleLabels } from '@/lib/names';
 import { CONDITION_OPS } from '@/components/workflows/definition-draft';
 import {
   NODE_HEIGHT,
@@ -109,6 +108,13 @@ export function GraphCanvas({
     },
     [size.width],
   );
+
+  // The editor names the things a step mentions: the role it belongs to, the field a
+  // condition compares (ADR 0016, ADR 0018).
+  const nodeLabels = {
+    roles: new Map(knownRoles.map((role) => [role.key, role.label])),
+    fields: new Map(conditionFields.map((field) => [field.key, field.label])),
+  };
 
   function startDrag(event: PointerEvent, node: DraftNode) {
     event.stopPropagation();
@@ -394,7 +400,7 @@ export function GraphCanvas({
                             ? labelOrKey(knownRoleLabels.get(node.assigneeRole), node.assigneeRole)
                             : 'chưa gán vai trò'
                           : node.type === 'condition'
-                            ? conditionSummary(node.condition)
+                            ? conditionSummary(node.condition, nodeLabels)
                             : NODE_TYPE_LABELS[node.type]}
                       </text>
                     </g>

@@ -69,7 +69,7 @@ Thứ tự gợi ý, kèm phần cần nói rõ để không trình bày quá:
 | --- | --- | --- | --- |
 | 1 | **Trang giới thiệu** `/` (công khai) → **Tổng quan** `/overview` (sau đăng nhập) | Trang bìa mô tả sản phẩm cho người chưa có tài khoản; sau khi đăng nhập là trạng thái API/database đọc trực tiếp (không phải ảnh chụp), các màn hình kèm nhãn và quy ước nhãn | live |
 | 2 | **Business Objects** `/objects` | Tạo object mới ngay tại chỗ: thêm vài field, một field `select` kèm danh sách lựa chọn | live |
-| 3 | **Object detail** `/objects/<key>` | Ba phần, mở từng phần một: **Trường** (các trường của phiên bản đang dùng + lịch sử phiên bản + khung sửa định nghĩa), **Bản ghi** (bảng bản ghi + form nhập sinh từ định nghĩa; thử để trống trường bắt buộc để thấy server chặn), **Quy trình** (chạy một quy trình + các lần chạy). Mỗi dòng bản ghi có lối vào xem riêng các lần chạy của nó | live |
+| 3 | **Object detail** `/objects/<key>` | Ba phần, mở từng phần một: **Trường** (các trường của phiên bản đang dùng + lịch sử phiên bản + khung sửa định nghĩa), **Bản ghi** (bảng bản ghi + form nhập sinh từ định nghĩa; thử để trống trường bắt buộc để thấy server chặn), **Quy trình** (chạy một quy trình + các lần chạy). Mỗi dòng bản ghi có **Mở bản ghi** để xem/sửa/xoá trên màn hình riêng (sửa theo đúng phiên bản định nghĩa của bản ghi; bản ghi đã có lần chạy thì không xoá được) và lối vào xem riêng các lần chạy của nó. Nút **Xuất CSV** tải danh sách đang xem (tối đa 10.000 dòng) ra file mở bằng Excel; khối **Nhập từ CSV** kiểm tra file trước rồi mới ghi (tất cả hoặc không gì); trường **Báo giá** kiểu tệp cho tải tài liệu lên ngay trong form; mỗi bản ghi có **Lịch sử thay đổi** ghi ai sửa trường nào | live |
 | 3b | **Phát hành phiên bản** (phần Trường) | Sửa định nghĩa rồi **Phát hành phiên bản v2**: bản ghi cũ vẫn nằm ở nhóm "phiên bản cũ" với đúng định nghĩa cũ, bản ghi mới dùng định nghĩa mới. Đây là bất biến #1 của playbook chạy thật | live |
 | 4 | **Forms** `/forms` | Đổi schema, thấy form đổi theo; danh sách "chưa có trong V1" | live + concept |
 | 5 | **Workflows** `/workflows` | Danh sách định nghĩa đọc từ API và lối vào **Tạo quy trình mới** (`/workflows/new`): trả lời ba câu hỏi (tên, loại dữ liệu, ai nhận việc ở bước đầu) rồi **vẽ các bước trên canvas** ngay từ đầu — bản mẫu ba bước có sẵn, checklist bên cạnh nói còn gì phải sửa trước khi phát hành. Mở một định nghĩa để **kéo thả trên canvas** (kéo bước, kéo chấm tròn để nối, thêm/xoá, sửa vai trò/điều kiện), lưu nháp rồi **Phát hành phiên bản mới**; xem lại phiên bản cũ. Cần vai trò thiết kế quy trình hoặc quản trị hệ thống mới phát hành được | **live** |
@@ -77,8 +77,9 @@ Thứ tự gợi ý, kèm phần cần nói rõ để không trình bày quá:
 | 6 | **Tasks** `/tasks` | Inbox thật theo role của người đang đăng nhập; mở một việc để xem bản ghi, event log và **duyệt / trả về / từ chối**; thử bằng hai tài khoản khác role để thấy việc chuyển người | **live** |
 | 7 | **Analytics** `/analytics` | Metric thật trên dữ liệu thật: tạo metric từ field của object (đếm/tổng/trung bình, lọc, nhóm), thấy con số và phân rã ngay; kéo–thả sắp widget, **Lưu bố cục**, F5 để thấy còn nguyên | **live** |
 | 8 | **Applications** `/apps` | Danh sách và chi tiết đọc bản ghi thật; kanban; tab **Cấu hình** (các ô đều bị khoá); panel tích hợp | live + mock + concept |
-| 9 | **Roadmap** `/roadmap` | Bốn phase, điều kiện nghiệm thu MVP, quyết định đang mở chặn tiến độ và các quyết định đã chốt | concept |
-| 10 | **Cài đặt** `/settings` | Danh sách endpoint, cổng, lệnh seed/smoke; **nhật ký giao webhook** (bật/tắt, số lần thử, lỗi cuối) | live |
+| 9 | **Quản trị** `/admin` | Danh mục tài khoản, phòng ban, vai trò; tạo người, gán vai trò, khoá tài khoản, đặt lại mật khẩu, mở khoá đăng nhập khi tài khoản bị tạm khoá sau nhiều lần gõ sai. Chỉ tài khoản giữ vai trò quản trị hệ thống thấy khu vực này | **live** |
+| 10 | **Roadmap** `/roadmap` | Bốn phase, điều kiện nghiệm thu MVP, quyết định đang mở chặn tiến độ và các quyết định đã chốt | concept |
+| 11 | **Cài đặt** `/settings` | Danh sách endpoint, cổng, lệnh seed/smoke; **nhật ký giao webhook** (bật/tắt, số lần thử, lỗi cuối) | live |
 
 Câu nên nói ở mục 8: "kanban và connector là mô phỏng". Nhãn `Mock` / `Concept` đã hiện sẵn ở góc
 phải mỗi màn hình, nên người xem tự kiểm chứng được. Mục 6 (Tasks) và 7 (Analytics) là **live**: mọi
@@ -173,7 +174,8 @@ chuyển tiếp nó cho API (ADR 0008). `make seed-demo` tạo sẵn bộ tài k
 | `seed_ke_toan@opvaryn.local` | Kế toán | `ke_toan` | (trống — chỉ nhận việc sau khi trưởng bộ phận duyệt đề nghị dưới ngưỡng) |
 | `seed@opvaryn.local` | Ban giám đốc | `admin` | Tất cả dữ liệu, dùng để chứng minh phạm vi |
 
-Tài khoản thủ công (nếu bạn tự tạo theo hướng dẫn cũ):
+Tài khoản thủ công: `useradm` vẫn là đường bootstrap cho tài khoản quản trị đầu tiên. Sau đó, tạo
+và quản lý tài khoản, phòng ban, vai trò ngay trong sản phẩm tại **Quản trị** `/admin` (ADR 0022).
 
 ```bash
 make useradm ARGS="-create-department -key ky_thuat -department-name 'Kỹ thuật'"
@@ -192,7 +194,7 @@ Hai điều cần biết khi trình diễn phần này:
   trò đó không thấy các nút tạo/sửa (kể cả trình soạn quy trình — họ chỉ đọc sơ đồ), và mỗi màn
   nói rõ việc đó cần vai trò gì; API vẫn là nơi từ chối thật (ADR 0021).
 - **Bản ghi được lọc theo bộ phận**: đăng nhập `lan@opvaryn.local` (Kỹ thuật) sẽ thấy đề nghị của
-  Kỹ thuật, `bao@opvaryn.local` (Kế toán) thấy 0, còn `seed@opvaryn.local` (admin) thấy tất cả. Đó
+  Kỹ thuật, `seed_ke_toan@opvaryn.local` (Kế toán) thấy 0, còn `seed@opvaryn.local` (admin) thấy tất cả. Đó
   là D09b chạy thật, không phải ẩn trên giao diện. Muốn nạp dữ liệu mẫu đúng bộ phận: `make seed-demo`.
 - **Quy trình pilot** (`purchase_approval`, `incident_triage`, `hr_onboarding_flow`) đã được publish
   v1 và seed sẵn việc đang chờ; muốn xem định nghĩa thật:
@@ -232,8 +234,8 @@ quyết định một task mà role của bạn không giữ trả **403**.
 ## 8. Sau khi xem demo
 
 - Phần lớn **MVP V1** đã chạy trên chính repo này (runtime, identity, inbox, thiết kế quy trình, ba
-  quy trình pilot); phần còn lại và các quyết định còn mở nằm ở trang `/roadmap` trong app và
-  `operations-playbook/decisions.html` — hiện chỉ **D06** (analytics) còn mở.
+  quy trình pilot); phần còn lại nằm ở trang `/roadmap` trong app. Các quyết định trong playbook
+  (**D04–D10**) đã chốt hết và chạy trong code — xem `docs/adr/`.
 - Muốn chạy sản phẩm trên một host nội bộ (Docker Compose, backup, diễn tập phục hồi):
   [ops-runbook.md](ops-runbook.md).
 - Muốn kiểm tra chất lượng đầy đủ trước khi commit: `make quality-check`.

@@ -164,6 +164,126 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/business-objects/{key}/records/import": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Import records from a CSV file
+         * @description Reads a CSV whose first row is the field labels (or the machine keys) of the object's
+         *     newest published version, converts each cell by the field type, and stores every row
+         *     in one transaction. Labels are matched case-insensitively; numbers accept Vietnamese
+         *     formatting (`1.500.000`, `12,5`), dates accept `YYYY-MM-DD` and `DD/MM/YYYY`, a select
+         *     accepts the option label or its value, and a rows cell is split on `;` and newlines.
+         *     File fields cannot be imported: attach the file after the record exists.
+         *
+         *     Every row is checked before anything is written: a file with one bad row creates
+         *     nothing and answers the row numbers that need fixing. `dryRun=true` runs the same
+         *     checks without writing. The cap is 500 data rows and 5 MB.
+         */
+        post: operations["importObjectRecords"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/business-objects/{key}/records/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Export the records the caller may read as a CSV file
+         * @description One CSV file for the records of the addressed object, in scope order (newest first).
+         *     The first line carries the field labels, not the machine keys; select values are
+         *     written as the option a person sees, and rows as one cell with items separated by
+         *     `; `. The file starts with a UTF-8 BOM so Excel opens Vietnamese text correctly, and
+         *     cells that begin with `=`, `+`, `-` or `@` are prefixed with an apostrophe so a stored
+         *     value cannot become a spreadsheet formula.
+         *
+         *     Visibility is the record scope of ADR 0008, exactly like the list, and `q` applies
+         *     the same search. A request that would export more than 10,000 rows is refused with
+         *     400: narrow the search instead of asking for the whole table.
+         */
+        get: operations["exportObjectRecords"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/business-objects/{key}/records/{recordId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Read one record
+         * @description One record of the addressed object. Visibility is the record scope of ADR 0008, the
+         *     same rule the list applies; a record the caller may not read answers 404.
+         */
+        get: operations["getObjectRecord"];
+        /**
+         * Replace the values of one record
+         * @description Replaces the record's values. They are validated against the field definitions of the
+         *     version the record was created under — never the newest schema — and the typed
+         *     projection is rewritten in the same transaction. The record's object, version and
+         *     creator never change.
+         *
+         *     Writing needs more than reading: an administrator, the person who created the record,
+         *     or a member of the record's department. A caller who may read a record through an open
+         *     task but does not belong to either group answers 403.
+         */
+        put: operations["updateObjectRecord"];
+        post?: never;
+        /**
+         * Delete one record
+         * @description Deletes a record that no process has ever run on. A record with a process instance is
+         *     refused with the `in_use` code: its runs and their audit trail are the history of a
+         *     decision, and deleting the record would take that history with it.
+         */
+        delete: operations["deleteObjectRecord"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/business-objects/{key}/records/{recordId}/history": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The change history of one record
+         * @description Append-only history: who created, changed or deleted the record and which fields
+         *     changed, newest first. Field labels and values are rendered for a person; the stored
+         *     values (not identifiers) are what the history keeps. Visibility is the record scope —
+         *     a hidden record answers 404. The history outlives the record, so a deleted record's
+         *     entries are not removed by the record's deletion.
+         */
+        get: operations["listObjectRecordHistory"];
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/auth/login": {
         parameters: {
             query?: never;
@@ -220,6 +340,29 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/me/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Change the signed-in user's password
+         * @description Verifies the current password, stores a new argon2id hash and ends every *other*
+         *     session of that person: the session making the request keeps working, so nobody is
+         *     signed out of the device they are standing at. An administrator reset is the way to
+         *     take an account back (`POST /admin/users/{userId}/password`).
+         */
+        post: operations["changeMyPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/roles": {
         parameters: {
             query?: never;
@@ -238,6 +381,263 @@ export interface paths {
         put?: never;
         post?: never;
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List people, one page at a time
+         * @description Administration view of the organisation: every account, its department, its roles and
+         *     whether it may sign in. `q` searches the email and the name. The caller must hold the
+         *     `admin` role; a missing role answers 403. An account that is waiting out a sign-in
+         *     cooldown carries `lockedUntil` (ADR 0028).
+         */
+        get: operations["listAdminUsers"];
+        put?: never;
+        /**
+         * Create one account
+         * @description Creates a person with a password, a department and at least one role. The first
+         *     administrator cannot come from here: the bootstrap account is created with
+         *     `make useradm` (ADR 0008).
+         */
+        post: operations["createAdminUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{userId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** One account for the edit screen */
+        get: operations["getAdminUser"];
+        /**
+         * Replace an account's profile and roles
+         * @description Replaces the editable profile and the complete role set. Disabling an account ends its
+         *     sessions immediately. The API refuses to disable the signed-in account or to remove the
+         *     last active administrator.
+         */
+        put: operations["updateAdminUser"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{userId}/password": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Replace an account's password
+         * @description Sets a new password and ends every existing session of that person, so a reset also
+         *     takes back an account somebody else may still be using.
+         */
+        post: operations["setAdminUserPassword"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{userId}/unlock": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Clear the sign-in cooldown of one account
+         * @description Ends the short wait an address gets after too many wrong passwords (ADR 0028). The
+         *     person signs in with the right password again right away. The password is not changed
+         *     and no session is touched.
+         */
+        post: operations["unlockAdminUser"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/users/{userId}/sessions": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /**
+         * End every session of one account
+         * @description Signs the person out everywhere without changing the password. Useful before handing
+         *     an account to somebody else, or after a device went missing.
+         */
+        delete: operations["revokeAdminUserSessions"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/departments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** List departments with head counts */
+        get: operations["listAdminDepartments"];
+        put?: never;
+        /** Add one department */
+        post: operations["createAdminDepartment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/departments/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Rename one department
+         * @description The key is the scope value stored on records, so it never changes.
+         */
+        put: operations["updateAdminDepartment"];
+        post?: never;
+        /**
+         * Delete an empty department
+         * @description Refused while people belong to it or stored records name it as their scope: deleting it
+         *     would silently change who can read those records.
+         */
+        delete: operations["deleteAdminDepartment"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/roles": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * List the whole role catalogue
+         * @description Unlike `GET /api/v1/roles`, which lists the roles somebody holds, this lists every role
+         *     in the catalogue, including roles created before they are granted, with the number of
+         *     people holding each one.
+         */
+        get: operations["listAdminRoles"];
+        put?: never;
+        /** Add one role to the catalogue */
+        post: operations["createAdminRole"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/admin/roles/{key}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        /**
+         * Rename one role
+         * @description The key stays fixed: process nodes and authorization compare it.
+         */
+        put: operations["updateAdminRole"];
+        post?: never;
+        /**
+         * Delete a role nothing depends on
+         * @description Refused for a platform role (`admin`, `process_designer`), a role somebody holds, and a
+         *     role named by any published process version.
+         */
+        delete: operations["deleteAdminRole"];
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attachments": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * Upload one file for a record field
+         * @description Uploads a file and returns its identifier. A file starts unbound; it is attached to
+         *     the record when the form that references its identifier is saved. Only the uploader
+         *     (or an administrator) may bind it, and a file is bound once. The content type is
+         *     sniffed from the bytes; the size cap is 10 MB.
+         */
+        post: operations["uploadAttachment"];
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/api/v1/attachments/{attachmentId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * Download one file
+         * @description Streams the bytes as an attachment. A file is visible to its uploader while unbound
+         *     and to the record's readers once bound; a hidden file answers 404. The response is
+         *     always served as a download with `nosniff`, never rendered in the browser.
+         */
+        get: operations["downloadAttachment"];
+        put?: never;
+        post?: never;
+        /**
+         * Remove an upload that never became part of a record
+         * @description Only an unbound file uploaded by the caller (or an administrator) can be removed.
+         *     A bound file belongs to its record and is replaced or deleted with it.
+         */
+        delete: operations["deleteAttachment"];
         options?: never;
         head?: never;
         patch?: never;
@@ -624,6 +1024,26 @@ export interface components {
             values: {
                 [key: string]: unknown;
             };
+            /**
+             * @description Display name of the person who entered the record, so a screen names them instead
+             *     of printing an identifier (ADR 0016). Absent when the account is gone.
+             */
+            createdByName?: string;
+            /** @description Display name of the department the record belongs to; absent when none applies. */
+            departmentName?: string;
+            /**
+             * @description Whether the signed-in caller satisfies the write rule of ADR 0023 (administrator,
+             *     creator, or a member of the record's department). A display hint only: the API
+             *     checks it again on every update and delete.
+             */
+            canEdit: boolean;
+            /**
+             * @description File name per file-field key, so a screen names the attachment instead of showing
+             *     its identifier. Filled when one record is read.
+             */
+            attachmentNames?: {
+                [key: string]: string;
+            };
             /** Format: date-time */
             createdAt: string;
             /** Format: date-time */
@@ -636,6 +1056,61 @@ export interface components {
              */
             total: number;
             data: components["schemas"]["ObjectRecord"][];
+        };
+        RecordHistoryList: {
+            total: number;
+            /** @description Entries newest first. */
+            data: components["schemas"]["RecordHistoryEntry"][];
+        };
+        RecordHistoryEntry: {
+            /** Format: int64 */
+            id: number;
+            /** @enum {string} */
+            action: "created" | "updated" | "deleted";
+            /** @description The name at the time of the change (empty for the system or a gone account). */
+            actorName: string;
+            changes: components["schemas"]["RecordHistoryChange"][];
+            /** Format: date-time */
+            createdAt: string;
+        };
+        RecordHistoryChange: {
+            /** @description The field's name, not its key. */
+            fieldLabel: string;
+            /** @description The value before the change; empty when the field was absent. */
+            from: string;
+            /** @description The value after the change; empty when the field was cleared. */
+            to: string;
+        };
+        RecordImportResult: {
+            dryRun: boolean;
+            /** @description Data rows found in the file (excluding the header). */
+            rows: number;
+            /** @description Rows that passed every check. */
+            valid: number;
+            /** @description Rows actually stored; zero for a dry run and zero when any row failed. */
+            created: number;
+            /** @description `row` is the spreadsheet line number (the header is line 1). */
+            errors: components["schemas"]["RecordImportError"][];
+        };
+        RecordImportError: {
+            row: number;
+            message: string;
+        };
+        Attachment: {
+            /** Format: uuid */
+            id: string;
+            objectKey: string;
+            /** @description Sanitized name shown to people and sent back as the download name. */
+            fileName: string;
+            /** @description Sniffed from the bytes, not taken from the upload request. */
+            contentType: string;
+            /**
+             * Format: int64
+             * @description Size in bytes (the cap is 10 MB).
+             */
+            size: number;
+            /** Format: date-time */
+            createdAt: string;
         };
         CreateObjectRecordRequest: {
             /**
@@ -858,6 +1333,12 @@ export interface components {
             /** @description Visible instances, newest first. */
             data: components["schemas"]["ProcessInstanceSummary"][];
         };
+        ChangeMyPasswordRequest: {
+            /** @description The password the person signs in with today. */
+            currentPassword: string;
+            /** @description At least 10 characters and different from the current one. */
+            newPassword: string;
+        };
         LoginRequest: {
             /** @example lan@example.com */
             email: string;
@@ -908,6 +1389,126 @@ export interface components {
              * @description Display name; empty when the role has not been named yet.
              * @example Trưởng bộ phận
              */
+            label: string;
+        };
+        /**
+         * @description A disabled account keeps its history but cannot sign in.
+         * @enum {string}
+         */
+        AdminUserStatus: "active" | "disabled";
+        AdminUser: {
+            /** Format: uuid */
+            id: string;
+            email: string;
+            name: string;
+            /** @description Department key (D09b scoping). Keys are for the engine, not for screens. */
+            department: string;
+            /**
+             * @description Display name of the department, for screens (ADR 0016).
+             * @example Kỹ thuật
+             */
+            departmentName: string;
+            roles: string[];
+            /** @description Display name per role key. A role nobody has named is absent. */
+            roleLabels: {
+                [key: string]: string;
+            };
+            status: components["schemas"]["AdminUserStatus"];
+            /**
+             * Format: date-time
+             * @description When the sign-in cooldown of this address ends (ADR 0028). Absent when the account
+             *     can sign in normally. Only the administration area reads it.
+             */
+            lockedUntil?: string;
+            /** Format: date-time */
+            createdAt: string;
+            /** Format: date-time */
+            updatedAt: string;
+        };
+        AdminUserList: {
+            /** @description Accounts behind the page. */
+            total: number;
+            /** @description One page of accounts, ordered by email. */
+            data: components["schemas"]["AdminUser"][];
+        };
+        CreateAdminUserRequest: {
+            /** @example lan@example.com */
+            email: string;
+            /** @example Nguyễn Thị Lan */
+            name: string;
+            /** @description At least 10 characters; stored only as an argon2id PHC string. */
+            password: string;
+            /**
+             * @description Key of an existing department.
+             * @example ky_thuat
+             */
+            department: string;
+            /** @description At least one role key. */
+            roles: string[];
+        };
+        UpdateAdminUserRequest: {
+            email: string;
+            name: string;
+            department: string;
+            /** @description The complete role set; it replaces what the person held. */
+            roles: string[];
+            status: components["schemas"]["AdminUserStatus"];
+        };
+        SetAdminUserPasswordRequest: {
+            /** @description At least 10 characters. */
+            password: string;
+        };
+        AdminDepartment: {
+            /** @example ky_thuat */
+            key: string;
+            /** @example Kỹ thuật */
+            name: string;
+            /** @description People whose department is this one; a department with people cannot be deleted. */
+            userCount: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AdminDepartmentList: {
+            total: number;
+            data: components["schemas"]["AdminDepartment"][];
+        };
+        CreateAdminDepartmentRequest: {
+            /** @example ky_thuat */
+            key: string;
+            /** @example Kỹ thuật */
+            name: string;
+        };
+        UpdateAdminDepartmentRequest: {
+            /** @example Kỹ thuật và hạ tầng */
+            name: string;
+        };
+        AdminRole: {
+            /** @example truong_bo_phan */
+            key: string;
+            /**
+             * @description Display name.
+             * @example Trưởng bộ phận
+             */
+            label: string;
+            /** @description Platform roles (admin, process_designer) may be renamed but not deleted. */
+            isSystem: boolean;
+            /** @description People holding the role; a held role cannot be deleted. */
+            userCount: number;
+            /** Format: date-time */
+            createdAt: string;
+        };
+        AdminRoleList: {
+            total: number;
+            data: components["schemas"]["AdminRole"][];
+        };
+        CreateAdminRoleRequest: {
+            /** @example truong_bo_phan */
+            key: string;
+            /** @example Trưởng bộ phận */
+            label: string;
+        };
+        UpdateAdminRoleRequest: {
+            /** @example Trưởng bộ phận */
             label: string;
         };
         /**
@@ -1114,6 +1715,15 @@ export interface components {
                 "application/json": components["schemas"]["ErrorResponse"];
             };
         };
+        /** @description The signed-in user does not hold the required role */
+        Forbidden: {
+            headers: {
+                [name: string]: unknown;
+            };
+            content: {
+                "application/json": components["schemas"]["ErrorResponse"];
+            };
+        };
         /** @description The addressed resource moved while the request was in flight */
         Conflict: {
             headers: {
@@ -1135,6 +1745,14 @@ export interface components {
         InstanceId: string;
         /** @description Human task identifier. */
         TaskId: string;
+        /** @description Business object record identifier. */
+        RecordId: string;
+        /** @description Uploaded file identifier. */
+        AttachmentId: string;
+        /** @description Account identifier. */
+        UserId: string;
+        /** @description Stable key of a department or a role. */
+        AdminKey: string;
     };
     requestBodies: never;
     headers: never;
@@ -1236,6 +1854,7 @@ export interface operations {
                     "application/json": components["schemas"]["BusinessObjectList"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -1262,6 +1881,8 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             /** @description A business object with this key already exists */
             409: {
                 headers: {
@@ -1295,6 +1916,7 @@ export interface operations {
                     "application/json": components["schemas"]["BusinessObject"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             503: components["responses"]["ServiceUnavailable"];
         };
@@ -1325,6 +1947,8 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             503: components["responses"]["ServiceUnavailable"];
         };
@@ -1350,6 +1974,7 @@ export interface operations {
                     "application/json": components["schemas"]["BusinessObjectVersionList"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             503: components["responses"]["ServiceUnavailable"];
         };
@@ -1382,6 +2007,7 @@ export interface operations {
                     "application/json": components["schemas"]["ObjectRecordList"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             503: components["responses"]["ServiceUnavailable"];
         };
@@ -1412,6 +2038,205 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    importObjectRecords: {
+        parameters: {
+            query?: {
+                /** @description Check the file and report per-row problems without writing anything. */
+                dryRun?: boolean;
+            };
+            header?: never;
+            path: {
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The rows that are valid and, for a real import, how many were created */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordImportResult"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    exportObjectRecords: {
+        parameters: {
+            query?: {
+                /** @description Search term matched against the stored values. Empty means no filter. */
+                q?: string;
+            };
+            header?: never;
+            path: {
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description UTF-8 CSV (with BOM); the first line is the field labels */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "text/csv": string;
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getObjectRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
+                /** @description Business object record identifier. */
+                recordId: components["parameters"]["RecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The record */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObjectRecord"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    updateObjectRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
+                /** @description Business object record identifier. */
+                recordId: components["parameters"]["RecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateObjectRecordRequest"];
+            };
+        };
+        responses: {
+            /** @description The updated record */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ObjectRecord"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    deleteObjectRecord: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
+                /** @description Business object record identifier. */
+                recordId: components["parameters"]["RecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The record is gone */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description A process instance still refers to the record */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listObjectRecordHistory: {
+        parameters: {
+            query?: {
+                /** @description Rows per page (default 25, maximum 100). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
+            header?: never;
+            path: {
+                /** @description Stable machine key of the business object. */
+                key: components["parameters"]["ObjectKey"];
+                /** @description Business object record identifier. */
+                recordId: components["parameters"]["RecordId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of history entries */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["RecordHistoryList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             503: components["responses"]["ServiceUnavailable"];
         };
@@ -1483,6 +2308,31 @@ export interface operations {
             503: components["responses"]["ServiceUnavailable"];
         };
     };
+    changeMyPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["ChangeMyPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description The password changed and the other sessions are gone */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
     listRoles: {
         parameters: {
             query?: never;
@@ -1502,6 +2352,552 @@ export interface operations {
                 };
             };
             401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listAdminUsers: {
+        parameters: {
+            query?: {
+                /** @description Search term matched against the email and the name. */
+                q?: string;
+                /** @description Rows per page (default 25, maximum 100). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of accounts */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUserList"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    createAdminUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAdminUserRequest"];
+            };
+        };
+        responses: {
+            /** @description The created account */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUser"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    getAdminUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Account identifier. */
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUser"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    updateAdminUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Account identifier. */
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAdminUserRequest"];
+            };
+        };
+        responses: {
+            /** @description The updated account */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminUser"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    setAdminUserPassword: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Account identifier. */
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["SetAdminUserPasswordRequest"];
+            };
+        };
+        responses: {
+            /** @description The password changed and the sessions are gone */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    unlockAdminUser: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Account identifier. */
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The account can sign in again */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    revokeAdminUserSessions: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Account identifier. */
+                userId: components["parameters"]["UserId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description No session of that person remains */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listAdminDepartments: {
+        parameters: {
+            query?: {
+                /** @description Search term matched against the name and the key. */
+                q?: string;
+                /** @description Rows per page (default 25, maximum 100). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of departments */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDepartmentList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    createAdminDepartment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAdminDepartmentRequest"];
+            };
+        };
+        responses: {
+            /** @description The created department */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDepartment"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    updateAdminDepartment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable key of a department or a role. */
+                key: components["parameters"]["AdminKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAdminDepartmentRequest"];
+            };
+        };
+        responses: {
+            /** @description The updated department */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminDepartment"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    deleteAdminDepartment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable key of a department or a role. */
+                key: components["parameters"]["AdminKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The department is gone */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description Something still depends on the department */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listAdminRoles: {
+        parameters: {
+            query?: {
+                /** @description Search term matched against the key and the display name. */
+                q?: string;
+                /** @description Rows per page (default 25, maximum 100). */
+                limit?: number;
+                /** @description Rows to skip. */
+                offset?: number;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description One page of roles */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRoleList"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    createAdminRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["CreateAdminRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description The created role */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRole"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            409: components["responses"]["Conflict"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    updateAdminRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable key of a department or a role. */
+                key: components["parameters"]["AdminKey"];
+            };
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["UpdateAdminRoleRequest"];
+            };
+        };
+        responses: {
+            /** @description The updated role */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["AdminRole"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    deleteAdminRole: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Stable key of a department or a role. */
+                key: components["parameters"]["AdminKey"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The role is gone */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description Something still depends on the role */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    uploadAttachment: {
+        parameters: {
+            query: {
+                /** @description The business object the file will belong to. */
+                objectKey: string;
+            };
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "multipart/form-data": {
+                    /** Format: binary */
+                    file: string;
+                };
+            };
+        };
+        responses: {
+            /** @description The stored file */
+            201: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["Attachment"];
+                };
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    downloadAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Uploaded file identifier. */
+                attachmentId: components["parameters"]["AttachmentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The file bytes */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/octet-stream": string;
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            404: components["responses"]["NotFound"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    deleteAttachment: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path: {
+                /** @description Uploaded file identifier. */
+                attachmentId: components["parameters"]["AttachmentId"];
+            };
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The upload is gone */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
+            404: components["responses"]["NotFound"];
+            /** @description The file belongs to a record */
+            409: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["ErrorResponse"];
+                };
+            };
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -1774,6 +3170,7 @@ export interface operations {
                     "application/json": components["schemas"]["ProcessDefinitionList"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };
@@ -1800,6 +3197,8 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             409: components["responses"]["Conflict"];
             503: components["responses"]["ServiceUnavailable"];
         };
@@ -1825,6 +3224,7 @@ export interface operations {
                     "application/json": components["schemas"]["ProcessDefinition"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             503: components["responses"]["ServiceUnavailable"];
         };
@@ -1855,6 +3255,8 @@ export interface operations {
                 };
             };
             400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             404: components["responses"]["NotFound"];
             503: components["responses"]["ServiceUnavailable"];
         };
@@ -1880,6 +3282,7 @@ export interface operations {
                     "application/json": components["schemas"]["ProcessDefinitionVersionList"];
                 };
             };
+            401: components["responses"]["Unauthorized"];
             404: components["responses"]["NotFound"];
             503: components["responses"]["ServiceUnavailable"];
         };

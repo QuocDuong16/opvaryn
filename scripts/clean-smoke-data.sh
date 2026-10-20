@@ -45,10 +45,18 @@ DELETE FROM process_instances
        );
 
 DELETE FROM process_definitions WHERE key ~ '^(smoke|flow|restart)_';
+-- Files of smoke objects, including uploads that were never attached to a record.
+DELETE FROM attachments        WHERE object_key ~ '^(smoke|flow|restart)_';
+-- The audit table has no foreign key (it outlives records), so it is cleaned by object key.
+DELETE FROM record_audit       WHERE object_key ~ '^(smoke|flow|restart)_';
+DELETE FROM login_failures     WHERE email LIKE '%@example.com';
 DELETE FROM business_objects    WHERE key ~ '^(smoke|flow|restart)_';
 DELETE FROM metric_definitions  WHERE key ~ '^(smoke|flow|restart)_';
 DELETE FROM users               WHERE email LIKE '%@example.com';
 DELETE FROM departments         WHERE key ~ '^(smoke|flow|restart)_';
+-- Roles the smoke runs created (ADR 0022). Deleting the users above removed every holder;
+-- the process definitions deleted earlier removed the published versions that named them.
+DELETE FROM roles               WHERE key ~ '^(smoke|flow|restart)_';
 
 COMMIT;
 SQL

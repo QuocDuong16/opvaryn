@@ -93,7 +93,9 @@ nào thất bại thì cả transaction bị huỷ — không có quyết địn
 ### 9. Durability
 
 State được commit trước khi trả response; response trả đúng instance đã ghi trong transaction đó.
-MVP chưa có side effect ra ngoài nên **chưa có outbox**: khi node Service Action xuất hiện, nó phải
+~~MVP chưa có side effect ra ngoài nên **chưa có outbox**~~ **[Đã sửa bởi ADR 0012]**: giao sự kiện
+ra ngoài nay đi qua outbox `webhook_deliveries`, ghi cùng transaction với sự kiện. Khi node Service
+Action xuất hiện, nó phải
 kèm bảng outbox và ADR riêng (bất biến 3: lỗi tích hợp không được đảo ngược quyết định đã commit).
 
 ### 10. Auditing

@@ -25,6 +25,10 @@ tags:
     description: Records stored against a business object definition
   - name: identity
     description: Sign in, sign out and the current user
+  - name: administration
+    description: Organisation administration for administrators (users, departments, roles)
+  - name: attachments
+    description: Files uploaded for a record field (ADR 0025)
   - name: task-inbox
     description: The open tasks of the signed-in user
 paths:
@@ -106,6 +110,8 @@ paths:
             type: integer
             minimum: 0
             default: 0
+      security:
+        - sessionCookie: []
       responses:
         '200':
           description: Business object definitions
@@ -113,6 +119,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BusinessObjectList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
     post:
@@ -128,6 +136,8 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateBusinessObjectRequest'
+      security:
+        - sessionCookie: []
       responses:
         '201':
           description: Business object definition created
@@ -137,6 +147,10 @@ paths:
                 $ref: '#/components/schemas/BusinessObject'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '409':
           description: A business object with this key already exists
           content:
@@ -155,6 +169,8 @@ paths:
         newest published version of its schema (`version`).
       parameters:
         - $ref: '#/components/parameters/ObjectKey'
+      security:
+        - sessionCookie: []
       responses:
         '200':
           description: The business object definition
@@ -162,6 +178,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BusinessObject'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '503':
@@ -182,6 +200,8 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UpdateBusinessObjectRequest'
+      security:
+        - sessionCookie: []
       responses:
         '200':
           description: The definition with its newly published version
@@ -191,6 +211,10 @@ paths:
                 $ref: '#/components/schemas/BusinessObject'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '503':
@@ -203,6 +227,8 @@ paths:
       description: Returns every published snapshot, newest first.
       parameters:
         - $ref: '#/components/parameters/ObjectKey'
+      security:
+        - sessionCookie: []
       responses:
         '200':
           description: Published definition versions
@@ -210,6 +236,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/BusinessObjectVersionList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '503':
@@ -248,6 +276,8 @@ paths:
             type: integer
             minimum: 0
             default: 0
+      security:
+        - sessionCookie: []
       responses:
         '200':
           description: Records of the business object
@@ -255,6 +285,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ObjectRecordList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '503':
@@ -275,6 +307,8 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateObjectRecordRequest'
+      security:
+        - sessionCookie: []
       responses:
         '201':
           description: Record created
@@ -284,6 +318,246 @@ paths:
                 $ref: '#/components/schemas/ObjectRecord'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/business-objects/{key}/records/import:
+    post:
+      operationId: importObjectRecords
+      tags: [object-records]
+      summary: Import records from a CSV file
+      description: |
+        Reads a CSV whose first row is the field labels (or the machine keys) of the object's
+        newest published version, converts each cell by the field type, and stores every row
+        in one transaction. Labels are matched case-insensitively; numbers accept Vietnamese
+        formatting (`1.500.000`, `12,5`), dates accept `YYYY-MM-DD` and `DD/MM/YYYY`, a select
+        accepts the option label or its value, and a rows cell is split on `;` and newlines.
+        File fields cannot be imported: attach the file after the record exists.
+
+        Every row is checked before anything is written: a file with one bad row creates
+        nothing and answers the row numbers that need fixing. `dryRun=true` runs the same
+        checks without writing. The cap is 500 data rows and 5 MB.
+      parameters:
+        - $ref: '#/components/parameters/ObjectKey'
+        - name: dryRun
+          in: query
+          required: false
+          description: Check the file and report per-row problems without writing anything.
+          schema:
+            type: boolean
+            default: false
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: The rows that are valid and, for a real import, how many were created
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordImportResult'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/business-objects/{key}/records/export:
+    get:
+      operationId: exportObjectRecords
+      tags: [object-records]
+      summary: Export the records the caller may read as a CSV file
+      description: |
+        One CSV file for the records of the addressed object, in scope order (newest first).
+        The first line carries the field labels, not the machine keys; select values are
+        written as the option a person sees, and rows as one cell with items separated by
+        `; `. The file starts with a UTF-8 BOM so Excel opens Vietnamese text correctly, and
+        cells that begin with `=`, `+`, `-` or `@` are prefixed with an apostrophe so a stored
+        value cannot become a spreadsheet formula.
+
+        Visibility is the record scope of ADR 0008, exactly like the list, and `q` applies
+        the same search. A request that would export more than 10,000 rows is refused with
+        400: narrow the search instead of asking for the whole table.
+      parameters:
+        - $ref: '#/components/parameters/ObjectKey'
+        - name: q
+          in: query
+          required: false
+          description: Search term matched against the stored values. Empty means no filter.
+          schema:
+            type: string
+            maxLength: 100
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: UTF-8 CSV (with BOM); the first line is the field labels
+          content:
+            text/csv:
+              schema:
+                type: string
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/business-objects/{key}/records/{recordId}:
+    get:
+      operationId: getObjectRecord
+      tags: [object-records]
+      summary: Read one record
+      description: |
+        One record of the addressed object. Visibility is the record scope of ADR 0008, the
+        same rule the list applies; a record the caller may not read answers 404.
+      parameters:
+        - $ref: '#/components/parameters/ObjectKey'
+        - $ref: '#/components/parameters/RecordId'
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: The record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectRecord'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    put:
+      operationId: updateObjectRecord
+      tags: [object-records]
+      summary: Replace the values of one record
+      description: |
+        Replaces the record's values. They are validated against the field definitions of the
+        version the record was created under — never the newest schema — and the typed
+        projection is rewritten in the same transaction. The record's object, version and
+        creator never change.
+
+        Writing needs more than reading: an administrator, the person who created the record,
+        or a member of the record's department. A caller who may read a record through an open
+        task but does not belong to either group answers 403.
+      parameters:
+        - $ref: '#/components/parameters/ObjectKey'
+        - $ref: '#/components/parameters/RecordId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateObjectRecordRequest'
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: The updated record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ObjectRecord'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    delete:
+      operationId: deleteObjectRecord
+      tags: [object-records]
+      summary: Delete one record
+      description: |
+        Deletes a record that no process has ever run on. A record with a process instance is
+        refused with the `in_use` code: its runs and their audit trail are the history of a
+        decision, and deleting the record would take that history with it.
+      parameters:
+        - $ref: '#/components/parameters/ObjectKey'
+        - $ref: '#/components/parameters/RecordId'
+      security:
+        - sessionCookie: []
+      responses:
+        '204':
+          description: The record is gone
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: A process instance still refers to the record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/business-objects/{key}/records/{recordId}/history:
+    get:
+      operationId: listObjectRecordHistory
+      tags: [object-records]
+      summary: The change history of one record
+      description: |
+        Append-only history: who created, changed or deleted the record and which fields
+        changed, newest first. Field labels and values are rendered for a person; the stored
+        values (not identifiers) are what the history keeps. Visibility is the record scope —
+        a hidden record answers 404. The history outlives the record, so a deleted record's
+        entries are not removed by the record's deletion.
+      parameters:
+        - $ref: '#/components/parameters/ObjectKey'
+        - $ref: '#/components/parameters/RecordId'
+        - name: limit
+          in: query
+          required: false
+          description: Rows per page (default 25, maximum 100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: offset
+          in: query
+          required: false
+          description: Rows to skip.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: One page of history entries
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/RecordHistoryList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '503':
@@ -342,6 +616,33 @@ paths:
           $ref: '#/components/responses/Unauthorized'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/me/password:
+    post:
+      operationId: changeMyPassword
+      tags: [identity]
+      summary: Change the signed-in user's password
+      description: |
+        Verifies the current password, stores a new argon2id hash and ends every *other*
+        session of that person: the session making the request keeps working, so nobody is
+        signed out of the device they are standing at. An administrator reset is the way to
+        take an account back (`POST /admin/users/{userId}/password`).
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/ChangeMyPasswordRequest'
+      responses:
+        '204':
+          description: The password changed and the other sessions are gone
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/roles:
     get:
       operationId: listRoles
@@ -363,6 +664,609 @@ paths:
                 $ref: '#/components/schemas/RoleList'
         '401':
           $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/admin/users:
+    get:
+      operationId: listAdminUsers
+      tags: [administration]
+      summary: List people, one page at a time
+      description: |
+        Administration view of the organisation: every account, its department, its roles and
+        whether it may sign in. `q` searches the email and the name. The caller must hold the
+        `admin` role; a missing role answers 403. An account that is waiting out a sign-in
+        cooldown carries `lockedUntil` (ADR 0028).
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Search term matched against the email and the name.
+          schema:
+            type: string
+            maxLength: 100
+        - name: limit
+          in: query
+          required: false
+          description: Rows per page (default 25, maximum 100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: offset
+          in: query
+          required: false
+          description: Rows to skip.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: One page of accounts
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUserList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      operationId: createAdminUser
+      tags: [administration]
+      summary: Create one account
+      description: |
+        Creates a person with a password, a department and at least one role. The first
+        administrator cannot come from here: the bootstrap account is created with
+        `make useradm` (ADR 0008).
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdminUserRequest'
+      responses:
+        '201':
+          description: The created account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/admin/users/{userId}:
+    get:
+      operationId: getAdminUser
+      tags: [administration]
+      summary: One account for the edit screen
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: The account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    put:
+      operationId: updateAdminUser
+      tags: [administration]
+      summary: Replace an account's profile and roles
+      description: |
+        Replaces the editable profile and the complete role set. Disabling an account ends its
+        sessions immediately. The API refuses to disable the signed-in account or to remove the
+        last active administrator.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAdminUserRequest'
+      responses:
+        '200':
+          description: The updated account
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminUser'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/admin/users/{userId}/password:
+    post:
+      operationId: setAdminUserPassword
+      tags: [administration]
+      summary: Replace an account's password
+      description: |
+        Sets a new password and ends every existing session of that person, so a reset also
+        takes back an account somebody else may still be using.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/SetAdminUserPasswordRequest'
+      responses:
+        '204':
+          description: The password changed and the sessions are gone
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/admin/users/{userId}/unlock:
+    post:
+      operationId: unlockAdminUser
+      tags: [administration]
+      summary: Clear the sign-in cooldown of one account
+      description: |
+        Ends the short wait an address gets after too many wrong passwords (ADR 0028). The
+        person signs in with the right password again right away. The password is not changed
+        and no session is touched.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '204':
+          description: The account can sign in again
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/admin/users/{userId}/sessions:
+    delete:
+      operationId: revokeAdminUserSessions
+      tags: [administration]
+      summary: End every session of one account
+      description: |
+        Signs the person out everywhere without changing the password. Useful before handing
+        an account to somebody else, or after a device went missing.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '204':
+          description: No session of that person remains
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/admin/departments:
+    get:
+      operationId: listAdminDepartments
+      tags: [administration]
+      summary: List departments with head counts
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Search term matched against the name and the key.
+          schema:
+            type: string
+            maxLength: 100
+        - name: limit
+          in: query
+          required: false
+          description: Rows per page (default 25, maximum 100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: offset
+          in: query
+          required: false
+          description: Rows to skip.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: One page of departments
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDepartmentList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      operationId: createAdminDepartment
+      tags: [administration]
+      summary: Add one department
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdminDepartmentRequest'
+      responses:
+        '201':
+          description: The created department
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDepartment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/admin/departments/{key}:
+    put:
+      operationId: updateAdminDepartment
+      tags: [administration]
+      summary: Rename one department
+      description: The key is the scope value stored on records, so it never changes.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/AdminKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAdminDepartmentRequest'
+      responses:
+        '200':
+          description: The updated department
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminDepartment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    delete:
+      operationId: deleteAdminDepartment
+      tags: [administration]
+      summary: Delete an empty department
+      description: |
+        Refused while people belong to it or stored records name it as their scope: deleting it
+        would silently change who can read those records.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/AdminKey'
+      responses:
+        '204':
+          description: The department is gone
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Something still depends on the department
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/admin/roles:
+    get:
+      operationId: listAdminRoles
+      tags: [administration]
+      summary: List the whole role catalogue
+      description: |
+        Unlike `GET /api/v1/roles`, which lists the roles somebody holds, this lists every role
+        in the catalogue, including roles created before they are granted, with the number of
+        people holding each one.
+      parameters:
+        - name: q
+          in: query
+          required: false
+          description: Search term matched against the key and the display name.
+          schema:
+            type: string
+            maxLength: 100
+        - name: limit
+          in: query
+          required: false
+          description: Rows per page (default 25, maximum 100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: offset
+          in: query
+          required: false
+          description: Rows to skip.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: One page of roles
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminRoleList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      operationId: createAdminRole
+      tags: [administration]
+      summary: Add one role to the catalogue
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/CreateAdminRoleRequest'
+      responses:
+        '201':
+          description: The created role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminRole'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '409':
+          $ref: '#/components/responses/Conflict'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/admin/roles/{key}:
+    put:
+      operationId: updateAdminRole
+      tags: [administration]
+      summary: Rename one role
+      description: 'The key stays fixed: process nodes and authorization compare it.'
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/AdminKey'
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/UpdateAdminRoleRequest'
+      responses:
+        '200':
+          description: The updated role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/AdminRole'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    delete:
+      operationId: deleteAdminRole
+      tags: [administration]
+      summary: Delete a role nothing depends on
+      description: |
+        Refused for a platform role (`admin`, `process_designer`), a role somebody holds, and a
+        role named by any published process version.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/AdminKey'
+      responses:
+        '204':
+          description: The role is gone
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: Something still depends on the role
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/attachments:
+    post:
+      operationId: uploadAttachment
+      tags: [attachments]
+      summary: Upload one file for a record field
+      description: |
+        Uploads a file and returns its identifier. A file starts unbound; it is attached to
+        the record when the form that references its identifier is saved. Only the uploader
+        (or an administrator) may bind it, and a file is bound once. The content type is
+        sniffed from the bytes; the size cap is 10 MB.
+      security:
+        - sessionCookie: []
+      parameters:
+        - name: objectKey
+          in: query
+          required: true
+          description: The business object the file will belong to.
+          schema:
+            type: string
+            pattern: '^[a-z][a-z0-9_]{1,63}$'
+      requestBody:
+        required: true
+        content:
+          multipart/form-data:
+            schema:
+              type: object
+              required: [file]
+              properties:
+                file:
+                  type: string
+                  format: binary
+      responses:
+        '201':
+          description: The stored file
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/Attachment'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/attachments/{attachmentId}:
+    get:
+      operationId: downloadAttachment
+      tags: [attachments]
+      summary: Download one file
+      description: |
+        Streams the bytes as an attachment. A file is visible to its uploader while unbound
+        and to the record's readers once bound; a hidden file answers 404. The response is
+        always served as a download with `nosniff`, never rendered in the browser.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/AttachmentId'
+      responses:
+        '200':
+          description: The file bytes
+          content:
+            application/octet-stream:
+              schema:
+                type: string
+                format: binary
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    delete:
+      operationId: deleteAttachment
+      tags: [attachments]
+      summary: Remove an upload that never became part of a record
+      description: |
+        Only an unbound file uploaded by the caller (or an administrator) can be removed.
+        A bound file belongs to its record and is replaced or deleted with it.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/AttachmentId'
+      responses:
+        '204':
+          description: The upload is gone
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '409':
+          description: The file belongs to a record
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/ErrorResponse'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/metrics:
@@ -680,6 +1584,8 @@ paths:
             type: integer
             minimum: 0
             default: 0
+      security:
+        - sessionCookie: []
       responses:
         '200':
           description: Process definitions
@@ -687,6 +1593,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProcessDefinitionList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '503':
           $ref: '#/components/responses/ServiceUnavailable'
     post:
@@ -703,6 +1611,8 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/CreateProcessDefinitionRequest'
+      security:
+        - sessionCookie: []
       responses:
         '201':
           description: Process definition created and published
@@ -712,6 +1622,10 @@ paths:
                 $ref: '#/components/schemas/ProcessDefinition'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '409':
           $ref: '#/components/responses/Conflict'
         '503':
@@ -723,6 +1637,8 @@ paths:
       summary: Get one process definition with its newest published version
       parameters:
         - $ref: '#/components/parameters/DefinitionKey'
+      security:
+        - sessionCookie: []
       responses:
         '200':
           description: The process definition
@@ -730,6 +1646,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProcessDefinition'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '503':
@@ -749,6 +1667,8 @@ paths:
           application/json:
             schema:
               $ref: '#/components/schemas/UpdateProcessDefinitionRequest'
+      security:
+        - sessionCookie: []
       responses:
         '200':
           description: The definition with its newly published version
@@ -758,6 +1678,10 @@ paths:
                 $ref: '#/components/schemas/ProcessDefinition'
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
         '404':
           $ref: '#/components/responses/NotFound'
         '503':
@@ -769,6 +1693,8 @@ paths:
       summary: List the published versions of a process definition
       parameters:
         - $ref: '#/components/parameters/DefinitionKey'
+      security:
+        - sessionCookie: []
       responses:
         '200':
           description: Published versions, newest first
@@ -776,6 +1702,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/ProcessDefinitionVersionList'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
         '404':
           $ref: '#/components/responses/NotFound'
         '503':
@@ -996,6 +1924,38 @@ components:
       schema:
         type: string
         format: uuid
+    RecordId:
+      name: recordId
+      in: path
+      required: true
+      description: Business object record identifier.
+      schema:
+        type: string
+        format: uuid
+    AttachmentId:
+      name: attachmentId
+      in: path
+      required: true
+      description: Uploaded file identifier.
+      schema:
+        type: string
+        format: uuid
+    UserId:
+      name: userId
+      in: path
+      required: true
+      description: Account identifier.
+      schema:
+        type: string
+        format: uuid
+    AdminKey:
+      name: key
+      in: path
+      required: true
+      description: Stable key of a department or a role.
+      schema:
+        type: string
+        pattern: '^[a-z][a-z0-9_]{1,63}$'
   responses:
     BadRequest:
       description: The request body or parameters are invalid
@@ -1017,6 +1977,12 @@ components:
             $ref: '#/components/schemas/ErrorResponse'
     Unauthorized:
       description: No session, or the session expired
+      content:
+        application/json:
+          schema:
+            $ref: '#/components/schemas/ErrorResponse'
+    Forbidden:
+      description: The signed-in user does not hold the required role
       content:
         application/json:
           schema:
@@ -1164,7 +2130,7 @@ components:
             $ref: '#/components/schemas/FieldDefinition'
     ObjectRecord:
       type: object
-      required: [id, objectKey, objectVersion, values, createdAt, updatedAt]
+      required: [id, objectKey, objectVersion, values, canEdit, createdAt, updatedAt]
       properties:
         id:
           type: string
@@ -1181,6 +2147,27 @@ components:
           type: object
           additionalProperties: true
           description: Field key → value map. Values are validated against the field definitions.
+        createdByName:
+          type: string
+          description: |
+            Display name of the person who entered the record, so a screen names them instead
+            of printing an identifier (ADR 0016). Absent when the account is gone.
+        departmentName:
+          type: string
+          description: Display name of the department the record belongs to; absent when none applies.
+        canEdit:
+          type: boolean
+          description: |
+            Whether the signed-in caller satisfies the write rule of ADR 0023 (administrator,
+            creator, or a member of the record's department). A display hint only: the API
+            checks it again on every update and delete.
+        attachmentNames:
+          type: object
+          description: |
+            File name per file-field key, so a screen names the attachment instead of showing
+            its identifier. Filled when one record is read.
+          additionalProperties:
+            type: string
         createdAt:
           type: string
           format: date-time
@@ -1199,6 +2186,100 @@ components:
           type: array
           items:
             $ref: '#/components/schemas/ObjectRecord'
+    RecordHistoryList:
+      type: object
+      required: [data, total]
+      properties:
+        total:
+          type: integer
+        data:
+          type: array
+          description: Entries newest first.
+          items:
+            $ref: '#/components/schemas/RecordHistoryEntry'
+    RecordHistoryEntry:
+      type: object
+      required: [id, action, actorName, changes, createdAt]
+      properties:
+        id:
+          type: integer
+          format: int64
+        action:
+          type: string
+          enum: [created, updated, deleted]
+        actorName:
+          type: string
+          description: The name at the time of the change (empty for the system or a gone account).
+        changes:
+          type: array
+          items:
+            $ref: '#/components/schemas/RecordHistoryChange'
+        createdAt:
+          type: string
+          format: date-time
+    RecordHistoryChange:
+      type: object
+      required: [fieldLabel, from, to]
+      properties:
+        fieldLabel:
+          type: string
+          description: The field's name, not its key.
+        from:
+          type: string
+          description: The value before the change; empty when the field was absent.
+        to:
+          type: string
+          description: The value after the change; empty when the field was cleared.
+    RecordImportResult:
+      type: object
+      required: [dryRun, rows, valid, created, errors]
+      properties:
+        dryRun:
+          type: boolean
+        rows:
+          type: integer
+          description: Data rows found in the file (excluding the header).
+        valid:
+          type: integer
+          description: Rows that passed every check.
+        created:
+          type: integer
+          description: Rows actually stored; zero for a dry run and zero when any row failed.
+        errors:
+          type: array
+          description: '`row` is the spreadsheet line number (the header is line 1).'
+          items:
+            $ref: '#/components/schemas/RecordImportError'
+    RecordImportError:
+      type: object
+      required: [row, message]
+      properties:
+        row:
+          type: integer
+        message:
+          type: string
+    Attachment:
+      type: object
+      required: [id, objectKey, fileName, contentType, size, createdAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        objectKey:
+          type: string
+        fileName:
+          type: string
+          description: Sanitized name shown to people and sent back as the download name.
+        contentType:
+          type: string
+          description: Sniffed from the bytes, not taken from the upload request.
+        size:
+          type: integer
+          format: int64
+          description: Size in bytes (the cap is 10 MB).
+        createdAt:
+          type: string
+          format: date-time
     CreateObjectRecordRequest:
       type: object
       required: [values]
@@ -1593,6 +2674,16 @@ components:
           description: Visible instances, newest first.
           items:
             $ref: '#/components/schemas/ProcessInstanceSummary'
+    ChangeMyPasswordRequest:
+      type: object
+      required: [currentPassword, newPassword]
+      properties:
+        currentPassword:
+          type: string
+          description: The password the person signs in with today.
+        newPassword:
+          type: string
+          description: At least 10 characters and different from the current one.
     LoginRequest:
       type: object
       required: [email, password]
@@ -1664,6 +2755,204 @@ components:
         label:
           type: string
           description: Display name; empty when the role has not been named yet.
+          example: Trưởng bộ phận
+    AdminUserStatus:
+      type: string
+      enum: [active, disabled]
+      description: A disabled account keeps its history but cannot sign in.
+    AdminUser:
+      type: object
+      required:
+        [id, email, name, department, departmentName, roles, roleLabels, status, createdAt, updatedAt]
+      properties:
+        id:
+          type: string
+          format: uuid
+        email:
+          type: string
+        name:
+          type: string
+        department:
+          type: string
+          description: Department key (D09b scoping). Keys are for the engine, not for screens.
+        departmentName:
+          type: string
+          description: Display name of the department, for screens (ADR 0016).
+          example: Kỹ thuật
+        roles:
+          type: array
+          items:
+            type: string
+        roleLabels:
+          type: object
+          description: Display name per role key. A role nobody has named is absent.
+          additionalProperties:
+            type: string
+        status:
+          $ref: '#/components/schemas/AdminUserStatus'
+        lockedUntil:
+          type: string
+          format: date-time
+          description: |
+            When the sign-in cooldown of this address ends (ADR 0028). Absent when the account
+            can sign in normally. Only the administration area reads it.
+        createdAt:
+          type: string
+          format: date-time
+        updatedAt:
+          type: string
+          format: date-time
+    AdminUserList:
+      type: object
+      required: [data, total]
+      properties:
+        total:
+          type: integer
+          description: Accounts behind the page.
+        data:
+          type: array
+          description: One page of accounts, ordered by email.
+          items:
+            $ref: '#/components/schemas/AdminUser'
+    CreateAdminUserRequest:
+      type: object
+      required: [email, name, password, department, roles]
+      properties:
+        email:
+          type: string
+          example: lan@example.com
+        name:
+          type: string
+          example: Nguyễn Thị Lan
+        password:
+          type: string
+          description: At least 10 characters; stored only as an argon2id PHC string.
+        department:
+          type: string
+          description: Key of an existing department.
+          example: ky_thuat
+        roles:
+          type: array
+          description: At least one role key.
+          minItems: 1
+          items:
+            type: string
+    UpdateAdminUserRequest:
+      type: object
+      required: [email, name, department, roles, status]
+      properties:
+        email:
+          type: string
+        name:
+          type: string
+        department:
+          type: string
+        roles:
+          type: array
+          description: The complete role set; it replaces what the person held.
+          minItems: 1
+          items:
+            type: string
+        status:
+          $ref: '#/components/schemas/AdminUserStatus'
+    SetAdminUserPasswordRequest:
+      type: object
+      required: [password]
+      properties:
+        password:
+          type: string
+          description: At least 10 characters.
+    AdminDepartment:
+      type: object
+      required: [key, name, userCount, createdAt]
+      properties:
+        key:
+          type: string
+          example: ky_thuat
+        name:
+          type: string
+          example: Kỹ thuật
+        userCount:
+          type: integer
+          description: People whose department is this one; a department with people cannot be deleted.
+        createdAt:
+          type: string
+          format: date-time
+    AdminDepartmentList:
+      type: object
+      required: [data, total]
+      properties:
+        total:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminDepartment'
+    CreateAdminDepartmentRequest:
+      type: object
+      required: [key, name]
+      properties:
+        key:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{1,63}$'
+          example: ky_thuat
+        name:
+          type: string
+          example: Kỹ thuật
+    UpdateAdminDepartmentRequest:
+      type: object
+      required: [name]
+      properties:
+        name:
+          type: string
+          example: Kỹ thuật và hạ tầng
+    AdminRole:
+      type: object
+      required: [key, label, isSystem, userCount, createdAt]
+      properties:
+        key:
+          type: string
+          example: truong_bo_phan
+        label:
+          type: string
+          description: Display name.
+          example: Trưởng bộ phận
+        isSystem:
+          type: boolean
+          description: Platform roles (admin, process_designer) may be renamed but not deleted.
+        userCount:
+          type: integer
+          description: People holding the role; a held role cannot be deleted.
+        createdAt:
+          type: string
+          format: date-time
+    AdminRoleList:
+      type: object
+      required: [data, total]
+      properties:
+        total:
+          type: integer
+        data:
+          type: array
+          items:
+            $ref: '#/components/schemas/AdminRole'
+    CreateAdminRoleRequest:
+      type: object
+      required: [key, label]
+      properties:
+        key:
+          type: string
+          pattern: '^[a-z][a-z0-9_]{1,63}$'
+          example: truong_bo_phan
+        label:
+          type: string
+          example: Trưởng bộ phận
+    UpdateAdminRoleRequest:
+      type: object
+      required: [label]
+      properties:
+        label:
+          type: string
           example: Trưởng bộ phận
     MetricAggregation:
       type: string

@@ -367,12 +367,136 @@ for key, want in expected.items():
 print("flows: stored values verified (trimmed text, number, date, select, rows)")
 PY
 
+record_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["data"][0]["id"])' "$tmp_dir/records.json")"
+
+echo "flows: [A] a record can be opened, edited and deleted from its own screen"
+status="$(web_get "/objects/$object_key/records/$record_id" "$tmp_dir/record-detail.html")"
+assert_status "$status" "200" "record detail page"
+assert_contains "$tmp_dir/record-detail.html" "Sửa bản ghi" "the detail page offers editing to its creator"
+assert_contains "$tmp_dir/record-detail.html" "Kiểm thử luồng demo" "the detail page shows the stored values"
+assert_contains "$tmp_dir/record-detail.html" "Thông tin bản ghi" "the detail page names who entered the record"
+
+mapfile -t edit_args < <(form_args "$tmp_dir/record-detail.html" recordId)
+[[ ${#edit_args[@]} -ge 4 ]] || fail "[A] the edit form has no server-action fields"
+status="$(web_post "/objects/$object_key/records/$record_id" "$tmp_dir/record-edited.html" \
+  "${edit_args[@]}" \
+  --form-string 'title=Kiểm thử luồng demo (đã sửa)' \
+  --form-string 'amount=1700000' \
+  --form-string 'due_on=2026-11-02' \
+  --form-string 'priority=normal' \
+  --form-string 'items=Máy in
+Mực in
+Giấy')"
+assert_status "$status" "200" "editing a record through its screen"
+assert_contains "$tmp_dir/record-edited.html" "Đã lưu thay đổi cho bản ghi" "the edit form reports the change"
+# The record page carries the append-only history: who changed which field, with labels.
+assert_contains "$tmp_dir/record-edited.html" "Lịch sử thay đổi" "the record page shows its history"
+assert_contains "$tmp_dir/record-edited.html" "Sửa bản ghi" "the history names the action"
+assert_contains "$tmp_dir/record-edited.html" "Mức ưu tiên" "the history names the changed field"
+assert_contains "$tmp_dir/record-edited.html" "Gấp" "the history keeps the old value"
+assert_contains "$tmp_dir/record-edited.html" "Bình thường" "the history shows the new value"
+
+curl -sS -b "$cookie_jar" -o "$tmp_dir/record-updated.json" \
+  "$api_base/api/v1/business-objects/$object_key/records/$record_id"
+python3 - "$tmp_dir/record-updated.json" <<'PY' || fail "[A] the edit was not stored against the record's own version"
+import json, sys
+
+record = json.load(open(sys.argv[1], encoding="utf-8"))
+if record["values"].get("title") != "Kiểm thử luồng demo (đã sửa)":
+    sys.exit(f"the edited title is missing: {record['values'].get('title')!r}")
+if record["values"].get("amount") != 1700000 or record["values"].get("priority") != "normal":
+    sys.exit(f"the edited values are wrong: {record['values']}")
+if record["objectVersion"] != 1:
+    sys.exit(f"editing changed the record's version: {record['objectVersion']}")
+print("flows: the edited values were stored against version 1")
+PY
+
+# A record nothing has run on can be deleted from its screen; the action ends on the list.
+status="$(curl -sS -b "$cookie_jar" -o "$tmp_dir/throwaway.json" -w '%{http_code}' -X POST \
+  "$api_base/api/v1/business-objects/$object_key/records" -H 'Content-Type: application/json' \
+  -d '{"values":{"title":"Bản ghi tạm","amount":1,"priority":"normal"}}')"
+assert_status "$status" "201" "creating a throwaway record"
+throwaway_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$tmp_dir/throwaway.json")"
+status="$(web_get "/objects/$object_key/records/$throwaway_id" "$tmp_dir/record-delete.html")"
+assert_status "$status" "200" "throwaway record page"
+mapfile -t delete_args < <(form_args "$tmp_dir/record-delete.html" deleteRecord)
+[[ ${#delete_args[@]} -ge 4 ]] || fail "[A] the delete form has no server-action fields"
+status="$(web_post "/objects/$object_key/records/$throwaway_id" "$tmp_dir/record-deleted.html" \
+  "${delete_args[@]}")"
+# The record's own address no longer resolves, so the action redirects to the list.
+assert_status "$status" "303" "deleting a record through its screen"
+status="$(web_get "/objects/$object_key?tab=records&deleted=1" "$tmp_dir/record-deleted-list.html")"
+assert_status "$status" "200" "the records list after a delete"
+assert_contains "$tmp_dir/record-deleted-list.html" "Đã xoá bản ghi" "the list confirms the delete"
+status="$(curl -sS -b "$cookie_jar" -o /dev/null -w '%{http_code}' \
+  "$api_base/api/v1/business-objects/$object_key/records/$throwaway_id")"
+assert_status "$status" "404" "the deleted record"
+
 status="$(web_get "/objects/$object_key?tab=records" "$tmp_dir/detail-after.html")"
 assert_status "$status" "200" "records tab after the write"
-assert_contains "$tmp_dir/detail-after.html" "Kiểm thử luồng demo" "records table"
+assert_contains "$tmp_dir/detail-after.html" "Kiểm thử luồng demo (đã sửa)" "records table"
 assert_contains "$tmp_dir/detail-after.html" "Bản ghi đã lưu (" "records table"
 # The row is where a person asks what has run on that record.
 assert_contains "$tmp_dir/detail-after.html" "Xem các lần chạy" "a record row links to its runs"
+assert_contains "$tmp_dir/detail-after.html" "Xuất CSV" "the records tab offers a CSV download"
+assert_contains "$tmp_dir/detail-after.html" "Nhập từ CSV" "the records tab offers a CSV import"
+assert_contains "$tmp_dir/detail-after.html" "Kiểm tra trước" "the import can be checked before writing"
+
+# The download goes through the web route, which forwards the session to the API; the file
+# carries the edited values and is served as an attachment.
+status="$(curl -sS -b "$cookie_jar" -D "$tmp_dir/export.headers" -o "$tmp_dir/export.csv" \
+  -w '%{http_code}' "$web_base/objects/$object_key/records/export")"
+assert_status "$status" "200" "exporting records through the web"
+grep -qi '^content-type: text/csv' "$tmp_dir/export.headers" || fail "[A] the export is not CSV"
+grep -qi '^content-disposition: attachment; filename=' "$tmp_dir/export.headers" ||
+  fail "[A] the export is not a download"
+python3 - "$tmp_dir/export.csv" <<'PY' || fail "[A] the exported file does not match the records"
+import csv, io, sys
+
+raw = open(sys.argv[1], "rb").read()
+if not raw.startswith(b"\xef\xbb\xbf"):
+    sys.exit("the CSV is missing the UTF-8 BOM")
+rows = list(csv.reader(io.StringIO(raw.decode("utf-8-sig"))))
+if rows[0][:2] != ["Nội dung", "Số tiền"]:
+    sys.exit(f"the header does not carry the field labels: {rows[0]}")
+if len(rows) != 2 or rows[1][0] != "Kiểm thử luồng demo (đã sửa)":
+    sys.exit(f"the edited record is missing from the export: {rows[1:]}")
+print("flows: the CSV export carries the edited record")
+PY
+
+# ---------------------------------------------------------------- attachments ----
+
+echo "flows: [A] a file field shows its attachment and downloads it"
+files_key="flow_files_$stamp"
+files_schema="$(printf '{"key":"%s","name":"Tệp luồng demo","fields":[{"key":"title","label":"Nội dung","type":"text","required":true},{"key":"quote","label":"Báo giá","type":"file"}]}' "$files_key")"
+status="$(curl -sS -b "$cookie_jar" -o "$tmp_dir/files-object.json" -w '%{http_code}' -X POST \
+  "$api_base/api/v1/business-objects" -H 'Content-Type: application/json' -d "$files_schema")"
+assert_status "$status" "201" "creating the attachments object"
+
+printf 'báo giá: 2.000.000\n' > "$tmp_dir/quote.txt"
+status="$(curl -sS -b "$cookie_jar" -o "$tmp_dir/attachment.json" -w '%{http_code}' -X POST \
+  "$api_base/api/v1/attachments?objectKey=$files_key" \
+  -F "file=@$tmp_dir/quote.txt;filename=báo giá.txt")"
+assert_status "$status" "201" "uploading a file"
+flow_attachment="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$tmp_dir/attachment.json")"
+
+status="$(curl -sS -b "$cookie_jar" -o "$tmp_dir/files-record.json" -w '%{http_code}' -X POST \
+  "$api_base/api/v1/business-objects/$files_key/records" -H 'Content-Type: application/json' \
+  -d "$(printf '{"values":{"title":"Đề nghị có báo giá","quote":"%s"}}' "$flow_attachment")")"
+assert_status "$status" "201" "creating a record with a file"
+flow_files_record="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$tmp_dir/files-record.json")"
+
+status="$(web_get "/objects/$files_key/records/$flow_files_record" "$tmp_dir/files-record.html")"
+assert_status "$status" "200" "the record page with a file"
+assert_contains "$tmp_dir/files-record.html" "báo giá.txt" "the field names the attached file"
+assert_contains "$tmp_dir/files-record.html" "/attachments/$flow_attachment" "the file is a download link"
+
+status="$(curl -sS -b "$cookie_jar" -D "$tmp_dir/file-download.headers" -o "$tmp_dir/file-download.txt" \
+  -w '%{http_code}' "$web_base/attachments/$flow_attachment")"
+assert_status "$status" "200" "downloading a file through the web"
+grep -qi '^content-disposition: attachment;' "$tmp_dir/file-download.headers" ||
+  fail "[A] the web download is missing Content-Disposition"
+grep -q '2.000.000' "$tmp_dir/file-download.txt" || fail "[A] the downloaded bytes are wrong"
 
 # ------------------------------------------- flow B: validation reaches the user ----
 
@@ -442,7 +566,7 @@ status="$(web_post "/objects" "$tmp_dir/object-duplicate.html" \
   --form-string 'name=Trùng key' \
   --form-string "fields=$builder_schema")"
 assert_status "$status" "200" "duplicate object submission"
-assert_contains "$tmp_dir/object-duplicate.html" "Key này đã tồn tại" "duplicate object submission"
+assert_contains "$tmp_dir/object-duplicate.html" "Dữ liệu này đã tồn tại" "duplicate object submission"
 
 # --------------------------- flow D: metrics and the dashboard layout are real ----
 
@@ -453,7 +577,7 @@ status="$(curl -sS -b "$cookie_jar" -o "$tmp_dir/metric.json" -w '%{http_code}' 
   -d "$(printf '{"key":"%s","name":"Tổng giá trị luồng demo","objectKey":"%s","aggregation":"sum","field":"amount"}' "$metric_key" "$object_key")")"
 assert_status "$status" "201" "creating a metric through the API"
 
-# Flow A stored one record with amount 1.500.000; the metric must answer exactly that.
+# Flow A stored one record and flow A edited it to 1.700.000; the metric must answer exactly that.
 status="$(curl -sS -b "$cookie_jar" -o "$tmp_dir/metric-result.json" -w '%{http_code}' \
   "$api_base/api/v1/metrics/$metric_key/result")"
 assert_status "$status" "200" "reading the metric result"
@@ -461,8 +585,8 @@ python3 - "$tmp_dir/metric-result.json" <<'CHECK_METRIC'
 import json, sys
 
 result = json.load(open(sys.argv[1], encoding="utf-8"))
-if result["total"] != 1500000 or result["records"] != 1:
-    sys.exit(f'expected 1500000 over 1 record, got {result["total"]} over {result["records"]}')
+if result["total"] != 1700000 or result["records"] != 1:
+    sys.exit(f'expected 1700000 over 1 record, got {result["total"]} over {result["records"]}')
 print("flows: the metric answered over the projected record values")
 CHECK_METRIC
 
@@ -475,7 +599,7 @@ assert_contains "$tmp_dir/analytics.html" "Tỉ lệ duyệt" "the approval rate
 assert_contains "$tmp_dir/analytics.html" "Tỉ lệ phải chạy lại" "the rework rate is shown"
 assert_contains "$tmp_dir/analytics.html" "SLA chưa có" "the missing SLA policy is stated, not faked"
 assert_contains "$tmp_dir/analytics.html" "Tổng giá trị luồng demo" "the live metric is listed"
-assert_contains "$tmp_dir/analytics.html" "1500000" "the metric table shows the real value"
+assert_contains "$tmp_dir/analytics.html" "1700000" "the metric table shows the real value"
 
 mapfile -t layout_args < <(form_args "$tmp_dir/analytics.html" layout layout)
 [[ ${#layout_args[@]} -ge 4 ]] || fail "[D] the layout form has no server-action fields"
@@ -488,7 +612,7 @@ assert_contains "$tmp_dir/layout-saved.html" "Đã lưu 1 widget" "layout save"
 
 curl -sS -b "$cookie_jar" -o "$tmp_dir/analytics-saved.html" "$web_base/analytics"
 assert_contains "$tmp_dir/analytics-saved.html" "Tổng giá trị luồng demo" "saved layout renders the chosen metric"
-assert_contains "$tmp_dir/analytics-saved.html" "1.500.000" "the widget shows the real number, formatted"
+assert_contains "$tmp_dir/analytics-saved.html" "1.700.000" "the widget shows the real number, formatted"
 assert_contains "$tmp_dir/analytics-saved.html" "trên 1 bản ghi bạn được đọc" "the widget says how much data it rests on"
 saved_widgets="$(count_occurrences "$tmp_dir/analytics-saved.html" "trên 1 bản ghi bạn được đọc")"
 [[ "$saved_widgets" -ge 1 ]] ||
@@ -590,19 +714,31 @@ assert_not_contains "$tmp_dir/surface.html" ">title<" "the form does not print t
 # the list and the way into the create screen only (ADR 0015, ADR 0019).
 check_surface "/workflows" "workflows" "Tạo quy trình mới" "Đang dùng"
 # No process was started yet, so the live inbox is empty for this role — and it says so.
-check_surface "/tasks" "tasks" "Không có việc nào đang chờ bạn" "Đã có gì, còn thiếu gì"
+# The build-status block of the inbox is administrator material and is checked further down,
+# after an administrator turns advanced mode on (ADR 0015, ADR 0018).
+check_surface "/tasks" "tasks" "Không có việc nào đang chờ bạn"
 check_surface "/apps" "applications" "Kanban" "Cấu hình" "Tích hợp"
 
 status="$(web_get_as "$cookie_jar" "/roadmap" "$tmp_dir/roadmap-denied.html")"
 assert_status "$status" "404" "roadmap for a non-admin"
 status="$(web_get_as "$cookie_jar" "/settings" "$tmp_dir/settings-denied.html")"
 assert_status "$status" "404" "operations screen for a non-admin"
+# Organisation administration is a product screen for an administrator: a department head
+# gets the same 404 as everywhere else (ADR 0015, ADR 0022).
+status="$(web_get_as "$cookie_jar" "/admin" "$tmp_dir/admin-denied.html")"
+assert_status "$status" "404" "administration for a non-admin"
 
 # The administrator gets them, but only after turning the switch on — the switch is the real
 # form in the topbar, replayed the way a browser without JavaScript would submit it.
 status="$(web_get_as "$admin_jar" "/overview" "$tmp_dir/admin-overview.html")"
 assert_status "$status" "200" "admin overview"
 assert_not_contains "$tmp_dir/admin-overview.html" "Thông tin hệ thống" "advanced mode is off by default"
+# Administration itself does not wait for the switch (ADR 0022).
+assert_contains "$tmp_dir/admin-overview.html" "Quản trị" "administration appears for an admin without advanced mode"
+status="$(web_get_as "$admin_jar" "/admin/users" "$tmp_dir/admin-users.html")"
+assert_status "$status" "200" "accounts screen for an admin"
+assert_contains "$tmp_dir/admin-users.html" "Tạo tài khoản mới" "the accounts screen offers creation"
+assert_contains "$tmp_dir/admin-users.html" "$admin_email" "the accounts screen lists the admin"
 mapfile -t advanced_args < <(form_args "$tmp_dir/admin-overview.html" advanced)
 [[ ${#advanced_args[@]} -ge 2 ]] || fail "the advanced switch has no server-action fields"
 status="$(web_post_as "$admin_jar" "/overview" "$tmp_dir/admin-advanced.html" \
@@ -620,6 +756,76 @@ status="$(web_get_as "$admin_jar" "/settings" "$tmp_dir/settings.html")"
 assert_status "$status" "200" "operations screen for an admin in advanced mode"
 assert_contains "$tmp_dir/settings.html" "make seed-demo" "operations content"
 assert_contains "$tmp_dir/settings.html" "make smoke-api" "operations content"
+status="$(web_get_as "$admin_jar" "/admin/roles" "$tmp_dir/admin-roles.html")"
+assert_status "$status" "200" "roles screen for an admin"
+assert_contains "$tmp_dir/admin-roles.html" "Vai trò hệ thống" "the role catalogue marks platform roles"
+
+# The administration screens are real forms, not decoration: replay the account form the way
+# a browser without JavaScript submits it, then ask the API whether the account exists
+# (ADR 0022).
+mapfile -t create_user_args < <(form_args "$tmp_dir/admin-users.html" password)
+[[ ${#create_user_args[@]} -ge 4 ]] || fail "the account form has no server-action fields"
+admin_made_email="flow_adminmade_$stamp@example.com"
+status="$(web_post_as "$admin_jar" "/admin/users" "$tmp_dir/admin-user-created.html" \
+  "${create_user_args[@]}" \
+  --form-string "name=Người do quản trị tạo" \
+  --form-string "email=$admin_made_email" \
+  --form-string "password=$designer_password" \
+  --form-string "department=$department" \
+  --form-string "roles=$approver_role")"
+assert_status "$status" "200" "creating an account through the admin form"
+assert_contains "$tmp_dir/admin-user-created.html" "Đã tạo tài khoản cho" "the form reports the created account"
+curl -sS -b "$admin_jar" -o "$tmp_dir/admin-user-list.json" \
+  "$api_base/api/v1/admin/users?q=flow_adminmade_$stamp"
+grep -qF "$admin_made_email" "$tmp_dir/admin-user-list.json" ||
+  fail "the account created through the form is missing from the API"
+# The inbox build status is administrator material: the department head saw the inbox
+# without it, the administrator in advanced mode sees it (ADR 0015, ADR 0018).
+status="$(web_get_as "$admin_jar" "/tasks" "$tmp_dir/admin-tasks.html")"
+assert_status "$status" "200" "tasks for an admin in advanced mode"
+assert_contains "$tmp_dir/admin-tasks.html" "Đã có gì, còn thiếu gì" "the inbox build status in advanced mode"
+
+# Five wrong passwords put an address into its sign-in cooldown (ADR 0028). The accounts
+# screen then says who is waiting, and the administrator ends the wait from there
+# (ADR 0029) — the CLI stays the way back when nobody can sign in.
+echo "flows: [E] an administrator lifts a sign-in cooldown from the accounts screen"
+for _ in 1 2 3 4 5; do
+  status="$(curl -sS -o "$tmp_dir/cooldown-login.json" -w '%{http_code}' -X POST \
+    "$api_base/api/v1/auth/login" -H 'Content-Type: application/json' \
+    -d "$(printf '{"email":"%s","password":"khong-dung-mat-khau"}' "$admin_made_email")")"
+  assert_status "$status" "401" "a wrong password while the cooldown builds"
+done
+
+status="$(web_get_as "$admin_jar" "/admin/users?q=flow_adminmade_$stamp" "$tmp_dir/admin-users-waiting.html")"
+assert_status "$status" "200" "the accounts screen while an account waits"
+assert_contains "$tmp_dir/admin-users-waiting.html" "Tạm khoá đăng nhập" "the accounts screen says who is waiting"
+
+curl -sS -b "$admin_jar" -o "$tmp_dir/admin-user-waiting.json" \
+  "$api_base/api/v1/admin/users?q=flow_adminmade_$stamp"
+admin_made_id="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["data"][0]["id"])' \
+  "$tmp_dir/admin-user-waiting.json")"
+grep -q '"lockedUntil"' "$tmp_dir/admin-user-waiting.json" ||
+  fail "the waiting account must say when its cooldown ends"
+
+status="$(web_get_as "$admin_jar" "/admin/users/$admin_made_id" "$tmp_dir/admin-user-waiting.html")"
+assert_status "$status" "200" "the account screen while it waits"
+assert_contains "$tmp_dir/admin-user-waiting.html" "Mở khoá đăng nhập" "the account screen offers the unlock"
+mapfile -t unlock_args < <(form_args "$tmp_dir/admin-user-waiting.html" unlockUserId)
+[[ ${#unlock_args[@]} -ge 2 ]] || fail "the unlock form has no server-action fields"
+status="$(web_post_as "$admin_jar" "/admin/users/$admin_made_id" "$tmp_dir/admin-user-unlocked.html" \
+  "${unlock_args[@]}")"
+# The account is no longer waiting, so the card that carried the button is gone: the
+# confirmation travels in the address and the next render shows it.
+assert_status "$status" "303" "lifting the cooldown through the form"
+status="$(web_get_as "$admin_jar" "/admin/users/$admin_made_id?unlocked=1" "$tmp_dir/admin-user-unlocked.html")"
+assert_status "$status" "200" "the account screen after the unlock"
+assert_contains "$tmp_dir/admin-user-unlocked.html" "Đã mở khoá đăng nhập" "the screen confirms the unlocked account"
+assert_not_contains "$tmp_dir/admin-user-unlocked.html" "Mở khoá đăng nhập" "no unlock button once the account is free"
+
+status="$(curl -sS -o "$tmp_dir/cooldown-login-ok.json" -w '%{http_code}' -X POST \
+  "$api_base/api/v1/auth/login" -H 'Content-Type: application/json' \
+  -d "$(printf '{"email":"%s","password":"%s"}' "$admin_made_email" "$designer_password")")"
+assert_status "$status" "200" "signing in again after the unlock"
 
 # The gate never lets the workspace render for an anonymous caller, so the pages no
 # longer carry a sign-in card of their own.
@@ -704,14 +910,14 @@ status="$(curl -sS -b "$cookie_jar" -o "$tmp_dir/process-created.json" -w '%{htt
   "$api_base/api/v1/process-definitions" -H 'Content-Type: application/json' -d "$process_body")"
 assert_status "$status" "201" "creating the approval process"
 
-# Start on the record flow A created: amount 1.500.000 sits above the gate, so the
+# Start on the record flow A created: amount 1.700.000 sits above the gate, so the
 # approval must escalate to the second role.
 curl -sS -b "$cookie_jar" -o "$tmp_dir/records.json" "$api_base/api/v1/business-objects/$object_key/records"
 record_id="$(python3 - "$tmp_dir/records.json" <<'PY'
 import json, sys
 
 records = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
-match = next((r for r in records if r["values"].get("title") == "Kiểm thử luồng demo"), None)
+match = next((r for r in records if str(r["values"].get("title", "")).startswith("Kiểm thử luồng demo")), None)
 if match is None:
     sys.exit("flows: the record created in flow A is missing")
 print(match["id"])
@@ -934,7 +1140,7 @@ record_id="$(python3 - "$tmp_dir/records.json" <<'PY'
 import json, sys
 
 records = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
-match = next((r for r in records if r["values"].get("title") == "Kiểm thử luồng demo"), None)
+match = next((r for r in records if str(r["values"].get("title", "")).startswith("Kiểm thử luồng demo")), None)
 if match is None:
     sys.exit("flows: the record created in flow A is missing")
 print(match["id"])

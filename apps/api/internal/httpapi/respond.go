@@ -9,11 +9,14 @@ import (
 	"io"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 	"github.com/google/uuid"
 
 	apiv1 "github.com/QuocDuong16/opvaryn/api/internal/api/v1"
+	"github.com/QuocDuong16/opvaryn/api/internal/service"
+	"github.com/QuocDuong16/opvaryn/api/internal/store"
 )
 
 // maxRequestBodyBytes bounds request bodies so a malformed or hostile client
@@ -26,6 +29,7 @@ const (
 	codeInvalidRequest = "invalid_request"
 	codeNotFound       = "not_found"
 	codeConflict       = "conflict"
+	codeInUse          = "in_use"
 	codeForbidden      = "forbidden"
 	codeUnauthorized   = "unauthorized"
 	codeUnavailable    = "service_unavailable"
@@ -88,4 +92,56 @@ func decodeJSON(w http.ResponseWriter, r *http.Request, dst any) error {
 		return errors.New("request body must contain exactly one JSON object")
 	}
 	return nil
+}
+
+// writeStoreError maps service and store failures onto the stable error envelope.
+func writeStoreError(w http.ResponseWriter, log *slog.Logger, err error, action string) {
+	var validation *service.ValidationError
+	switch {
+	case errors.As(err, &validation):
+		writeError(w, log, http.StatusBadRequest, codeInvalidRequest, validation.Error())
+	case errors.Is(err, store.ErrNotFound), errors.Is(err, service.ErrNotFound),
+		errors.Is(err, service.ErrUserNotFound):
+		// The service uses its own sentinel for things it hides on purpose: an
+		// instance the caller may not see answers 404, not 403, so the API does not
+		// confirm that it exists.
+		writeError(w, log, http.StatusNotFound, codeNotFound, "the requested resource does not exist")
+	case errors.Is(err, store.ErrInUse):
+		// The row exists but other data depends on it. The message from the store names
+		// what is in the way in domain words, never SQL.
+		writeError(w, log, http.StatusConflict, codeInUse, trimStorePrefix(err))
+	case errors.Is(err, store.ErrConflict):
+		writeError(w, log, http.StatusConflict, codeConflict, "a resource with this key already exists")
+	case errors.Is(err, service.ErrForbidden):
+		// The service named the rule that refused; the client is told that rule instead
+		// of one generic sentence.
+		writeError(w, log, http.StatusForbidden, codeForbidden, forbiddenReason(err))
+	case errors.Is(err, service.ErrUnauthorized):
+		// A session that is missing or expired. The handlers behind a session check it
+		// first, so this is the safety net: an authentication failure must never be
+		// reported as a server error.
+		writeError(w, log, http.StatusUnauthorized, codeUnauthorized,
+			"a session is required for this request")
+	case errors.Is(err, service.ErrStateConflict), errors.Is(err, store.ErrTaskClosed):
+		writeError(w, log, http.StatusConflict, codeConflict,
+			"the task or instance already moved on; reload and check the timeline")
+	case errors.Is(err, store.ErrUnavailable):
+		log.Error(action+" failed", "error", err)
+		writeError(w, log, http.StatusServiceUnavailable, codeUnavailable, "database is unavailable, try again shortly")
+	default:
+		log.Error(action+" failed", "error", err)
+		writeError(w, log, http.StatusInternalServerError, codeInternal, "unexpected server error")
+	}
+}
+
+// forbiddenReason is the sentence the service attached to the refusal, so the answer names
+// the rule that refused instead of one generic sentence.
+func forbiddenReason(err error) string {
+	message := err.Error()
+	if index := strings.Index(message, ": "); index >= 0 {
+		if reason := strings.TrimSpace(message[index+2:]); reason != "" {
+			return reason
+		}
+	}
+	return "the caller does not hold the role this action needs"
 }

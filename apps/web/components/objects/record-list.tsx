@@ -15,6 +15,7 @@ export function RecordList({
   records,
   filtered = false,
   runsHref,
+  detailHref,
 }: {
   versions: readonly BusinessObjectVersion[];
   records: ObjectRecord[];
@@ -25,6 +26,8 @@ export function RecordList({
    * answer "quy trình nào đã chạy trên bản ghi này", and the row is where a person asks.
    */
   runsHref?: (record: ObjectRecord) => string;
+  /** Where a row leads to the record itself: its values, who entered it, edit and delete. */
+  detailHref?: (record: ObjectRecord) => string;
 }) {
   if (records.length === 0) {
     return (
@@ -85,6 +88,11 @@ export function RecordList({
                     <th scope="col" className="px-4 py-3 font-medium">
                       #
                     </th>
+                    {detailHref ? (
+                      <th scope="col" className="px-4 py-3 font-medium whitespace-nowrap">
+                        Bản ghi
+                      </th>
+                    ) : null}
                     {runsHref ? (
                       <th scope="col" className="px-4 py-3 font-medium whitespace-nowrap">
                         Quy trình
@@ -110,6 +118,16 @@ export function RecordList({
                       <td className="px-4 py-3 font-mono text-xs text-on-surface-muted">
                         {group.records.length - index}
                       </td>
+                      {detailHref ? (
+                        <td className="px-4 py-3 text-xs whitespace-nowrap">
+                          <Link
+                            href={detailHref(record)}
+                            className="text-accent-strong hover:underline"
+                          >
+                            Mở bản ghi →
+                          </Link>
+                        </td>
+                      ) : null}
                       {runsHref ? (
                         <td className="px-4 py-3 text-xs whitespace-nowrap">
                           <Link

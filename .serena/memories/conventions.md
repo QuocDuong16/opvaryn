@@ -7,8 +7,9 @@
   types and contain no business rules.
 - Validation belongs to the service and reports ALL problems at once
   (`service.ValidationError{Problems []string}`, joined with "; "). Handlers translate errors to
-  stable codes: `invalid_request`(400), `conflict`(409), `service_unavailable`(503),
-  `internal_error`(500). Clients switch on codes, never on messages.
+  stable codes: `invalid_request`(400), `conflict`(409), `in_use`(409, something still depends on
+  the row), `forbidden`(403), `service_unavailable`(503), `internal_error`(500). Clients switch on
+  codes, never on messages.
 - Store turns connectivity failures into `store.ErrUnavailable` (via `classify()`) and uniqueness
   violations into `store.ErrConflict`; handlers must map those, not string-match errors.
 - Machine keys are lowercase snake_case, 2–64 chars (`service.KeyPattern`), mirrored in the
@@ -29,9 +30,28 @@
 - Identity follows ADR 0008: passwords are argon2id PHC strings, session tokens are stored only as
   SHA-256 hashes, login answers identically for an unknown email and a wrong password, and
   passwords/tokens never reach a log. The actor of a transition is the signed-in user, never a body
-  field; a task is decided only with a role that user holds. Accounts and departments come from
-  `make useradm`. Endpoints that are still unprotected are listed in ADR 0008 — adding a new
-  unprotected endpoint means updating that ADR first.
+  field; a task is decided only with a role that user holds. The first administrator comes from
+  `make useradm`; after that `/api/v1/admin/*` and the `/admin` screens manage accounts,
+  departments and the role catalogue (ADR 0022, `mem:api/core`). Endpoints that are still
+  unprotected are listed in ADR 0008 — adding a new unprotected endpoint means updating that ADR
+  first.
+- Files follow ADR 0025: bytes live in PostgreSQL (`attachments`, 10 MB cap), a file is uploaded
+  first and bound inside the record's transaction, only its uploader (or an admin) may bind it, and
+  a download is always `application/octet-stream` + `Content-Disposition: attachment` + `nosniff` —
+  never rendered. CSV exports (ADR 0024) carry labels, the union of version fields, a UTF-8 BOM and
+  a 10,000-row cap, with `= + - @` cells prefixed by an apostrophe. CSV imports (ADR 0026) match
+  columns by key or label, check every row, write all-or-nothing in one transaction, refuse file
+  fields and support a dry run; the cap is 500 rows / 5 MB.
+- Every record write appends to `record_audit` in the same transaction (ADR 0027): only changed
+  fields, actor name snapshot, no FK so history outlives the record, and no endpoint modifies it.
+  Screen it by field label and formatted value, never by key or id.
+- Sign-in is throttled per address, not per IP (the API only sees the BFF): 5 failures in 15
+  minutes trigger a 15-minute cooldown that answers exactly like a wrong password; success clears
+  it, and `useradm -unlock` is the operator's way out (ADR 0028).
+- A record is written only under the ADR 0023 rule (admin, creator, or the record's department),
+  is validated against the version it was created under, and cannot be deleted while a process
+  instance refers to it. Do not widen record writes to everyone who can read the record: a
+  cross-department approver decides the task, and must not rewrite the request.
 - The process engine follows ADR 0007: one transaction per decision with compare-and-swap on the
   task and the instance (the second caller gets 409, never a second transition), reject terminal,
   return resets to a new attempt, instances bound to the version they started with, every
@@ -46,6 +66,8 @@
   forms). Keep client boundaries small.
 - All API access goes through `lib/api/server.ts` (`createServerApiClient`); components never call
   the Go API directly. Mutations use server actions in `app/**/actions.ts` + `revalidatePath`.
+  The shared client applies `AbortSignal.timeout(API_TIMEOUT_MS)` to every call; the login/logout
+  helper does the same. Do not add a fetch without a timeout.
 - `'use server'` modules may export ONLY async functions — shared state/types live in a sibling
   module (established pattern: `components/objects/create-object-state.ts`).
 - Theming: httpOnly cookie `opvaryn.theme`, read in the root layout (SSR-correct first paint) and
@@ -55,7 +77,10 @@
   `@theme inline` mapping to Tailwind utilities (`bg-surface-raised`, `text-on-surface-muted`,
   `border-border-strong`, `text-accent-strong`, …). Add tokens there; never hard-code hex.
 - Navigation has a single source: `app/nav.ts` (`NAV_ITEMS`, `navItemFor`) drives sidebar, compact
-  nav and breadcrumb. A new screen = nav entry + route + stage badge.
+  nav and breadcrumb. A new screen = nav entry + route + stage badge; every entry picks an
+  `audience` (`everyone` default) and an admin entry says whether it also needs advanced mode
+  (`requiresAdvanced`: true for `/settings`, `/roadmap`; `/admin` is for any admin — ADR 0022).
+  `navItemsFor(isAdminUser, showAdvanced)` decides what renders.
 - Screens without real behavior use `components/ui/module-placeholder.tsx` and must declare a
   stage; real screens use `PageHeader` for the eyebrow/title/lead rhythm.
 - Simulated surfaces keep typed fixtures next to their components (`components/<area>/demo-*.ts`)

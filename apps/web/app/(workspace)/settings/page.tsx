@@ -12,25 +12,66 @@ import { formatTimestamp } from '@/lib/format';
 
 export const metadata = { title: 'Cài đặt' };
 
+// The endpoint table of the running system. `scripts/check-docs.mjs` compares it with the
+// OpenAPI document, so a new endpoint cannot be added without appearing here.
 const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = [
   { method: 'GET', path: '/healthz', purpose: 'Liveness probe' },
+  { method: 'GET', path: '/readyz', purpose: 'Readiness, kiểm tra database' },
+  { method: 'GET', path: '/api/v1/meta', purpose: 'Tên, phiên bản và giai đoạn build' },
+
   { method: 'POST', path: '/api/v1/auth/login', purpose: 'Đăng nhập, mở phiên làm việc' },
-  { method: 'POST', path: '/api/v1/auth/logout', purpose: 'Kết thúc session hiện tại' },
+  { method: 'POST', path: '/api/v1/auth/logout', purpose: 'Kết thúc phiên hiện tại' },
   { method: 'GET', path: '/api/v1/me', purpose: 'Người dùng hiện tại kèm vai trò và bộ phận' },
-  {
-    method: 'GET',
-    path: '/api/v1/roles',
-    purpose: 'Danh mục vai trò có ít nhất một người giữ (trình thiết kế dùng để gợi ý)',
-  },
+  { method: 'POST', path: '/api/v1/me/password', purpose: 'Đổi mật khẩu của chính mình' },
+  { method: 'GET', path: '/api/v1/roles', purpose: 'Danh mục vai trò có ít nhất một người giữ' },
   {
     method: 'GET',
     path: '/api/v1/tasks',
-    purpose: 'Hộp việc: việc đang mở của các vai trò mà người đang đăng nhập giữ',
+    purpose: 'Hộp việc của các vai trò người đang đăng nhập giữ',
   },
-  { method: 'GET', path: '/readyz', purpose: 'Readiness, kiểm tra database' },
-  { method: 'GET', path: '/api/v1/meta', purpose: 'Tên, phiên bản và giai đoạn build' },
-  { method: 'GET', path: '/api/v1/business-objects', purpose: 'Danh sách business object' },
-  { method: 'POST', path: '/api/v1/business-objects', purpose: 'Tạo business object mới' },
+
+  {
+    method: 'GET',
+    path: '/api/v1/admin/users',
+    purpose: 'Danh sách tài khoản (có phân trang và tìm kiếm)',
+  },
+  { method: 'POST', path: '/api/v1/admin/users', purpose: 'Tạo tài khoản' },
+  { method: 'GET', path: '/api/v1/admin/users/{userId}', purpose: 'Một tài khoản' },
+  { method: 'PUT', path: '/api/v1/admin/users/{userId}', purpose: 'Sửa hồ sơ và bộ vai trò' },
+  {
+    method: 'POST',
+    path: '/api/v1/admin/users/{userId}/password',
+    purpose: 'Đặt lại mật khẩu và kết thúc mọi phiên của người đó',
+  },
+  {
+    method: 'DELETE',
+    path: '/api/v1/admin/users/{userId}/sessions',
+    purpose: 'Đăng xuất mọi phiên của một người',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/admin/users/{userId}/unlock',
+    purpose: 'Mở khoá đăng nhập sau khi gõ sai mật khẩu quá nhiều lần',
+  },
+  { method: 'GET', path: '/api/v1/admin/departments', purpose: 'Danh sách phòng ban' },
+  { method: 'POST', path: '/api/v1/admin/departments', purpose: 'Tạo phòng ban' },
+  { method: 'PUT', path: '/api/v1/admin/departments/{key}', purpose: 'Đổi tên phòng ban' },
+  {
+    method: 'DELETE',
+    path: '/api/v1/admin/departments/{key}',
+    purpose: 'Xoá phòng ban không còn ai',
+  },
+  { method: 'GET', path: '/api/v1/admin/roles', purpose: 'Danh mục vai trò' },
+  { method: 'POST', path: '/api/v1/admin/roles', purpose: 'Thêm vai trò vào danh mục' },
+  { method: 'PUT', path: '/api/v1/admin/roles/{key}', purpose: 'Đổi tên hiển thị của vai trò' },
+  { method: 'DELETE', path: '/api/v1/admin/roles/{key}', purpose: 'Xoá vai trò không ai giữ' },
+
+  { method: 'GET', path: '/api/v1/business-objects', purpose: 'Danh sách định nghĩa dữ liệu' },
+  {
+    method: 'POST',
+    path: '/api/v1/business-objects',
+    purpose: 'Tạo định nghĩa và publish phiên bản đầu',
+  },
   {
     method: 'GET',
     path: '/api/v1/business-objects/{key}',
@@ -56,16 +97,52 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
     path: '/api/v1/business-objects/{key}/records',
     purpose: 'Tạo bản ghi, validate theo schema của phiên bản đang dùng',
   },
-  { method: 'GET', path: '/api/v1/process-definitions', purpose: 'Danh sách process definition' },
+  {
+    method: 'GET',
+    path: '/api/v1/business-objects/{key}/records/{recordId}',
+    purpose: 'Một bản ghi kèm quyền sửa của người đọc',
+  },
+  {
+    method: 'PUT',
+    path: '/api/v1/business-objects/{key}/records/{recordId}',
+    purpose: 'Sửa bản ghi theo đúng phiên bản định nghĩa của nó',
+  },
+  {
+    method: 'DELETE',
+    path: '/api/v1/business-objects/{key}/records/{recordId}',
+    purpose: 'Xoá bản ghi; bản ghi đang có lần chạy thì từ chối',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/business-objects/{key}/records/{recordId}/history',
+    purpose: 'Lịch sử thay đổi từng trường của bản ghi',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/business-objects/{key}/records/export',
+    purpose: 'Xuất bản ghi ra CSV theo phạm vi đọc',
+  },
+  {
+    method: 'POST',
+    path: '/api/v1/business-objects/{key}/records/import',
+    purpose: 'Nhập bản ghi từ CSV, có chạy thử và ghi tất cả hoặc không ghi gì',
+  },
+
+  { method: 'GET', path: '/api/v1/process-definitions', purpose: 'Danh sách quy trình' },
   {
     method: 'POST',
     path: '/api/v1/process-definitions',
-    purpose: 'Tạo process definition, validate graph và publish v1',
+    purpose: 'Tạo quy trình, validate graph và publish v1',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/process-definitions/{key}',
+    purpose: 'Đọc một quy trình theo key',
   },
   {
     method: 'PUT',
     path: '/api/v1/process-definitions/{key}',
-    purpose: 'Publish phiên bản mới của quy trình (instance đang chạy giữ phiên bản cũ)',
+    purpose: 'Publish phiên bản mới của quy trình (lần chạy đang chạy giữ phiên bản cũ)',
   },
   {
     method: 'GET',
@@ -75,45 +152,115 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
   {
     method: 'GET',
     path: '/api/v1/process-instances',
-    purpose: 'Instance theo phạm vi đọc, lọc theo business object hoặc quy trình',
-  },
-  { method: 'GET', path: '/api/v1/metrics', purpose: 'Danh sách metric đã định nghĩa' },
-  {
-    method: 'POST',
-    path: '/api/v1/metrics',
-    purpose: 'Tạo metric (cần admin hoặc process_designer)',
-  },
-  {
-    method: 'PUT',
-    path: '/api/v1/metrics/{key}',
-    purpose: 'Sửa định nghĩa metric; key là định danh nên không đổi được',
-  },
-  {
-    method: 'GET',
-    path: '/api/v1/metrics/{key}/result',
-    purpose: 'Chạy metric theo phạm vi dữ liệu của người gọi',
-  },
-  {
-    method: 'GET',
-    path: '/api/v1/process-metrics',
-    purpose: 'Read model vận hành: instance, cycle time, thời gian bước, tỉ lệ duyệt / chạy lại',
+    purpose: 'Lần chạy theo phạm vi đọc, lọc theo định nghĩa hoặc bản ghi',
   },
   {
     method: 'POST',
     path: '/api/v1/process-instances',
-    purpose: 'Khởi tạo instance từ một bản ghi đã lưu',
+    purpose: 'Khởi tạo lần chạy từ một bản ghi đã lưu',
   },
   {
     method: 'GET',
-    path: '/api/v1/process-instances/{id}',
+    path: '/api/v1/process-instances/{instanceId}',
     purpose: 'Một lần chạy kèm việc và nhật ký sự kiện',
   },
   {
     method: 'POST',
-    path: '/api/v1/process-instances/{id}/tasks/{taskId}/decisions',
-    purpose: 'Duyệt / trả về / từ chối, CAS trên task, một transaction',
+    path: '/api/v1/process-instances/{instanceId}/tasks/{taskId}/decisions',
+    purpose: 'Duyệt / trả về / từ chối, so khớp trên việc, một transaction',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/process-metrics',
+    purpose: 'Read model vận hành: lần chạy, cycle time, thời gian bước, tỉ lệ duyệt / chạy lại',
+  },
+
+  { method: 'GET', path: '/api/v1/metrics', purpose: 'Danh sách chỉ số đã định nghĩa' },
+  {
+    method: 'POST',
+    path: '/api/v1/metrics',
+    purpose: 'Tạo chỉ số (cần admin hoặc process_designer)',
+  },
+  { method: 'GET', path: '/api/v1/metrics/{key}', purpose: 'Đọc định nghĩa của một chỉ số' },
+  {
+    method: 'PUT',
+    path: '/api/v1/metrics/{key}',
+    purpose: 'Sửa định nghĩa chỉ số; key là định danh nên không đổi được',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/metrics/{key}/result',
+    purpose: 'Chạy chỉ số theo phạm vi dữ liệu của người gọi',
+  },
+
+  { method: 'POST', path: '/api/v1/attachments', purpose: 'Tải tệp lên, gắn vào bản ghi khi lưu' },
+  {
+    method: 'GET',
+    path: '/api/v1/attachments/{attachmentId}',
+    purpose: 'Tải tệp về (luôn tải xuống, không hiển thị)',
+  },
+  {
+    method: 'DELETE',
+    path: '/api/v1/attachments/{attachmentId}',
+    purpose: 'Xoá tệp chưa gắn vào bản ghi',
+  },
+  {
+    method: 'GET',
+    path: '/api/v1/webhook-deliveries',
+    purpose: 'Nhật ký gửi sự kiện ra hệ thống khác',
   },
 ];
+
+/**
+ * endpointGroup names the area an endpoint belongs to, so the table reads as a list of
+ * areas instead of one long wall of paths.
+ */
+function endpointGroup(path: string): string {
+  if (path.startsWith('/api/v1/admin')) {
+    return 'Quản trị tổ chức';
+  }
+  if (path.startsWith('/api/v1/business-objects')) {
+    return 'Định nghĩa dữ liệu và bản ghi';
+  }
+  if (path.startsWith('/api/v1/process')) {
+    return 'Quy trình phê duyệt';
+  }
+  if (path.startsWith('/api/v1/metrics')) {
+    return 'Chỉ số báo cáo';
+  }
+  if (path.startsWith('/api/v1/attachments')) {
+    return 'Tệp đính kèm';
+  }
+  if (path.startsWith('/api/v1/webhook')) {
+    return 'Tích hợp ra ngoài';
+  }
+  if (
+    path.startsWith('/api/v1/auth') ||
+    path.startsWith('/api/v1/me') ||
+    path === '/api/v1/roles'
+  ) {
+    return 'Phiên làm việc và vai trò';
+  }
+  if (path === '/api/v1/tasks') {
+    return 'Hộp việc';
+  }
+  return 'Hệ thống';
+}
+
+/** endpointGroups keeps the order of the table and drops the empty groups. */
+function endpointGroups(): {
+  title: string;
+  items: readonly { method: string; path: string; purpose: string }[];
+}[] {
+  const groups = new Map<string, { method: string; path: string; purpose: string }[]>();
+  for (const endpoint of ENDPOINTS) {
+    const title = endpointGroup(endpoint.path);
+    const items = groups.get(title) ?? [];
+    items.push(endpoint);
+    groups.set(title, items);
+  }
+  return [...groups.entries()].map(([title, items]) => ({ title, items }));
+}
 
 const DELIVERY_STATUS_LABELS: Record<string, string> = {
   pending: 'đang chờ gửi lại',
@@ -149,7 +296,7 @@ export default async function SettingsPage() {
       <PageHeader
         eyebrow="09 / Vận hành"
         title="Vận hành"
-        lead="Trang dành cho người vận hành hệ thống: endpoint, cổng, phiên bản công cụ và nhật ký tích hợp. Cấu hình tổ chức (đăng nhập, phân quyền, môi trường) chưa có trong bản này."
+        lead="Trang dành cho người vận hành hệ thống: endpoint, cổng, phiên bản công cụ và nhật ký tích hợp. Tài khoản, phòng ban và vai trò nằm ở khu vực Quản trị."
       />
 
       <div className="grid gap-6 lg:grid-cols-2">

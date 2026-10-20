@@ -1,3 +1,4 @@
+import { operatorLabel } from '@/lib/names';
 import type { ProcessEvent, ProcessInstance, ProcessTask } from '@opvaryn/contracts';
 
 import { labelOrKey } from '@/lib/names';
@@ -73,19 +74,6 @@ export function describeEvent(event: ProcessEvent, labels: EventLabels = {}): Ti
   };
 }
 
-/**
- * OPERATOR_LABELS names the comparison operators in the words a person uses. Two screens
- * read a condition: the audit log (a sentence) and the designer's condition step (a select).
- */
-export const OPERATOR_LABELS: Record<string, string> = {
-  eq: 'bằng',
-  ne: 'khác',
-  gt: 'lớn hơn',
-  gte: 'từ',
-  lt: 'nhỏ hơn',
-  lte: 'đến',
-};
-
 function describeDetail(
   eventType: string,
   payload: Record<string, unknown>,
@@ -114,7 +102,7 @@ function describeDetail(
       const field = optionalString(payload.field) ?? '?';
       const op = optionalString(payload.op) ?? '?';
       const fieldName = labelOrKey(labels.fields?.get(field), field);
-      const opName = OPERATOR_LABELS[op] ?? op;
+      const opName = operatorLabel(op);
       const expected = formatPayloadValue(payload.value);
       const actual = formatPayloadValue(payload.actual);
       const result = payload.result === true ? 'đúng' : 'sai';

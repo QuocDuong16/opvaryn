@@ -80,6 +80,8 @@ func run() error {
 				MaxAttempts: cfg.WebhookMaxAttempts,
 			})),
 			Identity:       service.NewIdentity(st),
+			Admin:          service.NewAdmin(st),
+			Attachments:    service.NewAttachments(st),
 			Metrics:        service.NewMetrics(st, st),
 			ProcessMetrics: service.NewProcessMetrics(st, st),
 			Webhooks:       webhooks,

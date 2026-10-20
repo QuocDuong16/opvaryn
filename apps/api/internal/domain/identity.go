@@ -34,6 +34,24 @@ type RoleEntry struct {
 	Label string
 }
 
+// Role is one entry of the administration catalogue (ADR 0022): the identity a process
+// node can assign, the display name, whether the platform itself defines it, and how many
+// people hold it. IsSystem roles (admin, process_designer) may be renamed but not deleted.
+type Role struct {
+	Key       string
+	Label     string
+	IsSystem  bool
+	UserCount int
+	CreatedAt time.Time
+}
+
+// DepartmentSummary is a department with the number of people in it, for the administration
+// list. The count is what tells an administrator whether deleting it is even possible.
+type DepartmentSummary struct {
+	Department
+	UserCount int
+}
+
 // User is a person who can log in. PasswordHash is the argon2id PHC string and is
 // never serialized to a client or written to a log. DepartmentName is the display name of
 // the department the key points at, so no screen has to show a key to a person.
@@ -48,6 +66,14 @@ type User struct {
 	Status         string
 	CreatedAt      time.Time
 	UpdatedAt      time.Time
+}
+
+// AdminUser is an account as the administration area shows it: the person, plus the sign-in
+// cooldown only an administrator cares about. LockedUntil is nil when the account can sign in
+// normally (ADR 0028).
+type AdminUser struct {
+	User
+	LockedUntil *time.Time
 }
 
 // Active reports whether the user may log in.

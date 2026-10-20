@@ -48,6 +48,28 @@ export type UpdateProcessDefinitionRequest =
   components['schemas']['UpdateProcessDefinitionRequest'];
 /** A role as a screen shows it: the key the engine compares, and its display name. */
 export type RoleEntry = components['schemas']['RoleEntry'];
+/** One account as the administration screen shows it. */
+export type AdminUser = components['schemas']['AdminUser'];
+/** Whether an account may sign in. */
+export type AdminUserStatus = components['schemas']['AdminUserStatus'];
+/** Request body for creating one account. */
+export type CreateAdminUserRequest = components['schemas']['CreateAdminUserRequest'];
+/** Request body for replacing an account's profile and roles. */
+export type UpdateAdminUserRequest = components['schemas']['UpdateAdminUserRequest'];
+/** Request body for replacing an account's password. */
+export type SetAdminUserPasswordRequest = components['schemas']['SetAdminUserPasswordRequest'];
+/** One department with its head count. */
+export type AdminDepartment = components['schemas']['AdminDepartment'];
+/** Request body for adding a department. */
+export type CreateAdminDepartmentRequest = components['schemas']['CreateAdminDepartmentRequest'];
+/** Request body for renaming a department. */
+export type UpdateAdminDepartmentRequest = components['schemas']['UpdateAdminDepartmentRequest'];
+/** One role of the catalogue with its holder count. */
+export type AdminRole = components['schemas']['AdminRole'];
+/** Request body for adding a role. */
+export type CreateAdminRoleRequest = components['schemas']['CreateAdminRoleRequest'];
+/** Request body for renaming a role. */
+export type UpdateAdminRoleRequest = components['schemas']['UpdateAdminRoleRequest'];
 
 /** One open task with the instance it belongs to. */
 export type InboxItem = components['schemas']['InboxItem'];
@@ -75,6 +97,12 @@ export type WebhookDeliveryList = components['schemas']['WebhookDeliveryList'];
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 /** The signed-in user with roles and department. */
 export type Me = components['schemas']['Me'];
+/** Request body for changing the signed-in user's own password. */
+export type ChangeMyPasswordRequest = components['schemas']['ChangeMyPasswordRequest'];
+/** One entry of a record's append-only history. */
+export type RecordHistoryEntry = components['schemas']['RecordHistoryEntry'];
+/** One changed field in a history entry, already rendered for a person. */
+export type RecordHistoryChange = components['schemas']['RecordHistoryChange'];
 /** Build identity reported by the API. */
 export type Meta = components['schemas']['Meta'];
 /** Liveness/readiness answer. `ok` or `unavailable`. */
@@ -114,6 +142,7 @@ export function pageParams(query: PageQuery = {}): string {
 export interface ApiClient {
   getMeta(): Promise<Meta>;
   getMe(): Promise<Me>;
+  changeMyPassword(input: ChangeMyPasswordRequest): Promise<void>;
   getReadiness(): Promise<HealthStatus>;
   listBusinessObjects(query?: PageQuery): Promise<Paged<BusinessObject>>;
   getBusinessObject(key: string): Promise<BusinessObject>;
@@ -122,6 +151,18 @@ export interface ApiClient {
   listBusinessObjectVersions(key: string): Promise<BusinessObjectVersion[]>;
   listObjectRecords(key: string, query?: PageQuery): Promise<Paged<ObjectRecord>>;
   createObjectRecord(key: string, input: CreateObjectRecordRequest): Promise<ObjectRecord>;
+  getObjectRecord(key: string, recordId: string): Promise<ObjectRecord>;
+  listObjectRecordHistory(
+    key: string,
+    recordId: string,
+    query?: PageQuery,
+  ): Promise<Paged<RecordHistoryEntry>>;
+  updateObjectRecord(
+    key: string,
+    recordId: string,
+    input: CreateObjectRecordRequest,
+  ): Promise<ObjectRecord>;
+  deleteObjectRecord(key: string, recordId: string): Promise<void>;
   listProcessDefinitions(query?: PageQuery): Promise<Paged<ProcessDefinition>>;
   getProcessDefinition(key: string): Promise<ProcessDefinition>;
   createProcessDefinition(input: CreateProcessDefinitionRequest): Promise<ProcessDefinition>;
@@ -133,6 +174,25 @@ export interface ApiClient {
   listInboxTasks(query?: PageQuery): Promise<Paged<InboxItem>>;
   /** Role keys held by at least one user: what the workflow designer offers. */
   listRoles(): Promise<RoleEntry[]>;
+  listAdminUsers(query?: PageQuery): Promise<Paged<AdminUser>>;
+  getAdminUser(userId: string): Promise<AdminUser>;
+  createAdminUser(input: CreateAdminUserRequest): Promise<AdminUser>;
+  updateAdminUser(userId: string, input: UpdateAdminUserRequest): Promise<AdminUser>;
+  setAdminUserPassword(userId: string, input: SetAdminUserPasswordRequest): Promise<void>;
+  revokeAdminUserSessions(userId: string): Promise<void>;
+  /** Ends the sign-in cooldown of an account, so the person can sign in again (ADR 0028). */
+  unlockAdminUser(userId: string): Promise<void>;
+  listAdminDepartments(query?: PageQuery): Promise<Paged<AdminDepartment>>;
+  createAdminDepartment(input: CreateAdminDepartmentRequest): Promise<AdminDepartment>;
+  updateAdminDepartment(
+    key: string,
+    input: UpdateAdminDepartmentRequest,
+  ): Promise<AdminDepartment>;
+  deleteAdminDepartment(key: string): Promise<void>;
+  listAdminRoles(query?: PageQuery): Promise<Paged<AdminRole>>;
+  createAdminRole(input: CreateAdminRoleRequest): Promise<AdminRole>;
+  updateAdminRole(key: string, input: UpdateAdminRoleRequest): Promise<AdminRole>;
+  deleteAdminRole(key: string): Promise<void>;
   listMetrics(): Promise<MetricDefinition[]>;
   getMetric(key: string): Promise<MetricDefinition>;
   createMetric(input: CreateMetricDefinitionRequest): Promise<MetricDefinition>;
@@ -170,9 +230,16 @@ export class ApiError extends Error {
 }
 
 interface RequestOptions {
-  method?: 'GET' | 'POST' | 'PUT';
+  method?: 'GET' | 'POST' | 'PUT' | 'DELETE';
   body?: unknown;
 }
+
+/**
+ * How long any one API call may take. A server that accepts the connection and then stops
+ * answering must not hold a page (or a server action) open forever; the caller gets the same
+ * "could not reach the API" answer it gets when the API is down.
+ */
+export const API_TIMEOUT_MS = 15_000;
 
 /**
  * Creates a typed client for the OPVARYN API.
@@ -189,6 +256,7 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
       headers: options.body === undefined ? undefined : { 'Content-Type': 'application/json' },
       body: options.body === undefined ? undefined : JSON.stringify(options.body),
       cache: 'no-store',
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
     });
 
     const payload: unknown = await response.json().catch(() => undefined);
@@ -209,10 +277,16 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
 
     getMe: () => request<Me>('/api/v1/me'),
 
+    changeMyPassword: (input) =>
+      request<void>('/api/v1/me/password', { method: 'POST', body: input }),
+
     // Readiness answers from the body, not the status code: 503 with
     // status=unavailable is a valid answer, not a transport error.
     async getReadiness() {
-      const response = await fetchImpl(`${base}/readyz`, { cache: 'no-store' });
+      const response = await fetchImpl(`${base}/readyz`, {
+        cache: 'no-store',
+        signal: AbortSignal.timeout(API_TIMEOUT_MS),
+      });
       const payload = (await response.json().catch(() => undefined)) as
         | Partial<HealthStatus>
         | undefined;
@@ -257,6 +331,29 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
         body: input,
       }),
 
+    getObjectRecord: (key, recordId) =>
+      request<ObjectRecord>(
+        `/api/v1/business-objects/${encodeURIComponent(key)}/records/${encodeURIComponent(recordId)}`,
+      ),
+
+    async listObjectRecordHistory(key, recordId, query) {
+      return request<Paged<RecordHistoryEntry>>(
+        `/api/v1/business-objects/${encodeURIComponent(key)}/records/${encodeURIComponent(recordId)}/history${pageParams(query)}`,
+      );
+    },
+
+    updateObjectRecord: (key, recordId, input) =>
+      request<ObjectRecord>(
+        `/api/v1/business-objects/${encodeURIComponent(key)}/records/${encodeURIComponent(recordId)}`,
+        { method: 'PUT', body: input },
+      ),
+
+    deleteObjectRecord: (key, recordId) =>
+      request<void>(
+        `/api/v1/business-objects/${encodeURIComponent(key)}/records/${encodeURIComponent(recordId)}`,
+        { method: 'DELETE' },
+      ),
+
     async listInboxTasks(query) {
       return request<Paged<InboxItem>>(`/api/v1/tasks${pageParams(query)}`);
     },
@@ -265,6 +362,72 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
       const payload = await request<{ data: RoleEntry[] }>('/api/v1/roles');
       return payload.data;
     },
+
+    async listAdminUsers(query) {
+      return request<Paged<AdminUser>>(`/api/v1/admin/users${pageParams(query)}`);
+    },
+
+    getAdminUser: (userId) =>
+      request<AdminUser>(`/api/v1/admin/users/${encodeURIComponent(userId)}`),
+
+    createAdminUser: (input) =>
+      request<AdminUser>('/api/v1/admin/users', { method: 'POST', body: input }),
+
+    updateAdminUser: (userId, input) =>
+      request<AdminUser>(`/api/v1/admin/users/${encodeURIComponent(userId)}`, {
+        method: 'PUT',
+        body: input,
+      }),
+
+    setAdminUserPassword: (userId, input) =>
+      request<void>(`/api/v1/admin/users/${encodeURIComponent(userId)}/password`, {
+        method: 'POST',
+        body: input,
+      }),
+
+    revokeAdminUserSessions: (userId) =>
+      request<void>(`/api/v1/admin/users/${encodeURIComponent(userId)}/sessions`, {
+        method: 'DELETE',
+      }),
+
+    unlockAdminUser: (userId) =>
+      request<void>(`/api/v1/admin/users/${encodeURIComponent(userId)}/unlock`, {
+        method: 'POST',
+      }),
+
+    async listAdminDepartments(query) {
+      return request<Paged<AdminDepartment>>(`/api/v1/admin/departments${pageParams(query)}`);
+    },
+
+    createAdminDepartment: (input) =>
+      request<AdminDepartment>('/api/v1/admin/departments', { method: 'POST', body: input }),
+
+    updateAdminDepartment: (key, input) =>
+      request<AdminDepartment>(`/api/v1/admin/departments/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        body: input,
+      }),
+
+    deleteAdminDepartment: (key) =>
+      request<void>(`/api/v1/admin/departments/${encodeURIComponent(key)}`, {
+        method: 'DELETE',
+      }),
+
+    async listAdminRoles(query) {
+      return request<Paged<AdminRole>>(`/api/v1/admin/roles${pageParams(query)}`);
+    },
+
+    createAdminRole: (input) =>
+      request<AdminRole>('/api/v1/admin/roles', { method: 'POST', body: input }),
+
+    updateAdminRole: (key, input) =>
+      request<AdminRole>(`/api/v1/admin/roles/${encodeURIComponent(key)}`, {
+        method: 'PUT',
+        body: input,
+      }),
+
+    deleteAdminRole: (key) =>
+      request<void>(`/api/v1/admin/roles/${encodeURIComponent(key)}`, { method: 'DELETE' }),
 
     async listMetrics() {
       const payload = await request<{ data: MetricDefinition[] }>('/api/v1/metrics');

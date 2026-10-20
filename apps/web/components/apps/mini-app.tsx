@@ -1,8 +1,9 @@
 'use client';
 
 import { useMemo, useState, type ReactNode } from 'react';
-import type { BusinessObject, ObjectRecord } from '@opvaryn/contracts';
+import type { BusinessObject, BusinessObjectVersion, ObjectRecord } from '@opvaryn/contracts';
 
+import { fieldsForVersionNumber } from '@/components/objects/record-grouping';
 import { StatusBadge, type StatusKind } from '@/components/ui/status-badge';
 import { formatFieldValue, formatTimestamp, primaryFieldValue } from '@/lib/format';
 import { cn } from '@/lib/utils';
@@ -10,6 +11,8 @@ import { cn } from '@/lib/utils';
 export interface MiniAppData {
   object: BusinessObject;
   records: readonly ObjectRecord[];
+  /** The published versions of the definition, so a record is read with its own schema. */
+  versions: readonly BusinessObjectVersion[];
 }
 
 type ViewKind = 'list' | 'detail' | 'kanban' | 'config' | 'integration';
@@ -148,37 +151,37 @@ function ListView({ app, onOpen }: { app: MiniAppData; onOpen: (recordId: string
     );
   }
 
-  const secondary = app.object.fields.filter((field) => field.type !== 'text').slice(0, 2);
-
   return (
     <ul className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-surface-raised/40">
-      {app.records.map((record) => (
-        <li key={record.id}>
-          <button
-            type="button"
-            onClick={() => onOpen(record.id)}
-            className="flex w-full flex-wrap items-baseline justify-between gap-x-6 gap-y-1 px-4 py-3 text-left transition-colors hover:bg-surface-overlay"
-          >
-            <span className="min-w-0">
-              <span className="block text-sm font-medium">
-                {primaryFieldValue(app.object.fields, record)}
-              </span>
-              <span className="mt-0.5 block font-mono text-[11px] text-on-surface-muted">
-                Bản ghi bạn không đọc được
-              </span>
-            </span>
-            <span className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-on-surface-muted">
-              {secondary.map((field) => (
-                <span key={field.key}>
-                  <span className="text-on-surface-muted/70">{field.label}:</span>{' '}
-                  {formatFieldValue(field, record.values[field.key])}
+      {app.records.map((record) => {
+        // A record keeps the fields of the version it was created under (ADR 0006).
+        const fields = fieldsForVersionNumber(app.versions, record.objectVersion);
+        const secondary = fields.filter((field) => field.type !== 'text').slice(0, 2);
+        return (
+          <li key={record.id}>
+            <button
+              type="button"
+              onClick={() => onOpen(record.id)}
+              className="flex w-full flex-wrap items-baseline justify-between gap-x-6 gap-y-1 px-4 py-3 text-left transition-colors hover:bg-surface-overlay"
+            >
+              <span className="min-w-0">
+                <span className="block text-sm font-medium">
+                  {primaryFieldValue(fields, record)}
                 </span>
-              ))}
-              <span>{formatTimestamp(record.createdAt)}</span>
-            </span>
-          </button>
-        </li>
-      ))}
+              </span>
+              <span className="flex flex-wrap gap-x-5 gap-y-1 text-xs text-on-surface-muted">
+                {secondary.map((field) => (
+                  <span key={field.key}>
+                    <span className="text-on-surface-muted/70">{field.label}:</span>{' '}
+                    {formatFieldValue(field, record.values[field.key])}
+                  </span>
+                ))}
+                <span>{formatTimestamp(record.createdAt)}</span>
+              </span>
+            </button>
+          </li>
+        );
+      })}
     </ul>
   );
 }
@@ -196,10 +199,10 @@ function DetailView({ app, record }: { app: MiniAppData; record: ObjectRecord | 
     <div className="grid gap-4 lg:grid-cols-[1fr_18rem]">
       <div className="rounded-xl border border-border bg-surface-raised p-5">
         <h3 className="text-base font-semibold tracking-tight">
-          {primaryFieldValue(app.object.fields, record)}
+          {primaryFieldValue(fieldsForVersionNumber(app.versions, record.objectVersion), record)}
         </h3>
         <dl className="mt-4 divide-y divide-border">
-          {app.object.fields.map((field) => (
+          {fieldsForVersionNumber(app.versions, record.objectVersion).map((field) => (
             <div key={field.key} className="grid gap-1 py-2.5 sm:grid-cols-[12rem_1fr]">
               <dt className="text-xs tracking-wide text-on-surface-muted uppercase">
                 {field.label}

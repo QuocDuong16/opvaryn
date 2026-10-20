@@ -1,16 +1,15 @@
 package httpapi
 
 import (
-	"errors"
 	"log/slog"
 	"net/http"
+	"strings"
 
 	"github.com/go-chi/chi/v5"
 
 	apiv1 "github.com/QuocDuong16/opvaryn/api/internal/api/v1"
 	"github.com/QuocDuong16/opvaryn/api/internal/domain"
 	"github.com/QuocDuong16/opvaryn/api/internal/service"
-	"github.com/QuocDuong16/opvaryn/api/internal/store"
 )
 
 func handleListBusinessObjects(objects *service.BusinessObjects, log *slog.Logger) http.HandlerFunc {
@@ -122,32 +121,15 @@ func handleListBusinessObjectVersions(objects *service.BusinessObjects, log *slo
 	}
 }
 
-// writeStoreError maps service and store failures onto the stable error envelope.
-func writeStoreError(w http.ResponseWriter, log *slog.Logger, err error, action string) {
-	var validation *service.ValidationError
-	switch {
-	case errors.As(err, &validation):
-		writeError(w, log, http.StatusBadRequest, codeInvalidRequest, validation.Error())
-	case errors.Is(err, store.ErrNotFound), errors.Is(err, service.ErrNotFound):
-		// The service uses its own sentinel for things it hides on purpose: an
-		// instance the caller may not see answers 404, not 403, so the API does not
-		// confirm that it exists.
-		writeError(w, log, http.StatusNotFound, codeNotFound, "the requested resource does not exist")
-	case errors.Is(err, store.ErrConflict):
-		writeError(w, log, http.StatusConflict, codeConflict, "a business object with this key already exists")
-	case errors.Is(err, service.ErrForbidden):
-		writeError(w, log, http.StatusForbidden, codeForbidden,
-			"the actor role does not hold this task")
-	case errors.Is(err, service.ErrStateConflict), errors.Is(err, store.ErrTaskClosed):
-		writeError(w, log, http.StatusConflict, codeConflict,
-			"the task or instance already moved on; reload and check the timeline")
-	case errors.Is(err, store.ErrUnavailable):
-		log.Error(action+" failed", "error", err)
-		writeError(w, log, http.StatusServiceUnavailable, codeUnavailable, "database is unavailable, try again shortly")
-	default:
-		log.Error(action+" failed", "error", err)
-		writeError(w, log, http.StatusInternalServerError, codeInternal, "unexpected server error")
+// trimStorePrefix turns a wrapped store sentinel into the domain sentence it carries, so
+// the conflict response explains what is in the way without exposing package names.
+func trimStorePrefix(err error) string {
+	const marker = "store: in use: "
+	message := err.Error()
+	if index := strings.Index(message, marker); index >= 0 {
+		return message[index+len(marker):]
 	}
+	return message
 }
 
 func toAPIBusinessObjects(objects []domain.BusinessObject) []apiv1.BusinessObject {

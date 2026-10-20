@@ -78,6 +78,12 @@ func (s *Store) CreateUser(ctx context.Context, user domain.User, passwordHash s
 		}
 
 		for _, role := range user.Roles {
+			// A role granted through the CLI or the bootstrap path joins the catalogue too, so
+			// the administration screen never shows a user holding an unknown role.
+			if _, err := tx.Exec(ctx,
+				`INSERT INTO roles (key) VALUES ($1) ON CONFLICT (key) DO NOTHING`, role); err != nil {
+				return fmt.Errorf("register role: %w", err)
+			}
 			if _, err := tx.Exec(ctx,
 				`INSERT INTO user_roles (user_id, role) VALUES ($1, $2)`, user.ID, role); err != nil {
 				return fmt.Errorf("insert user role: %w", err)
@@ -95,7 +101,11 @@ func (s *Store) CreateUser(ctx context.Context, user domain.User, passwordHash s
 // the workflow designer offers: a definition that assigns a role nobody holds would
 // wait forever, so the editor wants the roles that actually exist.
 func (s *Store) ListRoles(ctx context.Context) ([]string, error) {
-	rows, err := s.pool.Query(ctx, `SELECT DISTINCT role FROM user_roles ORDER BY role`)
+	rows, err := s.pool.Query(ctx, `
+		SELECT r.key
+		  FROM roles r
+		 WHERE EXISTS (SELECT 1 FROM user_roles ur WHERE ur.role = r.key)
+		 ORDER BY r.key`)
 	if err != nil {
 		return nil, classify(fmt.Errorf("query roles: %w", err))
 	}
@@ -120,6 +130,10 @@ func (s *Store) AddUserRoles(ctx context.Context, userID uuid.UUID, roles []stri
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
 		for _, role := range roles {
 			if _, err := tx.Exec(ctx, `
+				INSERT INTO roles (key) VALUES ($1) ON CONFLICT (key) DO NOTHING`, role); err != nil {
+				return fmt.Errorf("register role: %w", err)
+			}
+			if _, err := tx.Exec(ctx, `
 				INSERT INTO user_roles (user_id, role) VALUES ($1, $2)
 				ON CONFLICT (user_id, role) DO NOTHING`, userID, role); err != nil {
 				return fmt.Errorf("grant role: %w", err)
@@ -140,16 +154,50 @@ func (s *Store) AddUserRoles(ctx context.Context, userID uuid.UUID, roles []stri
 	return user, nil
 }
 
-// UpdatePassword replaces one user's password hash.
+// UpdatePassword replaces one user's password hash and ends every existing session: a
+// password reset is also the way an administrator takes back an account.
 func (s *Store) UpdatePassword(ctx context.Context, userID uuid.UUID, passwordHash string) error {
-	tag, err := s.pool.Exec(ctx, `
-		UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1`,
-		userID, passwordHash)
+	return s.updatePassword(ctx, userID, passwordHash, nil)
+}
+
+// UpdatePasswordKeepingSession replaces the hash and ends every session except the one whose
+// token hash is given: a person changing their own password stays signed in where they are,
+// while other devices are signed out.
+func (s *Store) UpdatePasswordKeepingSession(
+	ctx context.Context,
+	userID uuid.UUID,
+	passwordHash string,
+	keepTokenHash []byte,
+) error {
+	return s.updatePassword(ctx, userID, passwordHash, keepTokenHash)
+}
+
+func (s *Store) updatePassword(
+	ctx context.Context,
+	userID uuid.UUID,
+	passwordHash string,
+	keepTokenHash []byte,
+) error {
+	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `
+			UPDATE users SET password_hash = $2, updated_at = now() WHERE id = $1`,
+			userID, passwordHash)
+		if err != nil {
+			return fmt.Errorf("update password: %w", err)
+		}
+		if tag.RowsAffected() == 0 {
+			return fmt.Errorf("%w: user %s", ErrNotFound, userID)
+		}
+		if _, err := tx.Exec(ctx, `
+			DELETE FROM sessions
+			 WHERE user_id = $1 AND ($2::bytea IS NULL OR token_hash <> $2)`,
+			userID, keepTokenHash); err != nil {
+			return fmt.Errorf("revoke sessions: %w", err)
+		}
+		return nil
+	})
 	if err != nil {
-		return classify(fmt.Errorf("update password: %w", err))
-	}
-	if tag.RowsAffected() == 0 {
-		return fmt.Errorf("%w: user %s", ErrNotFound, userID)
+		return classify(err)
 	}
 	return nil
 }
@@ -223,6 +271,21 @@ func (s *Store) DeleteExpiredSessions(ctx context.Context, now time.Time) (int64
 		return 0, classify(fmt.Errorf("delete expired sessions: %w", err))
 	}
 	return tag.RowsAffected(), nil
+}
+
+// TouchSession moves one live session's expiry forward. It is the sliding half of the
+// session policy: an active person is not signed out mid-day, while an idle session still
+// ends.
+func (s *Store) TouchSession(ctx context.Context, tokenHash []byte, expiresAt time.Time) error {
+	tag, err := s.pool.Exec(ctx, `
+		UPDATE sessions SET expires_at = $2 WHERE token_hash = $1`, tokenHash, expiresAt)
+	if err != nil {
+		return classify(fmt.Errorf("touch session: %w", err))
+	}
+	if tag.RowsAffected() == 0 {
+		return fmt.Errorf("%w: session", ErrNotFound)
+	}
+	return nil
 }
 
 // DeleteSession ends one session by token hash.

@@ -9,6 +9,7 @@ import {
   type ProcessInstanceSummary,
 } from '@opvaryn/contracts';
 
+import { ImportRecordsForm } from '@/components/forms/import-records-form';
 import { ObjectForm } from '@/components/forms/object-form';
 import { FieldSchema } from '@/components/objects/field-schema';
 import { RecordList } from '@/components/objects/record-list';
@@ -24,6 +25,7 @@ import { DesignerNotice } from '@/components/ui/role-notice';
 import { Tabs } from '@/components/ui/tabs';
 import { canDesign } from '@/lib/access';
 import { createServerApiClient, describeApiError } from '@/lib/api/server';
+import { MAX_EXPORT_ROWS } from '@/lib/export';
 import { formatTimestamp } from '@/lib/format';
 import { designerRoleName, roleLabels } from '@/lib/names';
 
@@ -35,6 +37,10 @@ interface PageProps {
     offset?: string;
     ioffset?: string;
     record?: string;
+    /** The search term of the run picker: which record can be picked to run a process. */
+    run_q?: string;
+    /** Set by the delete action, so the records tab can confirm what just happened. */
+    deleted?: string;
   }>;
 }
 
@@ -63,7 +69,10 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
     offset: rawOffset,
     ioffset: rawInstanceOffset,
     record: rawRecord,
+    deleted: rawDeleted,
+    run_q: rawRunQuery,
   } = await searchParams;
+  const runQuery = (rawRunQuery ?? '').trim();
   const api = createServerApiClient();
 
   const tab = resolveObjectTab(rawTab);
@@ -86,6 +95,7 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
   let records: ObjectRecord[] = [];
   let recordTotal = 0;
   let pickerRecords: ObjectRecord[] = [];
+  let pickerTotal = 0;
   let definitions: ProcessDefinition[] = [];
   let instances: ProcessInstanceSummary[] = [];
   let instanceTotal = 0;
@@ -125,12 +135,16 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
           { limit: INSTANCES_PER_PAGE, offset: instanceOffset },
         ),
         api.listProcessDefinitions({ limit: 100 }),
-        api.listObjectRecords(key, { limit: RUN_PICKER_LIMIT }),
+        api.listObjectRecords(key, {
+          limit: RUN_PICKER_LIMIT,
+          ...(runQuery === '' ? {} : { q: runQuery }),
+        }),
       ]);
       instances = instancePage.data;
       instanceTotal = instancePage.total;
       definitions = definitionPage.data;
       pickerRecords = picker.data;
+      pickerTotal = picker.total;
     }
   } catch (cause) {
     if (cause instanceof ApiError && cause.code === 'not_found') {
@@ -179,6 +193,15 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
           'Định nghĩa dữ liệu nghiệp vụ với các trường có kiểu rõ ràng. Màn nhập liệu được sinh trực tiếp từ phiên bản đang dùng.'
         }
       />
+
+      {rawDeleted === '1' ? (
+        <p
+          role="status"
+          className="mb-6 rounded-lg border border-success/40 px-4 py-3 text-sm text-success"
+        >
+          Đã xoá bản ghi.
+        </p>
+      ) : null}
 
       <p className="mb-4 flex flex-wrap items-center gap-3 text-sm">
         <Link href="/objects" className="text-on-surface-muted hover:text-on-surface">
@@ -313,13 +336,27 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
                 <h2 className="text-sm font-semibold tracking-wide text-on-surface-muted uppercase">
                   {`Bản ghi đã lưu (${recordTotal})`}
                 </h2>
-                <ListSearch
-                  basePath={`/objects/${object.key}`}
-                  value={query}
-                  placeholder="Tìm trong giá trị của bản ghi"
-                  label="Tìm bản ghi"
-                  keep={{ tab: 'records' }}
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                  <ListSearch
+                    basePath={`/objects/${object.key}`}
+                    value={query}
+                    placeholder="Tìm trong giá trị của bản ghi"
+                    label="Tìm bản ghi"
+                    keep={{ tab: 'records' }}
+                  />
+                  {recordTotal === 0 ? null : recordTotal <= MAX_EXPORT_ROWS ? (
+                    <a
+                      href={`/objects/${object.key}/records/export${query ? `?q=${encodeURIComponent(query)}` : ''}`}
+                      className="rounded-lg border border-border px-3 py-1.5 text-sm font-medium hover:bg-surface-overlay"
+                    >
+                      Xuất CSV
+                    </a>
+                  ) : (
+                    <span className="text-xs text-on-surface-muted">
+                      Danh sách quá lớn để xuất — thu hẹp tìm kiếm trước.
+                    </span>
+                  )}
+                </div>
               </div>
               <p className="mb-3 text-xs text-on-surface-muted">
                 Bạn thấy bản ghi của bộ phận mình, bản ghi do mình tạo, và bản ghi đang có việc chờ
@@ -330,6 +367,7 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
                 records={records}
                 filtered={query !== ''}
                 runsHref={(record) => `/objects/${key}?tab=processes&record=${record.id}`}
+                detailHref={(record) => `/objects/${key}/records/${record.id}`}
               />
               <Pagination
                 total={recordTotal}
@@ -349,6 +387,17 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
               </CardDescription>
               <div className="mt-4">
                 <ObjectForm object={object} />
+              </div>
+            </Card>
+
+            <Card>
+              <CardTitle>Nhập từ CSV</CardTitle>
+              <CardDescription>
+                Kiểm tra file trước rồi mới ghi. Nếu một dòng sai, không dòng nào được lưu để bạn
+                sửa file và thử lại.
+              </CardDescription>
+              <div className="mt-4">
+                <ImportRecordsForm objectKey={object.key} />
               </div>
             </Card>
           </aside>
@@ -415,6 +464,9 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
                 records={pickerRecords}
                 fields={object.fields}
                 recordId={recordId || undefined}
+                query={runQuery}
+                total={pickerTotal}
+                searchAction={`/objects/${key}?tab=processes`}
               />
             </div>
           </aside>

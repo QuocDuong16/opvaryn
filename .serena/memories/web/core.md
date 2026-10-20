@@ -4,8 +4,11 @@
 
 - Routes: `/` is the **public front page** and `/login` the sign-in screen; both stand outside the
   workspace frame (ADR 0014). Every screen behind the sign-in lives in the `app/(workspace)` route
-  group — `/overview` (workspace home), `/objects` (+ `/objects/[key]`), `/forms`, `/workflows`
-  (+ `[key]`), `/tasks` (+ `[instanceId]`), `/analytics`, `/apps`, `/roadmap`, `/settings` — and the
+  group — `/overview` (workspace home), `/objects` (+ `/objects/[key]`, plus
+  `/objects/[key]/records/[recordId]` for one record and `/objects/[key]/records/export` for the
+  CSV download), `/attachments/[id]` (file download), `/forms`, `/workflows`
+  (+ `[key]`), `/tasks` (+ `[instanceId]`), `/analytics`, `/apps`, `/admin` (+ `/admin/users`,
+  `/admin/users/[id]`, `/admin/departments`, `/admin/roles`), `/roadmap`, `/settings` — and the
   group's `layout.tsx` carries the shell. `proxy.ts` (Next 16's name for middleware; `middleware.ts`
   is deprecated) sends a caller without the session cookie to `/login?next=<path>`; the API still
   validates the token on every call, so a stale cookie reaches the screen and the screen says it
@@ -13,7 +16,12 @@
   `@/app/(workspace)/objects/actions`.
 - `app/nav.ts` (`NAV_ITEMS`, `navItemFor`) holds the **workspace** nav only: no `/` and no `/login`;
   `index` values stay sequential and the shell test enforces both. `navItemFor` matches nested routes
-  by longest prefix, so `/objects/it_incident` resolves to the Objects area.
+  by longest prefix, so `/objects/it_incident` resolves to the Objects area and `/admin/users` to
+  Quản trị. `navItemsFor(isAdminUser, showAdvanced)` shows `audience: 'admin'` entries to admins;
+  one with `requiresAdvanced: true` (`/settings`, `/roadmap`) also needs the advanced cookie, while
+  `/admin` is administration work and does not (ADR 0022). The workspace layout also loads the
+  inbox total (`listInboxTasks({limit:1})`) and passes `counts={{'/tasks': n}}` to the sidebar and
+  compact nav, which render a small badge on Việc của tôi.
 - Root layout (`app/layout.tsx`) reads the theme cookie server-side, sets `data-theme` on `<html>`
   (no flash, no client theme script) and loads **Be Vietnam Pro** via `next/font` — subsets
   `latin` + `vietnamese`, weights 400/500/600 only, because the face is static on Google Fonts and
@@ -51,6 +59,22 @@
   filtered by that record, names it when it is among the loaded records, and offers "Bỏ lọc, xem
   tất cả"; the run form preselects it. `params` is a Promise; a missing key calls `notFound()`
   (custom `not-found.tsx` in that segment).
+- `/objects/[key]/records/[recordId]` **live** (ADR 0023): one record's own screen — its values
+  rendered from its version, who entered it, its department, the version, created/updated stamps,
+  the way to its runs, and an edit form + delete (confirmation, then the action redirects to
+  `?tab=records&deleted=1` and the list shows "Đã xoá bản ghi"). The API's `canEdit` decides
+  whether the controls render at all; a reader without the write rule sees the values read-only
+  with the reason (ADR 0021). The records table links every row with **Mở bản ghi**
+  (`RecordList`'s `detailHref`) and the tab offers **Xuất CSV** while the visible list is at most
+  `MAX_EXPORT_ROWS` (10,000; `lib/export.ts` mirrors the Go constant) — the download goes through
+  the route handler, never straight to the API. A `file` field renders `components/forms/file-field.tsx`:
+  the file uploads on selection through `uploadAttachmentAction`, the form carries the returned id
+  in a hidden input, "Bỏ tệp" clears it (and deletes the unbound upload), and the record page shows
+  a `/attachments/{id}` download link named by `attachmentNames` (ADR 0025). The records tab also
+  carries **Nhập từ CSV** (`ImportRecordsForm` → `importObjectRecordsAction`; "Kiểm tra trước" sets
+  `dryRun=true`, errors are listed by spreadsheet line, import is all-or-nothing — ADR 0026). The
+  record screen ends with **Lịch sử thay đổi** (`listObjectRecordHistory`, 10 per page via
+  `?hoffset`, action label + actor + "Trường: cũ → mới" — ADR 0027).
 - `/forms` **live** + concept list: object picker via `?object=key` (defaults to the first
   object), the same entry form as a preview, schema table, and the not-yet-built capabilities.
 - `/workflows/[key]` is a **drag-and-drop canvas editor** over a browser-local draft (ADR 0013):
@@ -132,6 +156,25 @@
   by the first `select` field (mock policy), `Cấu hình` is the administration preview (concept:
   every control is disabled and the copy says nothing is stored), integration panel lists mock
   connectors. Status badges are per view, not per page.
+- `/admin` **live** (ADR 0022, ADR 0029): an account that is waiting out a sign-in cooldown
+  carries `lockedUntil`; the accounts list shows it, the account page offers **Mở khoá đăng nhập**
+  only while the account waits, and the action redirects to `?unlocked=1` so the confirmation
+  survives the re-render (the card that carried the button is gone once the wait ends).
+  `components/admin/cooldown.ts` is the pure rule (a moment that already passed means free);
+  `lib/format.ts` owns the clock format (`formatClock`). the organisation administration area, four screens sharing
+  `components/admin/admin-nav.tsx` (Tổng quan / Người dùng / Phòng ban / Vai trò). `lib/admin-server.ts`
+  (`loadAdminAccess`) asks `/me` once per page: a non-admin gets `notFound()`, an API failure renders
+  `AdminLoadError` (an error is not a 404). Tổng quan counts the three catalogues (`limit: 1` reads)
+  and states the fixed permission model — it manages who holds which role, never an arbitrary
+  permission matrix. Người dùng is paged + `q`, a `<details>` create form (`components/admin/user-form.tsx`,
+  create and edit modes; the signed-in account cannot disable itself) and a detail page with
+  `PasswordResetForm` + `RevokeSessionsForm` (`security-forms.tsx`); Phòng ban and Vai trò are paged
+  catalogues with inline rename forms and `DeleteForm` (`delete-form.tsx`: `window.confirm`, and a
+  control that cannot work is rendered disabled with the reason — a department with people, a
+  system role). Server actions live in `app/(workspace)/admin/actions.ts`; they only assemble the
+  request and map the error envelope, so the API stays the authority (403 for a replayed form).
+  Forms may be replayed without JavaScript — `smoke-demo-flows` creates an account through the real
+  form and checks it through the API.
 - `/roadmap` **concept**: the playbook roadmap as a screen (four phases, MVP acceptance criteria,
   non-goals, resourcing estimates). `OPEN_DECISIONS` is empty (every playbook decision D04–D10 is
   settled) and `DECIDED` maps each to its ADR — keep both in step with `docs/adr/`; the
@@ -150,15 +193,26 @@
 - `lib/api/server.ts`: `createServerApiClient()` (base URL `API_BASE_URL` ??
   `NEXT_PUBLIC_API_BASE_URL` ?? `http://localhost:21501`) and `describeApiError()` mapping stable
   error codes to Vietnamese user messages. The client and all API types come from
-  `@opvaryn/contracts` (generated; regenerate via `make contract-generate`).
+  `@opvaryn/contracts` (generated; regenerate via `make contract-generate`). Every call carries
+  `AbortSignal.timeout(API_TIMEOUT_MS = 15s)` (the contracts client and `lib/api/auth.ts`), so an
+  API that accepts the connection and stops answering fails like one that is down instead of
+  holding a page or a server action open.
+- `fetchApiWithSession(path, init)`: the same client for the few endpoints that are not JSON
+  (the CSV export and attachment downloads). Route handlers under `app/(workspace)/…/route.ts`
+  stream the upstream body back with its headers, and the browser never talks to the API.
+- `app/(workspace)/error.tsx` is the workspace error boundary (one sentence, "Thử lại", optional
+  digest). There is deliberately **no workspace-level `loading.tsx`**: a streaming loading
+  boundary flushes the response before a page calls `notFound()`, so unknown objects/admin screens
+  would answer 200 instead of 404 — smoke-demo-flows checks the 404 status (ADR 0015).
 - Sign-in is a BFF: the form (`app/login/page.tsx` + `components/auth/login-form.tsx`) posts
   `loginAction`, which calls the API and stores the returned token in the web app's own httpOnly
   cookie (`lib/session.ts`, `SESSION_COOKIE = 'opvaryn.session'`). `createServerApiClient` forwards
   that token as a Cookie header, so the browser never holds it and no component fetches the API
   directly. `components/auth/session-summary.tsx` is the topbar **account menu**: a native
-  `<details>` showing name/email/department/roles with the **Đăng xuất** form — the only sign-out
-  in the workspace (the /login page has one, but nobody goes looking there). It fails soft when the
-  API is down, and its sign-out button carries `name="logout"` so smoke-demo-flows replays it.
+  `<details>` showing name/email/department/roles with a nested **Đổi mật khẩu** disclosure
+  (`PasswordForm` → `app/actions/password.ts`, which maps the service's validation sentences to
+  Vietnamese) and the **Đăng xuất** form — the only sign-out in the workspace. It fails soft when
+  the API is down, and its sign-out button carries `name="logout"` so smoke-demo-flows replays it.
   Useful for scripts: the cookie name matches the API's, and cookies ignore ports, so a session
   obtained from the API on :21501 is also accepted by the web app on :21500.
 - Server actions live in `app/**/actions.ts`. `app/objects/actions.ts` holds
@@ -221,9 +275,9 @@
   returns `[{key, label}]` (RoleEntry), `listProcessDefinitions()` for definition names, and
   `recordLabels()` from each record's own version. Keys are acceptable only on the operator screen
   (Vận hành) and inside inputs where a designer is choosing a key (the role datalist shows the
-  label as option text, the value stays the key). Role labels are data: table `role_labels`
-  (migration 0009), set with `useradm -set-role-label` by an administrator, seeded by
-  `scripts/seed-demo.sh`.
+  label as option text, the value stays the key). Role labels are data: the `roles` catalogue
+  (migration 0010; `role_labels` folded into it), renamed at `/admin/roles` or with
+  `useradm -set-role-label`, seeded by `scripts/seed-demo.sh`.
 - **Permission rule** (ADR 0021): the interface never renders a control the person has no
   permission for. `canDesign(roles)` (`lib/access.ts`: `process_designer` or `admin`, the same rule
   as the service's `requireDesigner`) decides the definition/process/metric controls, and the empty
@@ -233,12 +287,14 @@
   `/workflows/<key>` (the canvas renders read-only `ProcessCanvas` for a non-designer instead of
   `WorkflowEditor`), `/analytics` (metric form). Screens are still *not* hidden by role — everyone
   reads definitions, processes, records and metrics; only the admin's build/ops screens differ.
-- **Audience rule** (ADR 0015): the workspace is built for the person using it. Everyone signed in
-  sees the product screens (nav labels are Vietnamese: Dữ liệu, Nhập liệu, Quy trình, Việc của tôi,
-  Báo cáo, Ứng dụng); `/settings` (Vận hành) and `/roadmap` (Lộ trình) are `audience: 'admin'` and
-  call `notFound()` for anyone else — a 404, not a 403. Even for an admin they appear only with
-  **advanced mode on**: cookie `opvaryn.advanced` behind `app/actions/advanced.ts`, read through
-  `lib/advanced-server.ts`, decided by the pure `lib/advanced.ts` (+ `lib/access.ts` for `isAdmin`).
+- **Audience rule** (ADR 0015, extended by ADR 0022): the workspace is built for the person using
+  it. Everyone signed in sees the product screens (nav labels are Vietnamese: Dữ liệu, Nhập liệu,
+  Quy trình, Việc của tôi, Báo cáo, Ứng dụng); `/admin` (Quản trị) is `audience: 'admin'` and
+  appears for any administrator; `/settings` (Vận hành) and `/roadmap` (Lộ trình) also need
+  **advanced mode on** (`requiresAdvanced`). Every admin screen calls `notFound()` for anyone else
+  — a 404, not a 403. The switch is the cookie `opvaryn.advanced` behind
+  `app/actions/advanced.ts`, read through `lib/advanced-server.ts`, decided by the pure
+  `lib/advanced.ts` (+ `lib/access.ts` for `isAdmin`).
   The cookie grants nothing — the API still authorizes every call. `/overview` is a dashboard of the
   person's own work (greeting, "Việc đang chờ bạn", shortcuts, "Lần chạy gần đây"); the build status,
   screen list, "chưa có trong V1" and the label legend live in an `AdvancedSection` below it. Only

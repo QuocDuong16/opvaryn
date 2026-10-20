@@ -198,6 +198,24 @@ director_jar="$smoke_tmp_dir/director.cookies"
 outsider_jar="$smoke_tmp_dir/outsider.cookies"
 admin_jar="$smoke_tmp_dir/admin.cookies"
 
+echo "smoke: POST /api/v1/me/password (verify current, keep this session, end the others)"
+outsider_second_jar="$smoke_tmp_dir/outsider-second.cookies"
+status="$(login_as "$outsider_second_jar" "$outsider_email" "$smoke_password")"
+[[ "$status" == "200" ]] || fail "the second outsider session could not sign in (status $status)"
+status="$(request_as "$outsider_jar" POST /api/v1/me/password \
+  '{"currentPassword":"not-the-password","newPassword":"another-smoke-password"}')"
+[[ "$status" == "400" ]] || fail "a wrong current password returned $status, expected 400"
+status="$(request_as "$outsider_jar" POST /api/v1/me/password \
+  "$(printf '{"currentPassword":"%s","newPassword":"%s"}' "$smoke_password" "another-smoke-password")")"
+[[ "$status" == "204" ]] || fail "changing the password returned $status, expected 204"
+status="$(request_as "$outsider_jar" GET /api/v1/me)"
+[[ "$status" == "200" ]] || fail "changing the password signed the current session out (status $status)"
+status="$(request_as "$outsider_second_jar" GET /api/v1/me)"
+[[ "$status" == "401" ]] || fail "the other session survived a password change (status $status)"
+status="$(request_as "$outsider_jar" POST /api/v1/me/password \
+  "$(printf '{"currentPassword":"%s","newPassword":"%s"}' "another-smoke-password" "$smoke_password")")"
+[[ "$status" == "204" ]] || fail "restoring the smoke password returned $status, expected 204"
+
 echo "smoke: POST /api/v1/business-objects (create)"
 status="$(request_as "$designer_jar" POST /api/v1/business-objects "$object_body")"
 [[ "$status" == "201" ]] || fail "creating a business object returned $status, expected 201"
@@ -309,6 +327,241 @@ if set(old["values"]) != {"amount", "priority"}:
     sys.exit(f"the version 1 record lost its original values: {sorted(old['values'])}")
 print("smoke: record version binding verified")
 PY
+
+echo "smoke: one record can be read, edited and deleted (ADR 0023)"
+curl -sS -b "$designer_jar" -o "$tmp_records" "$base_url/api/v1/business-objects/$object_key/records"
+v1_record="$(python3 -c 'import json,sys; print(next(r["id"] for r in json.load(open(sys.argv[1]))["data"] if r["objectVersion"]==1))' "$tmp_records")"
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects/$object_key/records/$v1_record")"
+[[ "$status" == "200" ]] || fail "reading one record returned $status, expected 200"
+grep -q '"canEdit":true' "$body_file" || fail "the creator must be offered the edit controls"
+grep -q '"objectVersion":1' "$body_file" || fail "the record no longer reports its own version"
+status="$(request_as "$outsider_jar" GET "/api/v1/business-objects/$object_key/records/$v1_record")"
+[[ "$status" == "404" ]] || fail "a record outside the caller's scope returned $status, expected 404"
+
+# The record belongs to version 1 (amount, priority); a field that only exists in version 2
+# must be refused, because a record is validated with the schema it was created under.
+status="$(request_as "$designer_jar" PUT "/api/v1/business-objects/$object_key/records/$v1_record" \
+  '{"values":{"amount":1500000,"note":"not in version 1"}}')"
+[[ "$status" == "400" ]] || fail "editing a v1 record with a v2 field returned $status, expected 400"
+grep -q 'field is not defined on this object' "$body_file" || fail "the v2-only field was not reported"
+
+status="$(request_as "$designer_jar" PUT "/api/v1/business-objects/$object_key/records/$v1_record" \
+  '{"values":{"amount":1500000,"priority":"normal"}}')"
+[[ "$status" == "200" ]] || fail "editing a record returned $status, expected 200"
+grep -q '"priority":"normal"' "$body_file" || fail "the edited value is missing from the response"
+grep -q '"objectVersion":1' "$body_file" || fail "editing must keep the record's definition version"
+
+status="$(request_as "$outsider_jar" PUT "/api/v1/business-objects/$object_key/records/$v1_record" \
+  '{"values":{"amount":1500000,"priority":"normal"}}')"
+[[ "$status" == "404" ]] || fail "editing a record outside the caller's scope returned $status, expected 404"
+
+echo "smoke: record history (created, field change, labels, scope)"
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects/$object_key/records/$v1_record/history")"
+[[ "$status" == "200" ]] || fail "reading the record history returned $status, expected 200"
+grep -q '"action":"created"' "$body_file" || fail "the creation is missing from the history"
+grep -q '"action":"updated"' "$body_file" || fail "the edit is missing from the history"
+grep -q '"fieldLabel":"Mức ưu tiên"' "$body_file" ||
+  fail "the history must show the field label, not the key"
+grep -q '"from":"Gấp"' "$body_file" || fail "the old select value is missing"
+grep -q '"to":"Bình thường"' "$body_file" || fail "the new select value is missing"
+status="$(request_as "$outsider_jar" GET "/api/v1/business-objects/$object_key/records/$v1_record/history")"
+[[ "$status" == "404" ]] || fail "a hidden record's history returned $status, expected 404"
+
+echo "smoke: deleting an unused record, and refusing a malformed id"
+status="$(request_as "$designer_jar" POST "/api/v1/business-objects/$object_key/records" \
+  '{"values":{"amount":123,"note":"Bản ghi tạm"}}')"
+[[ "$status" == "201" ]] || fail "creating the throwaway record returned $status"
+throwaway_record="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$body_file")"
+status="$(request_as "$designer_jar" DELETE "/api/v1/business-objects/$object_key/records/$throwaway_record")"
+[[ "$status" == "204" ]] || fail "deleting an unused record returned $status, expected 204"
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects/$object_key/records/$throwaway_record")"
+[[ "$status" == "404" ]] || fail "a deleted record still answers $status, expected 404"
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects/$object_key/records/not-a-uuid")"
+[[ "$status" == "400" ]] || fail "a malformed record id returned $status, expected 400"
+
+echo "smoke: GET records export (CSV, scope, search and old-version columns)"
+export_file="$smoke_tmp_dir/records.csv"
+export_headers="$smoke_tmp_dir/records.headers"
+status="$(curl -sS -b "$designer_jar" -D "$export_headers" -o "$export_file" -w '%{http_code}' \
+  "$base_url/api/v1/business-objects/$object_key/records/export")"
+[[ "$status" == "200" ]] || fail "exporting records returned $status, expected 200"
+grep -qi '^content-type: text/csv' "$export_headers" || fail "the export is not served as CSV"
+grep -qi '^content-disposition: attachment; filename=' "$export_headers" ||
+  fail "the export is not offered as a download"
+python3 - "$export_file" <<'PY' || fail "the exported CSV does not match the records"
+import csv, io, sys
+
+raw = open(sys.argv[1], "rb").read()
+if not raw.startswith(b"\xef\xbb\xbf"):
+    sys.exit("the CSV is missing the UTF-8 BOM Excel needs")
+rows = list(csv.reader(io.StringIO(raw.decode("utf-8-sig"))))
+if rows[0] != ["Số tiền (VND)", "Ghi chú", "Mức ưu tiên"]:
+    sys.exit(f"the header lost a version's field or its label: {rows[0]}")
+records = {row[0]: row for row in rows[1:]}
+if len(records) != 2:
+    sys.exit(f"expected 2 visible records, got {len(records)}")
+v1 = records.get("1500000")
+if v1 is None or v1[1] != "" or v1[2] != "Bình thường":
+    sys.exit(f"the version 1 record lost its select value: {v1}")
+v2 = records.get("5000")
+if v2 is None or v2[1] != "ghi chú v2" or v2[2] != "":
+    sys.exit(f"the version 2 record is wrong: {v2}")
+print("smoke: the export carries both versions and the select label")
+PY
+
+status="$(curl -sS -b "$outsider_jar" -o "$smoke_tmp_dir/outsider.csv" -w '%{http_code}' \
+  "$base_url/api/v1/business-objects/$object_key/records/export")"
+[[ "$status" == "200" ]] || fail "exporting as another department returned $status, expected 200"
+python3 - "$smoke_tmp_dir/outsider.csv" <<'PY' || fail "the export ignored the department scope"
+import csv, io, sys
+
+rows = list(csv.reader(io.StringIO(open(sys.argv[1], encoding="utf-8-sig").read())))
+if len(rows) != 1:
+    sys.exit(f"another department must get an empty export, got {len(rows) - 1} row(s)")
+print("smoke: the export follows the record scope")
+PY
+
+status="$(curl -sS -b "$designer_jar" -o "$smoke_tmp_dir/search.csv" -w '%{http_code}' \
+  "$base_url/api/v1/business-objects/$object_key/records/export?q=ghi%20ch%C3%BA%20v2")"
+[[ "$status" == "200" ]] || fail "exporting with a search returned $status, expected 200"
+python3 - "$smoke_tmp_dir/search.csv" <<'PY' || fail "the export ignored the search term"
+import csv, io, sys
+
+rows = list(csv.reader(io.StringIO(open(sys.argv[1], encoding="utf-8-sig").read())))
+if len(rows) != 2 or rows[1][1] != "ghi chú v2":
+    sys.exit(f"the search should keep exactly the version 2 record: {rows}")
+print("smoke: the export applies the search")
+PY
+
+echo "smoke: attachments (upload, bind, download, scope, replace, delete)"
+files_key="smoke_files_$stamp"
+files_body="$(printf '{"key":"%s","name":"Smoke files %s","fields":[{"key":"title","label":"Nội dung","type":"text","required":true},{"key":"quote","label":"Báo giá","type":"file"}]}' "$files_key" "$stamp")"
+status="$(request_as "$designer_jar" POST /api/v1/business-objects "$files_body")"
+[[ "$status" == "201" ]] || fail "creating the attachments object returned $status, expected 201"
+
+printf 'báo giá: 1.500.000\n' > "$smoke_tmp_dir/quote.txt"
+status="$(curl -sS -b "$designer_jar" -o "$smoke_tmp_dir/attachment.json" -w '%{http_code}' -X POST \
+  "$base_url/api/v1/attachments?objectKey=$files_key" \
+  -F "file=@$smoke_tmp_dir/quote.txt;filename=báo giá.txt")"
+[[ "$status" == "201" ]] || fail "uploading an attachment returned $status, expected 201"
+grep -q 'báo giá.txt' "$smoke_tmp_dir/attachment.json" || fail "the upload lost the file name"
+attachment_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$smoke_tmp_dir/attachment.json")"
+
+status="$(request_as "$designer_jar" POST "/api/v1/business-objects/$files_key/records" \
+  "$(printf '{"values":{"title":"Có tệp","quote":"%s"}}' "$attachment_id")")"
+[[ "$status" == "201" ]] || fail "creating a record with a file returned $status, expected 201"
+files_record="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$body_file")"
+
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects/$files_key/records/$files_record")"
+[[ "$status" == "200" ]] || fail "reading the record with a file returned $status"
+grep -q 'báo giá.txt' "$body_file" || fail "the record does not name its attachment"
+
+status="$(curl -sS -b "$designer_jar" -D "$smoke_tmp_dir/download.headers" -o "$smoke_tmp_dir/download.txt" \
+  -w '%{http_code}' "$base_url/api/v1/attachments/$attachment_id")"
+[[ "$status" == "200" ]] || fail "downloading the attachment returned $status, expected 200"
+grep -qi '^content-type: application/octet-stream' "$smoke_tmp_dir/download.headers" ||
+  fail "a download must not be served with a renderable content type"
+grep -qi '^content-disposition: attachment;' "$smoke_tmp_dir/download.headers" ||
+  fail "the download is missing Content-Disposition"
+grep -q '1.500.000' "$smoke_tmp_dir/download.txt" || fail "the downloaded bytes are wrong"
+
+status="$(request_as "$outsider_jar" GET "/api/v1/attachments/$attachment_id")"
+[[ "$status" == "404" ]] || fail "an attachment outside the caller's scope returned $status, expected 404"
+status="$(request_as "$designer_jar" DELETE "/api/v1/attachments/$attachment_id")"
+[[ "$status" == "409" ]] || fail "deleting a bound file returned $status, expected 409"
+
+status="$(request_as "$designer_jar" PUT "/api/v1/business-objects/$files_key/records/$files_record" \
+  '{"values":{"title":"Bỏ tệp"}}')"
+[[ "$status" == "200" ]] || fail "removing the file from the record returned $status, expected 200"
+status="$(request_as "$designer_jar" GET "/api/v1/attachments/$attachment_id")"
+[[ "$status" == "404" ]] || fail "the replaced file still exists (status $status)"
+
+status="$(curl -sS -b "$designer_jar" -o "$smoke_tmp_dir/attachment2.json" -w '%{http_code}' -X POST \
+  "$base_url/api/v1/attachments?objectKey=$files_key" \
+  -F "file=@$smoke_tmp_dir/quote.txt;filename=nháp.txt")"
+[[ "$status" == "201" ]] || fail "uploading a second attachment returned $status"
+second_attachment="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$smoke_tmp_dir/attachment2.json")"
+status="$(request_as "$designer_jar" DELETE "/api/v1/attachments/$second_attachment")"
+[[ "$status" == "204" ]] || fail "deleting an unbound upload returned $status, expected 204"
+
+echo "smoke: CSV import (dry run, parsing, all-or-nothing, row errors)"
+import_file="$smoke_tmp_dir/import.csv"
+printf 'Nội dung\nĐề nghị nhập 1\nĐề nghị nhập 2\n' > "$import_file"
+status="$(curl -sS -b "$designer_jar" -o "$smoke_tmp_dir/import-dry.json" -w '%{http_code}' \
+  -X POST "$base_url/api/v1/business-objects/$files_key/records/import?dryRun=true" \
+  -F "file=@$import_file;type=text/csv")"
+[[ "$status" == "200" ]] || fail "a dry-run import returned $status, expected 200"
+python3 - "$smoke_tmp_dir/import-dry.json" <<'PY' || fail "the dry run did not report two valid rows"
+import json, sys
+
+result = json.load(open(sys.argv[1], encoding="utf-8"))
+if not result["dryRun"] or result["rows"] != 2 or result["valid"] != 2 or result["created"] != 0:
+    sys.exit(f"unexpected dry-run result: {result}")
+if result["errors"]:
+    sys.exit(f"unexpected dry-run errors: {result['errors']}")
+print("smoke: the dry run validated two rows without writing")
+PY
+curl -sS -b "$designer_jar" -o "$smoke_tmp_dir/files-before.json" \
+  "$base_url/api/v1/business-objects/$files_key/records"
+python3 - "$smoke_tmp_dir/files-before.json" <<'PY' || fail "a dry run wrote a record"
+import json, sys
+
+total = json.load(open(sys.argv[1], encoding="utf-8"))["total"]
+if total != 1:
+    sys.exit(f"a dry run wrote records: {total}")
+print("smoke: the dry run wrote nothing")
+PY
+
+printf 'Nội dung,Báo giá\n,\n' > "$smoke_tmp_dir/import-bad.csv"
+status="$(curl -sS -b "$designer_jar" -o "$smoke_tmp_dir/import-bad.json" -w '%{http_code}' \
+  -X POST "$base_url/api/v1/business-objects/$files_key/records/import" \
+  -F "file=@$smoke_tmp_dir/import-bad.csv;type=text/csv")"
+[[ "$status" == "200" ]] || fail "a file with a bad row returned $status, expected 200 with errors"
+python3 - "$smoke_tmp_dir/import-bad.json" <<'PY' || fail "the bad row was not reported"
+import json, sys
+
+result = json.load(open(sys.argv[1], encoding="utf-8"))
+if result["created"] != 0 or len(result["errors"]) == 0:
+    sys.exit(f"a bad row must create nothing and be reported: {result}")
+if result["errors"][0]["row"] != 2:
+    sys.exit(f"the first data row is line 2, got {result['errors'][0]['row']}")
+print("smoke: a bad row is reported by line and nothing is written")
+PY
+
+status="$(curl -sS -b "$designer_jar" -o "$smoke_tmp_dir/import.json" -w '%{http_code}' \
+  -X POST "$base_url/api/v1/business-objects/$files_key/records/import" \
+  -F "file=@$import_file;type=text/csv")"
+[[ "$status" == "200" ]] || fail "importing returned $status, expected 200"
+grep -q '"created":2' "$smoke_tmp_dir/import.json" || fail "two rows were not created"
+curl -sS -b "$designer_jar" -o "$smoke_tmp_dir/files-after.json" \
+  "$base_url/api/v1/business-objects/$files_key/records"
+python3 - "$smoke_tmp_dir/files-after.json" <<'PY' || fail "the imported records are missing"
+import json, sys
+
+page = json.load(open(sys.argv[1], encoding="utf-8"))
+titles = {record["values"].get("title") for record in page["data"]}
+if page["total"] != 3 or "Đề nghị nhập 1" not in titles or "Đề nghị nhập 2" not in titles:
+    sys.exit(f"unexpected records after import: {page['total']} {titles}")
+print("smoke: the imported rows are stored")
+PY
+
+# A dry run on the main object checks the Vietnamese number/date/select conversions without
+# touching the records the metric tests below count.
+printf 'Số tiền (VND),Ghi chú\n"1.500.000",Nhập từ CSV\n12,5,"Có dấu phẩy"\n' > "$smoke_tmp_dir/import-vn.csv"
+status="$(curl -sS -b "$designer_jar" -o "$smoke_tmp_dir/import-vn.json" -w '%{http_code}' \
+  -X POST "$base_url/api/v1/business-objects/$object_key/records/import?dryRun=true" \
+  -F "file=@$smoke_tmp_dir/import-vn.csv;type=text/csv")"
+[[ "$status" == "200" ]] || fail "the Vietnamese-format dry run returned $status"
+grep -q '"valid":2' "$smoke_tmp_dir/import-vn.json" ||
+  fail "the Vietnamese number/decimal rows were not accepted"
+
+printf 'Không có cột này\n1\n' > "$smoke_tmp_dir/import-header.csv"
+status="$(curl -sS -b "$designer_jar" -o "$smoke_tmp_dir/import-header.json" -w '%{http_code}' \
+  -X POST "$base_url/api/v1/business-objects/$files_key/records/import" \
+  -F "file=@$smoke_tmp_dir/import-header.csv;type=text/csv")"
+[[ "$status" == "400" ]] || fail "an unknown header returned $status, expected 400"
+grep -q '"code":"invalid_request"' "$smoke_tmp_dir/import-header.json" ||
+  fail "the header error did not use the invalid_request code"
 
 echo "smoke: POST /api/v1/process-definitions (create + publish v1)"
 process_key="smoke_flow_$stamp"
@@ -428,6 +681,13 @@ grep -q '"type":"task_approved"' "$body_file" || fail "the re-read log lost the 
 echo "smoke: another department cannot read the instance -> 404"
 status="$(request_as "$outsider_jar" GET "/api/v1/process-instances/$instance_id")"
 [[ "$status" == "404" ]] || fail "reading an instance from another department returned $status, expected 404"
+
+echo "smoke: a record with a process instance cannot be deleted -> 409 in_use"
+status="$(request_as "$designer_jar" DELETE "/api/v1/business-objects/$object_key/records/$above_record")"
+[[ "$status" == "409" ]] || fail "deleting a record with an instance returned $status, expected 409"
+grep -q '"code":"in_use"' "$body_file" || fail "the record guard did not return the in_use code"
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects/$object_key/records/$above_record")"
+[[ "$status" == "200" ]] || fail "the refused delete removed the record (status $status)"
 
 echo "smoke: the inbox lists the signed-in user's own open task"
 status="$(request_as "$designer_jar" GET /api/v1/tasks)"
@@ -702,6 +962,132 @@ for line, payload in zip(lines, payloads):
         sys.exit(f"a signature does not match the body and the shared secret: {line['signature']!r}")
 print(f"smoke: the receiver accepted {len(lines)} signed notifications ({', '.join(sorted(events))})")
 CHECK_WEBHOOK_RECEIVER
+
+echo "smoke: administration is administrators only (ADR 0022)"
+status="$(request_as "$designer_jar" GET /api/v1/admin/users)"
+[[ "$status" == "403" ]] || fail "listing accounts as a non-admin returned $status, expected 403"
+grep -q '"code":"forbidden"' "$body_file" || fail "the admin check did not return the forbidden code"
+status="$(request_as "$admin_jar" GET /api/v1/admin/users)"
+[[ "$status" == "200" ]] || fail "listing accounts as an administrator returned $status, expected 200"
+grep -q "$designer_email" "$body_file" || fail "the account list does not contain the designer"
+
+echo "smoke: administration creates a department, a role and an account through the API"
+admin_department="smoke_admin_dept_$stamp"
+status="$(request_as "$admin_jar" POST /api/v1/admin/departments \
+  "$(printf '{"key":"%s","name":"Smoke admin %s"}' "$admin_department" "$stamp")")"
+[[ "$status" == "201" ]] || fail "creating a department through the admin API returned $status, expected 201"
+grep -q "\"key\":\"$admin_department\"" "$body_file" || fail "the created department is missing from the response"
+
+admin_role="smoke_admin_role_$stamp"
+status="$(request_as "$admin_jar" POST /api/v1/admin/roles \
+  "$(printf '{"key":"%s","label":"Smoke vai tro %s"}' "$admin_role" "$stamp")")"
+[[ "$status" == "201" ]] || fail "creating a role through the admin API returned $status, expected 201"
+grep -q '"userCount":0' "$body_file" || fail "a role created before anyone holds it must report zero holders"
+
+admin_user_email="adminuser_$stamp@example.com"
+admin_user_password="smoke-admin-password"
+status="$(request_as "$admin_jar" POST /api/v1/admin/users \
+  "$(printf '{"email":"%s","name":"Smoke admin user","password":"%s","department":"%s","roles":["%s"]}' \
+    "$admin_user_email" "$admin_user_password" "$admin_department" "$admin_role")")"
+[[ "$status" == "201" ]] || fail "creating an account through the admin API returned $status, expected 201"
+grep -q "$admin_user_email" "$body_file" || fail "the created account is missing from the response"
+admin_user_id="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["id"])' "$body_file")"
+
+admin_user_jar="$smoke_tmp_dir/adminuser.cookies"
+status="$(login_as "$admin_user_jar" "$admin_user_email" "$admin_user_password")"
+[[ "$status" == "200" ]] || fail "the account created through the API could not sign in (status $status)"
+
+echo "smoke: repeated failures trigger the cooldown, and the API and the CLI lift it"
+for _ in 1 2 3 4 5; do
+  status="$(login_as "$smoke_tmp_dir/cooldown.cookies" "$admin_user_email" "not-the-password")"
+  [[ "$status" == "401" ]] || fail "a wrong password returned $status, expected 401"
+done
+status="$(login_as "$smoke_tmp_dir/cooldown.cookies" "$admin_user_email" "$admin_user_password")"
+[[ "$status" == "401" ]] ||
+  fail "the correct password must be refused during the cooldown (status $status)"
+grep -q '"code":"unauthorized"' "$body_file" ||
+  fail "the cooldown must answer with the same unauthorized envelope"
+
+status="$(request_as "$admin_jar" GET "/api/v1/admin/users?q=$admin_user_email")"
+[[ "$status" == "200" ]] || fail "listing the waiting account returned $status, expected 200"
+grep -q '"lockedUntil"' "$body_file" ||
+  fail "the waiting account must say when its cooldown ends"
+
+useradm -list-lockouts | grep -q "$admin_user_email" ||
+  fail "the CLI must list the address that is waiting out a cooldown"
+
+status="$(request_as "$designer_jar" POST "/api/v1/admin/users/$admin_user_id/unlock")"
+[[ "$status" == "403" ]] || fail "unlocking as a non-admin returned $status, expected 403"
+
+status="$(request_as "$admin_jar" POST "/api/v1/admin/users/$admin_user_id/unlock")"
+[[ "$status" == "204" ]] || fail "unlocking through the API returned $status, expected 204"
+status="$(login_as "$smoke_tmp_dir/cooldown.cookies" "$admin_user_email" "$admin_user_password")"
+[[ "$status" == "200" ]] || fail "the unlocked account could not sign in (status $status)"
+
+status="$(request_as "$admin_jar" GET "/api/v1/admin/users?q=$admin_user_email")"
+if grep -q '"lockedUntil"' "$body_file"; then
+  fail "an unlocked account must no longer report a cooldown"
+fi
+
+useradm -unlock -email "$admin_user_email" >/dev/null || fail "unlocking the address failed"
+useradm -prune-login-failures >/dev/null || fail "pruning sign-in failures failed"
+
+echo "smoke: an account without a role is refused and a missing account answers 404"
+status="$(request_as "$admin_jar" POST /api/v1/admin/users \
+  "$(printf '{"email":"norole_%s@example.com","name":"No role","password":"%s","department":"%s","roles":[]}' \
+    "$stamp" "$smoke_password" "$admin_department")")"
+[[ "$status" == "400" ]] || fail "creating an account without roles returned $status, expected 400"
+status="$(request_as "$admin_jar" GET "/api/v1/admin/users/$(python3 -c 'import uuid; print(uuid.uuid4())')")"
+[[ "$status" == "404" ]] || fail "reading an unknown account returned $status, expected 404"
+
+echo "smoke: an account in use and a role in use cannot be deleted -> 409 in_use"
+status="$(request_as "$admin_jar" DELETE "/api/v1/admin/departments/$admin_department")"
+[[ "$status" == "409" ]] || fail "deleting a department with people returned $status, expected 409"
+grep -q '"code":"in_use"' "$body_file" || fail "the department guard did not return the in_use code"
+status="$(request_as "$admin_jar" DELETE "/api/v1/admin/roles/$admin_role")"
+[[ "$status" == "409" ]] || fail "deleting a role somebody holds returned $status, expected 409"
+grep -q '"code":"in_use"' "$body_file" || fail "the role guard did not return the in_use code"
+
+echo "smoke: an empty department and an unheld role can be deleted"
+empty_department="smoke_empty_dept_$stamp"
+[[ "$(request_as "$admin_jar" POST /api/v1/admin/departments \
+  "$(printf '{"key":"%s","name":"Smoke empty %s"}' "$empty_department" "$stamp")")" == "201" ]] ||
+  fail "creating the empty department failed"
+[[ "$(request_as "$admin_jar" DELETE "/api/v1/admin/departments/$empty_department")" == "204" ]] ||
+  fail "deleting an empty department did not return 204"
+empty_role="smoke_empty_role_$stamp"
+[[ "$(request_as "$admin_jar" POST /api/v1/admin/roles \
+  "$(printf '{"key":"%s","label":"Smoke empty role %s"}' "$empty_role" "$stamp")")" == "201" ]] ||
+  fail "creating the unheld role failed"
+[[ "$(request_as "$admin_jar" DELETE "/api/v1/admin/roles/$empty_role")" == "204" ]] ||
+  fail "deleting an unheld role did not return 204"
+
+echo "smoke: a password reset ends the old session, and the new password works"
+new_password="smoke-reset-password"
+status="$(request_as "$admin_jar" POST "/api/v1/admin/users/$admin_user_id/password" \
+  "$(printf '{"password":"%s"}' "$new_password")")"
+[[ "$status" == "204" ]] || fail "setting a password returned $status, expected 204"
+status="$(request_as "$admin_user_jar" GET /api/v1/me)"
+[[ "$status" == "401" ]] || fail "the old session survived a password reset (status $status)"
+status="$(login_as "$admin_user_jar" "$admin_user_email" "$new_password")"
+[[ "$status" == "200" ]] || fail "signing in with the new password returned $status"
+
+echo "smoke: revoking sessions signs the person out without touching the password"
+status="$(request_as "$admin_jar" DELETE "/api/v1/admin/users/$admin_user_id/sessions")"
+[[ "$status" == "204" ]] || fail "revoking sessions returned $status, expected 204"
+status="$(request_as "$admin_user_jar" GET /api/v1/me)"
+[[ "$status" == "401" ]] || fail "the revoked session is still accepted (status $status)"
+
+echo "smoke: updating an account replaces its profile and roles"
+status="$(request_as "$admin_jar" PUT "/api/v1/admin/users/$admin_user_id" \
+  "$(printf '{"email":"%s","name":"Smoke admin user (v2)","department":"%s","roles":["%s"],"status":"disabled"}' \
+    "$admin_user_email" "$admin_department" "$admin_role")")"
+[[ "$status" == "200" ]] || fail "updating an account returned $status, expected 200"
+grep -q 'Smoke admin user (v2)' "$body_file" || fail "the updated name is missing from the response"
+status="$(request_as "$admin_jar" PUT "/api/v1/admin/users/$(python3 -c 'import uuid; print(uuid.uuid4())')" \
+  "$(printf '{"email":"nobody_%s@example.com","name":"Nobody","department":"%s","roles":["%s"],"status":"active"}' \
+    "$stamp" "$admin_department" "$admin_role")")"
+[[ "$status" == "404" ]] || fail "updating an unknown account returned $status, expected 404"
 
 echo "smoke: logout ends the session"
 status="$(request_as "$designer_jar" POST /api/v1/auth/logout)"

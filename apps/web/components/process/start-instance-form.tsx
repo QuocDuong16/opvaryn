@@ -23,6 +23,9 @@ export function StartInstanceForm({
   records,
   fields,
   recordId,
+  query,
+  total,
+  searchAction,
 }: {
   definitions: readonly { key: string; name: string }[];
   records: readonly ObjectRecord[];
@@ -30,6 +33,12 @@ export function StartInstanceForm({
   fields: Parameters<typeof primaryFieldValue>[0];
   /** The record to preselect: the screen arrived from that record's own row. */
   recordId?: string;
+  /** The term the picker is filtered by; the API does the filtering. */
+  query: string;
+  /** How many records the definition holds, so the picker can say what it does not show. */
+  total: number;
+  /** Where the search form submits: the same screen, with the term in the address. */
+  searchAction: string;
 }) {
   const [state, formAction] = useActionState(
     startProcessInstanceAction,
@@ -86,6 +95,39 @@ export function StartInstanceForm({
           </select>
         </div>
       </div>
+
+      {/* The picker offers a page of records; the search finds the one that is missing. */}
+      <form method="get" action={searchAction} className="mt-3 flex flex-wrap items-end gap-2">
+        <div className="min-w-[14rem] flex-1">
+          <label
+            htmlFor="start-record-search"
+            className="text-xs font-medium tracking-wide uppercase"
+          >
+            Tìm bản ghi
+          </label>
+          <input
+            id="start-record-search"
+            name="run_q"
+            type="search"
+            defaultValue={query}
+            placeholder="Tên hoặc nội dung cần tìm"
+            className={SELECT_CLASS}
+          />
+        </div>
+        <button
+          type="submit"
+          className="rounded-lg border border-border px-3 py-2 text-sm font-medium hover:bg-surface-overlay"
+        >
+          Tìm
+        </button>
+      </form>
+      <p className="mt-2 text-xs text-on-surface-muted">
+        {query === ''
+          ? total > records.length
+            ? `Danh sách này hiện ${records.length} bản ghi gần nhất trong ${total}. Dùng ô tìm để chọn bản ghi cũ hơn.`
+            : `Danh sách này hiện ${records.length} bản ghi.`
+          : `Tìm thấy ${records.length} trong ${total} bản ghi theo “${query}”.`}
+      </p>
 
       <div className="mt-4 flex flex-wrap items-center gap-3">
         <SubmitButton />

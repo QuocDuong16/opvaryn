@@ -47,8 +47,23 @@ tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
 - **Live (MVP)**: identity local — đăng nhập bằng mật khẩu argon2id, session cookie httpOnly (chỉ
   lưu hash của token), role và bộ phận trên user. **Mọi endpoint đều cần đăng nhập** (trừ health,
   meta và auth); tạo/publish định nghĩa cần `admin` hoặc `process_designer`; đọc bản ghi theo bộ
-  phận mình + việc mình đang giữ; `GET /api/v1/tasks` là inbox theo người dùng. Tài khoản tạo bằng
-  `make useradm` (ADR 0008).
+  phận mình + việc mình đang giữ; `GET /api/v1/tasks` là inbox theo người dùng. Tài khoản quản trị
+  đầu tiên tạo bằng `make useradm`; sau đó khu vực **Quản trị** (`/admin`, ADR 0022) quản lý tài
+  khoản, phòng ban và vai trò.
+- **Live (MVP)**: mỗi bản ghi có màn hình riêng, sửa và xoá được theo quy tắc ghi (ADR 0023):
+  quản trị hệ thống, người tạo hoặc người cùng bộ phận; giá trị mới validate theo đúng phiên bản
+  định nghĩa của bản ghi và ghi lại projection trong cùng transaction; bản ghi đã có lần chạy
+  không xoá được.
+- **Live (MVP)**: xuất bản ghi ra CSV theo đúng phạm vi đọc, gộp cột của mọi phiên bản định nghĩa,
+  trần 10.000 dòng (ADR 0024); trường `file` hoạt động — tải tệp lên trước, gắn vào bản ghi khi lưu,
+  bytes nằm trong PostgreSQL nên `make backup` phủ luôn (ADR 0025).
+- **Live (MVP)**: nhập bản ghi từ CSV với cách viết số/ngày kiểu Việt, kiểm tra từng dòng, chạy thử
+  trước và ghi tất cả hoặc không ghi gì (ADR 0026).
+- **Live (MVP)**: lịch sử thay đổi từng trường của bản ghi — ai sửa, trường nào, từ giá trị nào sang
+  giá trị nào — chỉ ghi thêm và đọc theo đúng phạm vi bản ghi (ADR 0027).
+- **Live (MVP)**: cooldown đăng nhập sau 5 lần sai trong 15 phút, trả lời giống hệt sai mật khẩu;
+  quản trị thấy tài khoản nào đang chờ và mở khoá ngay trong khu vực **Quản trị**, hoặc bằng
+  `make useradm ARGS="-unlock -email ..."` khi cần đường phục hồi ngoài sản phẩm (ADR 0028).
 - **Concept**: điều kiện hiển thị và calculated field của Form Builder, tab Cấu hình của Application
   Builder, SLA/escalation, template library, và nội dung Roadmap — các phần phụ thuộc quyết định
   còn mở hoặc thuộc V1.x.
@@ -63,7 +78,15 @@ Toàn bộ D04–D10 đã chốt và đang chạy trong code (ADR 0005–0010). 
 [ADR 0010](docs/adr/0010-analytics-query-builder.md),
 [ADR 0011](docs/adr/0011-process-operational-metrics.md),
 [ADR 0012](docs/adr/0012-outbound-webhook-integration.md),
-[ADR 0013](docs/adr/0013-canvas-draft-editing.md).
+[ADR 0013](docs/adr/0013-canvas-draft-editing.md),
+[ADR 0022](docs/adr/0022-administration-api-and-screens.md),
+[ADR 0023](docs/adr/0023-record-write-rule.md),
+[ADR 0024](docs/adr/0024-record-csv-export.md),
+[ADR 0025](docs/adr/0025-attachments-in-postgres.md),
+[ADR 0026](docs/adr/0026-record-csv-import.md),
+[ADR 0027](docs/adr/0027-record-audit.md),
+[ADR 0028](docs/adr/0028-login-cooldown.md) và
+[ADR 0029](docs/adr/0029-unlock-sign-in-from-the-admin-area.md).
 
 ## Bắt đầu nhanh
 
@@ -113,7 +136,14 @@ bí mật, cập nhật phiên bản, phục hồi khi database hỏng, xử lý
 [ADR 0010](docs/adr/0010-analytics-query-builder.md),
 [ADR 0011](docs/adr/0011-process-operational-metrics.md),
 [ADR 0012](docs/adr/0012-outbound-webhook-integration.md),
-[ADR 0013](docs/adr/0013-canvas-draft-editing.md).
+[ADR 0013](docs/adr/0013-canvas-draft-editing.md),
+[ADR 0022](docs/adr/0022-administration-api-and-screens.md),
+[ADR 0023](docs/adr/0023-record-write-rule.md),
+[ADR 0024](docs/adr/0024-record-csv-export.md),
+[ADR 0025](docs/adr/0025-attachments-in-postgres.md),
+[ADR 0026](docs/adr/0026-record-csv-import.md),
+[ADR 0027](docs/adr/0027-record-audit.md),
+[ADR 0028](docs/adr/0028-login-cooldown.md).
 
 Các target thường dùng:
 

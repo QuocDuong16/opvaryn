@@ -21,6 +21,8 @@ type Services struct {
 	ProcessDefinitions *service.ProcessDefinitions
 	ProcessRuntime     *service.ProcessRuntime
 	Identity           *service.Identity
+	Admin              *service.Admin
+	Attachments        *service.Attachments
 	Metrics            *service.Metrics
 	ProcessMetrics     *service.ProcessMetrics
 	Webhooks           *service.Webhooks
@@ -47,7 +49,7 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 
 	// The session cookie is resolved once per request; handlers that need a user
 	// call requireUser. Endpoints that are still unprotected say so in ADR 0008.
-	router.Use(sessionMiddleware(services.Identity, log))
+	router.Use(sessionMiddleware(services.Identity, !cfg.IsDevelopment(), log))
 
 	router.Get("/healthz", handleHealth(log))
 	router.Get("/readyz", handleReadiness(st, log))
@@ -62,8 +64,51 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 			r.Post("/logout", handleLogout(services.Identity, secureCookies, log))
 		})
 		r.Get("/me", handleMe(services.Identity, log))
+		r.Post("/me/password", handleChangeMyPassword(services.Identity, log))
 		r.Get("/roles", handleListRoles(services.Identity, log))
 		r.Get("/tasks", handleInbox(services.ProcessRuntime, log))
+
+		// Files for record fields (ADR 0025): upload first, bind while saving the record,
+		// download through the same scope that guards the record.
+		r.Route("/attachments", func(r chi.Router) {
+			r.Post("/", handleUploadAttachment(services.Attachments, log))
+			r.Route("/{attachmentId}", func(r chi.Router) {
+				r.Get("/", handleDownloadAttachment(services.Attachments, log))
+				r.Delete("/", handleDeleteAttachment(services.Attachments, log))
+			})
+		})
+
+		// Organisation administration (ADR 0022). Every handler is behind requireUser at the
+		// boundary and requireAdmin in the service; the UI hiding itself is not authorization.
+		r.Route("/admin", func(r chi.Router) {
+			r.Route("/users", func(r chi.Router) {
+				r.Get("/", handleListAdminUsers(services.Admin, log))
+				r.Post("/", handleCreateAdminUser(services.Admin, log))
+				r.Route("/{userId}", func(r chi.Router) {
+					r.Get("/", handleGetAdminUser(services.Admin, log))
+					r.Put("/", handleUpdateAdminUser(services.Admin, log))
+					r.Post("/password", handleSetAdminUserPassword(services.Admin, log))
+					r.Post("/unlock", handleUnlockAdminUser(services.Admin, log))
+					r.Delete("/sessions", handleRevokeAdminUserSessions(services.Admin, log))
+				})
+			})
+			r.Route("/departments", func(r chi.Router) {
+				r.Get("/", handleListAdminDepartments(services.Admin, log))
+				r.Post("/", handleCreateAdminDepartment(services.Admin, log))
+				r.Route("/{key}", func(r chi.Router) {
+					r.Put("/", handleUpdateAdminDepartment(services.Admin, log))
+					r.Delete("/", handleDeleteAdminDepartment(services.Admin, log))
+				})
+			})
+			r.Route("/roles", func(r chi.Router) {
+				r.Get("/", handleListAdminRoles(services.Admin, log))
+				r.Post("/", handleCreateAdminRole(services.Admin, log))
+				r.Route("/{key}", func(r chi.Router) {
+					r.Put("/", handleUpdateAdminRole(services.Admin, log))
+					r.Delete("/", handleDeleteAdminRole(services.Admin, log))
+				})
+			})
+		})
 		r.Route("/business-objects", func(r chi.Router) {
 			r.Get("/", handleListBusinessObjects(services.BusinessObjects, log))
 			r.Post("/", handleCreateBusinessObject(services.BusinessObjects, log))
@@ -71,8 +116,18 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 				r.Get("/", handleGetBusinessObject(services.BusinessObjects, log))
 				r.Put("/", handleUpdateBusinessObject(services.BusinessObjects, log))
 				r.Get("/versions", handleListBusinessObjectVersions(services.BusinessObjects, log))
-				r.Get("/records", handleListObjectRecords(services.ObjectRecords, log))
-				r.Post("/records", handleCreateObjectRecord(services.ObjectRecords, log))
+				r.Route("/records", func(r chi.Router) {
+					r.Get("/", handleListObjectRecords(services.ObjectRecords, log))
+					r.Post("/", handleCreateObjectRecord(services.ObjectRecords, log))
+					r.Get("/export", handleExportObjectRecords(services.ObjectRecords, log))
+					r.Post("/import", handleImportObjectRecords(services.ObjectRecords, log))
+					r.Route("/{recordId}", func(r chi.Router) {
+						r.Get("/", handleGetObjectRecord(services.ObjectRecords, log))
+						r.Put("/", handleUpdateObjectRecord(services.ObjectRecords, log))
+						r.Delete("/", handleDeleteObjectRecord(services.ObjectRecords, log))
+						r.Get("/history", handleListObjectRecordHistory(services.ObjectRecords, log))
+					})
+				})
 			})
 		})
 

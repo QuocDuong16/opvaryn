@@ -58,6 +58,49 @@ for (const file of collectMarkdown(root)) {
   }
 }
 
+/**
+ * The endpoint table of the operations screen must match the contract: an endpoint that is
+ * missing there is an endpoint nobody operating the system can find, and a path that the
+ * contract no longer has is a lie on a screen.
+ */
+const openapiPath = join(root, 'apps/api/openapi/openapi.yaml');
+const settingsPath = join(root, 'apps/web/app/(workspace)/settings/page.tsx');
+
+if (existsSync(openapiPath) && existsSync(settingsPath)) {
+  const openapi = readFileSync(openapiPath, 'utf8').split('\n');
+  const contract = new Set();
+  let current = null;
+  for (const line of openapi) {
+    const path = /^ {2}(\/\S*):\s*$/.exec(line);
+    if (path) {
+      current = path[1];
+      continue;
+    }
+    const method = /^ {4}(get|post|put|delete|patch):\s*$/.exec(line);
+    if (method && current) {
+      contract.add(`${method[1].toUpperCase()} ${current}`);
+    }
+  }
+
+  const settings = readFileSync(settingsPath, 'utf8');
+  const listed = new Set(
+    [...settings.matchAll(/method:\s*'([A-Z]+)',\s*path:\s*'([^']+)'/g)].map(
+      (match) => `${match[1]} ${match[2]}`,
+    ),
+  );
+
+  for (const operation of contract) {
+    if (!listed.has(operation)) {
+      problems.push(`settings endpoint table: missing ${operation}`);
+    }
+  }
+  for (const operation of listed) {
+    if (!contract.has(operation)) {
+      problems.push(`settings endpoint table: unknown ${operation}`);
+    }
+  }
+}
+
 if (problems.length > 0) {
   console.error('Docs check failed:');
   for (const problem of problems) console.error(`  - ${problem}`);

@@ -1,7 +1,14 @@
 import type { NavItem } from '@/app/nav';
 import { SidebarNav } from '@/components/app-shell/nav';
 
-export function Sidebar({ items }: { items: readonly NavItem[] }) {
+export function Sidebar({
+  items,
+  counts = {},
+}: {
+  items: readonly NavItem[];
+  /** Small badges by href, e.g. how much work is waiting in the inbox. */
+  counts?: Record<string, number>;
+}) {
   return (
     <aside className="hidden border-r border-border bg-surface-raised lg:sticky lg:top-0 lg:flex lg:h-dvh lg:flex-col">
       <div className="flex items-center gap-3 border-b border-border px-5 py-4">
@@ -18,7 +25,7 @@ export function Sidebar({ items }: { items: readonly NavItem[] }) {
       </div>
 
       <div className="flex-1 overflow-y-auto px-3 py-4">
-        <SidebarNav items={items} />
+        <SidebarNav items={items} counts={counts} />
       </div>
     </aside>
   );

@@ -18,6 +18,16 @@ async function loadRoles(): Promise<string[]> {
   }
 }
 
+/** Open work of the signed-in person, for the nav badge; a broken API just means no badge. */
+async function loadTaskCount(): Promise<number> {
+  try {
+    const page = await createServerApiClient().listInboxTasks({ limit: 1 });
+    return page.total;
+  } catch {
+    return 0;
+  }
+}
+
 /**
  * The workspace frame: every screen behind the sign-in shares it. The public landing page and
  * the sign-in screen live outside this route group on purpose (ADR 0014), and the proxy keeps
@@ -28,16 +38,21 @@ async function loadRoles(): Promise<string[]> {
  * on (ADR 0015).
  */
 export default async function WorkspaceLayout({ children }: { children: ReactNode }) {
-  const [roles, advanced] = await Promise.all([loadRoles(), getAdvancedMode()]);
+  const [roles, advanced, taskCount] = await Promise.all([
+    loadRoles(),
+    getAdvancedMode(),
+    loadTaskCount(),
+  ]);
   const isAdminUser = isAdmin(roles);
   const showAdvanced = advancedVisible(isAdminUser, advanced);
-  const items = navItemsFor(showAdvanced);
+  const items = navItemsFor(isAdminUser, showAdvanced);
+  const counts: Record<string, number> = taskCount > 0 ? { '/tasks': taskCount } : {};
 
   return (
     <div className="min-h-dvh lg:grid lg:grid-cols-[15rem_1fr]">
-      <Sidebar items={items} />
+      <Sidebar items={items} counts={counts} />
       <div className="flex min-w-0 flex-col">
-        <Topbar items={items} isAdminUser={isAdminUser} showStage={showAdvanced} />
+        <Topbar items={items} counts={counts} isAdminUser={isAdminUser} showStage={showAdvanced} />
         <main className="mx-auto w-full max-w-5xl flex-1 px-4 py-8 sm:px-6 lg:px-8">
           {children}
         </main>

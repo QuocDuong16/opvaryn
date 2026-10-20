@@ -16,7 +16,7 @@ import {
   formatRate,
   reworkedLabel,
 } from '@/components/analytics/process-metrics';
-import { fieldNames, labelOrKey, optionValueNames } from '@/lib/names';
+import { fieldNames, labelOrKey, optionValueNames, OPERATOR_LABELS } from '@/lib/names';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { DesignerNotice } from '@/components/ui/role-notice';
 import { PageHeader } from '@/components/ui/page-header';
@@ -33,16 +33,6 @@ const WINDOW_CHOICES = [7, 30, 90, 365] as const;
 interface PageProps {
   searchParams: Promise<{ definition?: string; window?: string }>;
 }
-
-/** OPERATOR_LABELS names the comparison operators the way a person reads them. */
-const OPERATOR_LABELS: Record<string, string> = {
-  eq: 'bằng',
-  ne: 'khác',
-  gt: 'lớn hơn',
-  gte: 'từ',
-  lt: 'nhỏ hơn',
-  lte: 'đến',
-};
 
 const AGGREGATION_LABELS: Record<string, string> = {
   count: 'Đếm',

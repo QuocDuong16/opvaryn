@@ -329,6 +329,8 @@ type fakeRuntimeStore struct {
 	lastWrite   domain.CompleteTaskWrite
 	// hidden makes the scoped instance read answer "not visible".
 	hidden bool
+	// recordHidden makes the scoped record read answer "not visible".
+	recordHidden bool
 	// scope remembers what visibility the service asked for.
 	scope domain.RecordScope
 	// listFilter and listLimit remember what the list call asked for.
@@ -362,6 +364,15 @@ func (f *fakeRuntimeStore) GetProcessDefinitionVersionByID(context.Context, uuid
 
 func (f *fakeRuntimeStore) FindObjectRecord(context.Context, uuid.UUID) (domain.ObjectRecord, bool, error) {
 	return f.record, f.recordFound, nil
+}
+
+func (f *fakeRuntimeStore) FindVisibleObjectRecord(
+	_ context.Context,
+	_ uuid.UUID,
+	scope domain.RecordScope,
+) (domain.ObjectRecord, bool, error) {
+	f.scope = scope
+	return f.record, f.recordFound && !f.recordHidden, nil
 }
 
 func (f *fakeRuntimeStore) StartProcessInstance(_ context.Context, in domain.StartInstanceWrite) error {
@@ -562,6 +573,26 @@ func TestStartRejectsAMissingRecord(t *testing.T) {
 	var validation *ValidationError
 	if !asValidationError(err, &validation) || !strings.Contains(validation.Error(), "does not exist") {
 		t.Fatalf("expected a record validation error, got %v", err)
+	}
+}
+
+func TestStartRejectsARecordTheCallerCannotRead(t *testing.T) {
+	t.Parallel()
+
+	store := newFakeRuntimeStore(t, nil)
+	store.recordHidden = true
+
+	_, err := NewProcessRuntime(store).Start(context.Background(), StartInput{
+		DefinitionKey: "purchase_approval",
+		RecordID:      store.record.ID,
+		Principal:     testPrincipal(),
+	})
+
+	// Hidden and missing answer the same way: the endpoint must not confirm that a
+	// record outside the caller's scope exists (ADR 0008).
+	var validation *ValidationError
+	if !asValidationError(err, &validation) || !strings.Contains(validation.Error(), "does not exist") {
+		t.Fatalf("expected the hidden record to look missing, got %v", err)
 	}
 }
 

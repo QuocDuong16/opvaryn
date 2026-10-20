@@ -1,4 +1,4 @@
-import type { Me } from '@opvaryn/contracts';
+import { API_TIMEOUT_MS, type Me } from '@opvaryn/contracts';
 
 import { SESSION_COOKIE } from '@/lib/session';
 
@@ -31,6 +31,7 @@ export async function loginViaApi(email: string, password: string): Promise<Logi
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email, password }),
       cache: 'no-store',
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
     });
   } catch {
     return { ok: false, message: 'Không gọi được API. Kiểm tra server Go ở cổng 21501.' };
@@ -63,6 +64,7 @@ export async function logoutViaApi(token: string | undefined): Promise<void> {
       method: 'POST',
       headers: { Cookie: `${SESSION_COOKIE}=${token}` },
       cache: 'no-store',
+      signal: AbortSignal.timeout(API_TIMEOUT_MS),
     });
   } catch {
     // The local cookie is cleared regardless; a session that cannot be reached now

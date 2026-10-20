@@ -6,6 +6,15 @@ import { getSessionToken, SESSION_COOKIE } from '@/lib/session';
 // loopback. NEXT_PUBLIC_API_BASE_URL is only the browser fallback.
 const DEFAULT_API_BASE_URL = 'http://localhost:21501';
 
+/** apiBaseUrl is the API origin every server-side call uses. */
+export function apiBaseUrl(): string {
+  return (
+    process.env.API_BASE_URL ??
+    process.env.NEXT_PUBLIC_API_BASE_URL ??
+    DEFAULT_API_BASE_URL
+  ).replace(/\/$/, '');
+}
+
 /**
  * Server-side API client. Server Components and Server Actions use this so the
  * browser never needs a CORS-enabled direct API call for reads and mutations.
@@ -14,9 +23,6 @@ const DEFAULT_API_BASE_URL = 'http://localhost:21501';
  * the API as a Cookie header; the browser never holds or sends it (ADR 0008).
  */
 export function createServerApiClient(): ApiClient {
-  const baseUrl =
-    process.env.API_BASE_URL ?? process.env.NEXT_PUBLIC_API_BASE_URL ?? DEFAULT_API_BASE_URL;
-
   const withSession: typeof fetch = async (input, init) => {
     const token = await getSessionToken();
     const headers = new Headers(init?.headers);
@@ -26,7 +32,21 @@ export function createServerApiClient(): ApiClient {
     return fetch(input, { ...init, headers });
   };
 
-  return createApiClient(baseUrl, withSession);
+  return createApiClient(apiBaseUrl(), withSession);
+}
+
+/**
+ * fetchApiWithSession calls the API and hands back the raw response, for the few endpoints
+ * that are not JSON (the CSV export streams a file). Everything else should go through the
+ * typed client.
+ */
+export async function fetchApiWithSession(path: string, init: RequestInit = {}): Promise<Response> {
+  const token = await getSessionToken();
+  const headers = new Headers(init.headers);
+  if (token) {
+    headers.set('Cookie', `${SESSION_COOKIE}=${token}`);
+  }
+  return fetch(`${apiBaseUrl()}${path}`, { ...init, headers, cache: 'no-store' });
 }
 
 /** describeApiError turns any thrown value into one user-facing sentence. */
@@ -40,14 +60,17 @@ export function describeApiError(error: unknown): string {
       case 'invalid_request':
         return `Dữ liệu chưa hợp lệ: ${error.message}`;
       case 'not_found':
-        return 'Không tìm thấy dữ liệu được yêu cầu. Có thể nó vừa bị xoá hoặc key chưa tồn tại.';
+        return 'Không tìm thấy dữ liệu được yêu cầu. Có thể nó vừa bị xoá.';
       case 'conflict':
-        return 'Key này đã tồn tại. Chọn key khác.';
+        return 'Dữ liệu này đã tồn tại. Chọn tên khác.';
+      case 'in_use':
+        return 'Không thể thực hiện: dữ liệu này vẫn đang được dùng ở nơi khác.';
       case 'service_unavailable':
-        return 'API chưa kết nối được database. Kiểm tra Postgres và chạy migration.';
+        return 'Hệ thống đang bận. Thử lại sau ít phút.';
       default:
-        return `API trả lỗi (${error.status}): ${error.message}`;
+        // The screen speaks to the person doing the work: no status codes, no internals.
+        return 'Hệ thống không xử lý được yêu cầu này. Thử lại sau ít phút.';
     }
   }
-  return 'Không gọi được API. Kiểm tra server Go đang chạy ở cổng 21501.';
+  return 'Không gọi được máy chủ. Thử lại sau ít phút.';
 }
