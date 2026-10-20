@@ -51,6 +51,26 @@ export function fieldNames(object: {
 }
 
 /**
+ * columnNames maps the key of a column inside a table field to the label a person
+ * reads, for one definition. A metric that measures a column of a table says the name
+ * of the column, not its key (ADR 0036).
+ */
+export function columnNames(object: {
+  fields: readonly {
+    key: string;
+    columns?: readonly { key: string; label: string }[];
+  }[];
+}): Map<string, string> {
+  const names = new Map<string, string>();
+  for (const field of object.fields) {
+    for (const column of field.columns ?? []) {
+      names.set(column.key, column.label);
+    }
+  }
+  return names;
+}
+
+/**
  * optionValueNames maps, for every select field of a definition, the value it stores to the
  * label a person reads. A breakdown groups by `ky_thuat`; the screen must say "Kỹ thuật".
  */

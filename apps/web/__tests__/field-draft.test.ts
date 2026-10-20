@@ -39,7 +39,7 @@ describe('fieldDraftsToDefinitions', () => {
         options: 'ky_thuat = Kỹ thuật',
         formula: '',
         visibleWhen: '',
-        columns: '',
+        columns: [],
       },
     ]);
 
@@ -69,6 +69,45 @@ describe('fieldDraftsToDefinitions', () => {
     ]);
 
     expect(definitions[0]?.options).toBeUndefined();
+  });
+
+  it('keeps the kind of every column of a table', () => {
+    const definitions = fieldDraftsToDefinitions([
+      {
+        ...EMPTY_FIELD_DRAFT,
+        key: 'items',
+        label: 'Danh sách món',
+        type: 'table',
+        columns: [
+          { key: 'ten_mon', label: 'Tên món', type: 'text' },
+          { key: 'gia', label: 'Giá', type: 'number' },
+          { key: 'ngay', label: 'Ngày', type: 'date' },
+        ],
+      },
+    ]);
+
+    expect(definitions[0]?.columns).toEqual([
+      { key: 'ten_mon', label: 'Tên món', type: 'text' },
+      { key: 'gia', label: 'Giá', type: 'number' },
+      { key: 'ngay', label: 'Ngày', type: 'date' },
+    ]);
+  });
+
+  it('drops a column without a key and keeps the rest', () => {
+    const definitions = fieldDraftsToDefinitions([
+      {
+        ...EMPTY_FIELD_DRAFT,
+        key: 'items',
+        label: 'Danh sách món',
+        type: 'table',
+        columns: [
+          { key: '', label: 'Chưa đặt tên', type: 'text' },
+          { key: 'gia', label: 'Giá', type: 'number' },
+        ],
+      },
+    ]);
+
+    expect(definitions[0]?.columns).toEqual([{ key: 'gia', label: 'Giá', type: 'number' }]);
   });
 });
 
@@ -113,7 +152,26 @@ describe('definitionsToDrafts', () => {
     const drafts = definitionsToDrafts([
       { key: 'note', label: 'Ghi chú', type: 'text', required: false },
     ]);
-
     expect(drafts[0]?.required).toBe(false);
+  });
+
+  it('brings the columns of a table back with their kind', () => {
+    const drafts = definitionsToDrafts([
+      {
+        key: 'items',
+        label: 'Danh sách món',
+        type: 'table',
+        required: false,
+        columns: [
+          { key: 'gia', label: 'Giá', type: 'number' },
+          { key: 'ngay', label: 'Ngày', type: 'date' },
+        ],
+      },
+    ]);
+
+    expect(drafts[0]?.columns).toEqual([
+      { key: 'gia', label: 'Giá', type: 'number' },
+      { key: 'ngay', label: 'Ngày', type: 'date' },
+    ]);
   });
 });

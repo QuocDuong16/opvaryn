@@ -21,6 +21,8 @@ type fakeRecordStore struct {
 	created domain.ObjectRecord
 	// projected is the typed projection written beside the record; metrics read it.
 	projected []domain.RecordFieldValue
+	// tableProjected is the typed projection of the cells of the table fields.
+	tableProjected []domain.RecordTableValue
 	// scope remembers what the service asked for, so the department rule can be
 	// asserted without a database.
 	scope domain.RecordScope
@@ -105,6 +107,7 @@ func (f *fakeRecordStore) CreateObjectRecord(
 	_ context.Context,
 	record domain.ObjectRecord,
 	projection []domain.RecordFieldValue,
+	tableProjection []domain.RecordTableValue,
 	bindings []domain.AttachmentBinding,
 	audit domain.RecordAudit,
 	_ bool,
@@ -114,6 +117,7 @@ func (f *fakeRecordStore) CreateObjectRecord(
 	}
 	f.created = record
 	f.projected = projection
+	f.tableProjected = tableProjection
 	f.bindings = bindings
 	f.lastAudit = audit
 	return record, nil
@@ -123,6 +127,7 @@ func (f *fakeRecordStore) CreateObjectRecords(
 	_ context.Context,
 	records []domain.ObjectRecord,
 	_ [][]domain.RecordFieldValue,
+	_ [][]domain.RecordTableValue,
 	_ []domain.RecordAudit,
 ) error {
 	if f.err != nil {
@@ -191,6 +196,7 @@ func (f *fakeRecordStore) UpdateObjectRecord(
 	_ context.Context,
 	record domain.ObjectRecord,
 	projection []domain.RecordFieldValue,
+	tableProjection []domain.RecordTableValue,
 	_ []string,
 	bindings []domain.AttachmentBinding,
 	_ uuid.UUID,
@@ -202,6 +208,7 @@ func (f *fakeRecordStore) UpdateObjectRecord(
 	}
 	f.updated = record
 	f.projected = projection
+	f.tableProjected = tableProjection
 	f.bindings = bindings
 	f.lastAudit = audit
 	return record, nil

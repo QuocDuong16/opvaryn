@@ -39,6 +39,9 @@ func TestEvaluateComputesTheExpression(t *testing.T) {
 		{name: "the bigger of two", expression: "MAX(amount, quantity)", want: 1500000},
 		{name: "a choice", expression: "amount > 1000000 ? 1 : 0", want: 1},
 		{name: "a choice the other way", expression: "amount > 9000000 ? 1 : 0", want: 0},
+		{name: "both conditions hold", expression: "amount > 1000000 && quantity > 2 ? 1 : 0", want: 1},
+		{name: "one condition does not hold", expression: "amount > 1000000 && quantity > 5 ? 1 : 0", want: 0},
+		{name: "either condition holds", expression: "amount > 9000000 || quantity > 2 ? 1 : 0", want: 1},
 	}
 
 	for _, testCase := range cases {
@@ -107,6 +110,49 @@ func TestFieldsListsWhatTheExpressionReads(t *testing.T) {
 		if !found[key] {
 			t.Fatalf("the expression reads %q, but the fields are %v", key, keys)
 		}
+	}
+}
+
+// The kind of an expression is known before any record exists, so a definition can
+// refuse a computed field that would not hold a number (ADR 0036).
+func TestResultKindReadsWhatTheExpressionProduces(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name       string
+		expression string
+		want       Kind
+	}{
+		{name: "a number", expression: "42", want: KindNumber},
+		{name: "a field", expression: "amount", want: KindNumber},
+		{name: "arithmetic", expression: "amount * quantity", want: KindNumber},
+		{name: "a function", expression: "ROUND(amount * rate, 0)", want: KindNumber},
+		{name: "a choice of numbers", expression: "amount > 1000 ? 1 : 0", want: KindNumber},
+		{name: "a comparison", expression: "amount > 1000", want: KindBool},
+		{name: "a logical operator", expression: "amount > 1 && quantity > 2", want: KindBool},
+		{name: "a choice of yes or no", expression: "amount > 1000 ? 1 : 0", want: KindNumber},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			kind, err := ResultKind(testCase.expression)
+			if err != nil {
+				t.Fatalf("the kind of %q: %v", testCase.expression, err)
+			}
+			if kind != testCase.want {
+				t.Fatalf("the kind of %q = %q, want %q", testCase.expression, kind, testCase.want)
+			}
+		})
+	}
+}
+
+// A broken expression has no kind: it is refused like a broken evaluation.
+func TestResultKindRefusesBrokenExpressions(t *testing.T) {
+	t.Parallel()
+
+	if _, err := ResultKind("amount +"); err == nil {
+		t.Fatal("a broken expression must have no kind")
 	}
 }
 

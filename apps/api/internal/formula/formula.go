@@ -48,6 +48,71 @@ func Evaluate(expression string, value Value) (any, error) {
 	return node.evaluate()
 }
 
+// Kind is what an expression produces. It is decided by reading the expression, not by
+// running it: a definition must know the kind of its computed field before any record
+// exists.
+type Kind string
+
+const (
+	// KindNumber is a number: the result of arithmetic, of a function, or of a choice
+	// whose two answers are both numbers.
+	KindNumber Kind = "number"
+	// KindBool is a yes/no answer: the result of a comparison or of a logical operator.
+	KindBool Kind = "bool"
+	// KindMixed is an expression whose two answers do not agree, so it has no one kind.
+	KindMixed Kind = "mixed"
+)
+
+// ResultKind reads an expression and answers what it produces.
+//
+// A field reference counts as a number: a computed field may only read number fields
+// of its own definition, which the definition service checks (ADR 0036).
+func ResultKind(expression string) (Kind, error) {
+	tokens, err := tokenize(expression)
+	if err != nil {
+		return "", err
+	}
+	parser := &parser{tokens: tokens, value: Value{}}
+	node, err := parser.parseExpression()
+	if err != nil {
+		return "", err
+	}
+	if !parser.done() {
+		return "", fmt.Errorf("the expression has something left over: %q", expression)
+	}
+	return kindOf(node), nil
+}
+
+// kindOf reads the kind of a parsed expression, from the leaves up.
+func kindOf(current node) Kind {
+	switch typed := current.(type) {
+	case numberNode:
+		return KindNumber
+	case fieldNode:
+		return KindNumber
+	case binaryNode:
+		switch typed.operator {
+		case "+", "-", "*", "/":
+			return KindNumber
+		default:
+			// A comparison or a logical operator answers yes or no.
+			return KindBool
+		}
+	case ternaryNode:
+		yes := kindOf(typed.yes)
+		no := kindOf(typed.no)
+		if yes == no {
+			return yes
+		}
+		return KindMixed
+	case functionNode:
+		// Every function of the language answers a number.
+		return KindNumber
+	default:
+		return KindMixed
+	}
+}
+
 // Fields returns the field keys the expression reads, so a definition can be checked
 // against its own fields.
 func Fields(expression string) ([]string, error) {
@@ -143,9 +208,19 @@ func tokenize(expression string) ([]token, error) {
 		case strings.ContainsRune("+-*/<>=!?:", char):
 			start := i
 			i++
-			if i < len(runes) && (runes[i] == '=' || (runes[i] == '&' && char == '&') || (runes[i] == '|' && char == '|')) {
+			if i < len(runes) && runes[i] == '=' {
 				i++
 			}
+			tokens = append(tokens, token{kind: tokenOperator, text: string(runes[start:i])})
+		case char == '&' || char == '|':
+			// The logical operators are written with two characters (`&&`, `||`); a single
+			// one is a typo, not an operator.
+			start := i
+			i++
+			if i >= len(runes) || runes[i] != char {
+				return nil, fmt.Errorf("%q is not something an expression can contain", string(char))
+			}
+			i++
 			tokens = append(tokens, token{kind: tokenOperator, text: string(runes[start:i])})
 		default:
 			return nil, fmt.Errorf("%q is not something an expression can contain", string(char))

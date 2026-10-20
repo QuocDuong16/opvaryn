@@ -52,6 +52,9 @@ type NewMetricInput struct {
 	Aggregation string
 	// Field is the numeric field for sum and avg; ignored for count.
 	Field string
+	// Column names a column inside a table field, so a metric can measure the cells
+	// of that column (ADR 0036). It is empty for a plain field.
+	Column string
 	// Filter is optional and uses the D04 condition shape.
 	Filter  *domain.ProcessCondition
 	GroupBy string
@@ -214,7 +217,7 @@ func buildMetric(in NewMetricInput, object domain.BusinessObject) (domain.Metric
 			problems = append(problems, "field: count does not measure a field; leave it empty")
 		}
 	} else {
-		measure, measureProblems := resolveField(fields, in.Field, "field")
+		measure, measureProblems := resolveFieldOrColumn(fields, in.Field, in.Column, "field")
 		problems = append(problems, measureProblems...)
 		if measure != nil && measure.Kind != domain.MetricNumber {
 			problems = append(problems, fmt.Sprintf(
@@ -248,7 +251,13 @@ func buildMetric(in NewMetricInput, object domain.BusinessObject) (domain.Metric
 		// branches use decides whether this filter is legal.
 		problems = append(problems, validateProcessCondition(&condition, fields, "filter")...)
 		if field, found := fields[condition.Field]; found {
-			if kind, ok := kindForField(field); ok {
+			kind, ok := kindForField(field)
+			if !ok {
+				// The filter would have been dropped, so the metric would quietly
+				// measure more than the person asked for. Say so instead.
+				problems = append(problems, fmt.Sprintf(
+					"filter.field: %s fields cannot be filtered on", field.Type))
+			} else {
 				metric.Filter = &domain.MetricFilter{
 					Field: domain.MetricFieldRef{Key: field.Key, Kind: kind},
 					Op:    condition.Op,
@@ -266,7 +275,20 @@ func buildMetric(in NewMetricInput, object domain.BusinessObject) (domain.Metric
 
 // resolveField looks a field up by key and returns its kind, so the stored metric does
 // not depend on the schema being unchanged later.
+//
+// A column of a table field is addressed by the field it belongs to plus the column
+// key (ADR 0036): the metric measures the cells of that column, not the table.
 func resolveField(fields map[string]domain.FieldDefinition, key string, label string) (*domain.MetricFieldRef, []string) {
+	return resolveFieldOrColumn(fields, key, "", label)
+}
+
+// resolveFieldOrColumn looks a field or a column of a table up and returns its kind.
+func resolveFieldOrColumn(
+	fields map[string]domain.FieldDefinition,
+	key string,
+	column string,
+	label string,
+) (*domain.MetricFieldRef, []string) {
 	trimmed := strings.TrimSpace(key)
 	if trimmed == "" {
 		return nil, []string{fmt.Sprintf("%s: must not be empty", label)}
@@ -274,6 +296,30 @@ func resolveField(fields map[string]domain.FieldDefinition, key string, label st
 	field, found := fields[trimmed]
 	if !found {
 		return nil, []string{fmt.Sprintf("%s: %q is not a field of the bound business object", label, trimmed)}
+	}
+	columnKey := strings.TrimSpace(column)
+	if columnKey != "" {
+		if field.Type != domain.FieldTypeTable {
+			return nil, []string{fmt.Sprintf(
+				"%s: %q is not a table, so it has no column %q", label, field.Key, columnKey)}
+		}
+		for _, tableColumn := range field.Columns {
+			if tableColumn.Key != columnKey {
+				continue
+			}
+			if tableColumn.Type != domain.FieldTypeNumber {
+				return nil, []string{fmt.Sprintf(
+					"%s: the column %q is %s; only a number column can be measured",
+					label, columnKey, tableColumn.Type)}
+			}
+			return &domain.MetricFieldRef{
+				Key:    field.Key,
+				Kind:   domain.MetricNumber,
+				Column: tableColumn.Key,
+			}, nil
+		}
+		return nil, []string{fmt.Sprintf(
+			"%s: %q is not a column of the table %q", label, columnKey, field.Key)}
 	}
 	kind, ok := kindForField(field)
 	if !ok {
@@ -286,6 +332,10 @@ func resolveField(fields map[string]domain.FieldDefinition, key string, label st
 func kindForField(field domain.FieldDefinition) (domain.MetricValueKind, bool) {
 	switch field.Type {
 	case domain.FieldTypeNumber:
+		return domain.MetricNumber, true
+	case domain.FieldTypeFormula:
+		// A computed field holds a number (ADR 0036), so it is measured like a
+		// number field.
 		return domain.MetricNumber, true
 	case domain.FieldTypeDate:
 		return domain.MetricDate, true

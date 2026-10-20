@@ -39,11 +39,35 @@ export function recordValuesFromForm(
         break;
       }
       case 'table': {
-        // The rows of a table travel as one JSON value (ADR 0032).
+        // The rows of a table travel as one JSON value (ADR 0032). A number cell
+        // travels as a number and a date cell as a date string, so the server reads
+        // the kind the column declares (ADR 0036).
         try {
-          const rows = JSON.parse(text);
+          const rows: unknown = JSON.parse(text);
           if (Array.isArray(rows)) {
-            values[field.key] = rows;
+            values[field.key] = rows.map((row) => {
+              if (!row || typeof row !== 'object') {
+                return row;
+              }
+              const cells: Record<string, unknown> = { ...(row as Record<string, unknown>) };
+              for (const column of field.columns ?? []) {
+                const cell = cells[column.key];
+                if (typeof cell !== 'string') {
+                  continue;
+                }
+                if (column.type === 'number') {
+                  const parsed = Number(cell);
+                  if (Number.isFinite(parsed)) {
+                    cells[column.key] = parsed;
+                  }
+                } else if (column.type === 'date') {
+                  cells[column.key] = cell.trim();
+                } else {
+                  cells[column.key] = cell.trim();
+                }
+              }
+              return cells;
+            });
           }
         } catch {
           // A table that is not JSON is left out; the server refuses the record anyway

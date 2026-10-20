@@ -56,6 +56,7 @@ func handleCreateMetricDefinition(metrics *service.Metrics, log *slog.Logger) ht
 			ObjectKey:   body.ObjectKey,
 			Aggregation: string(body.Aggregation),
 			Field:       stringValue(body.Field),
+			Column:      stringValue(body.Column),
 			Filter:      toDomainCondition(body.Filter),
 			GroupBy:     stringValue(body.GroupBy),
 		}, domain.NewPrincipal(user))
@@ -103,6 +104,7 @@ func handleUpdateMetricDefinition(metrics *service.Metrics, log *slog.Logger) ht
 			ObjectKey:   body.ObjectKey,
 			Aggregation: string(body.Aggregation),
 			Field:       stringValue(body.Field),
+			Column:      stringValue(body.Column),
 			Filter:      toDomainCondition(body.Filter),
 			GroupBy:     stringValue(body.GroupBy),
 		}, domain.NewPrincipal(user))
@@ -171,7 +173,11 @@ func toAPIMetricFieldRef(field *domain.MetricFieldRef) *apiv1.MetricFieldRef {
 	if field == nil {
 		return nil
 	}
-	return &apiv1.MetricFieldRef{Key: field.Key, Kind: apiv1.MetricValueKind(field.Kind)}
+	converted := apiv1.MetricFieldRef{Key: field.Key, Kind: apiv1.MetricValueKind(field.Kind)}
+	if field.Column != "" {
+		converted.Column = &field.Column
+	}
+	return &converted
 }
 
 func toAPIMetricResult(result domain.MetricResult) apiv1.MetricResult {

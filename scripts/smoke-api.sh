@@ -406,6 +406,74 @@ if record["values"].get("ghi_chu") != "cần gấp":
     sys.exit("a field whose condition holds must keep its value")
 PY
 
+echo "smoke: a computed field that does not produce a number is refused (ADR 0036)"
+status="$(request_as "$designer_jar" POST /api/v1/business-objects "$(printf '{"key":"smoke_bool_%s","name":"Smoke bool formula","fields":[{"key":"amount","label":"Số tiền","type":"number"},{"key":"check","label":"Kiểm tra","type":"formula","formula":"amount > 100"}]}' "$stamp")")"
+[[ "$status" == "400" ]] || fail "a computed field that answers yes or no returned $status, expected 400"
+grep -q 'must produce a number' "$body_file" || fail "the problem must say the computed field must produce a number"
+
+echo "smoke: the definition comes back whole, with its formula and its columns (ADR 0036)"
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects/$smart_key")"
+[[ "$status" == "200" ]] || fail "reading the definition returned $status, expected 200"
+python3 - "$body_file" <<'PY' || fail "the definition lost its formula or its columns"
+import json, sys
+
+fields = {f["key"]: f for f in json.load(open(sys.argv[1], encoding="utf-8"))["fields"]}
+if fields["thanh_tien"].get("formula") != "so_luong * don_gia":
+    sys.exit(f"the computed field lost its expression: {fields['thanh_tien']}")
+columns = {c["key"]: c for c in fields["items"].get("columns", [])}
+if columns.get("gia", {}).get("type") != "number":
+    sys.exit(f"the table lost the kind of its column: {fields['items']}")
+PY
+
+echo "smoke: a metric measures the computed field and a number column of a table (ADR 0036)"
+status="$(request_as "$designer_jar" POST /api/v1/metrics "$(printf '{"key":"smoke_total_%s","name":"Tổng tiền tính được","objectKey":"%s","aggregation":"sum","field":"thanh_tien"}' "$stamp" "$smart_key")")"
+[[ "$status" == "201" ]] || fail "creating a metric on a computed field returned $status, expected 201"
+status="$(request_as "$designer_jar" GET "/api/v1/metrics/smoke_total_$stamp/result")"
+[[ "$status" == "200" ]] || fail "reading the metric result returned $status, expected 200"
+python3 - "$body_file" <<'PY' || fail "the metric did not measure the computed field"
+import json, sys
+
+result = json.load(open(sys.argv[1], encoding="utf-8"))
+# Two records: 3 × 2.5.000.000 and 20 × 2.5.000.000.
+if result["total"] != 57500000:
+    sys.exit(f"the metric measured {result['total']!r}, want 57500000")
+PY
+status="$(request_as "$designer_jar" POST /api/v1/metrics "$(printf '{"key":"smoke_lines_%s","name":"Tổng giá các dòng","objectKey":"%s","aggregation":"sum","field":"items","column":"gia"}' "$stamp" "$smart_key")")"
+[[ "$status" == "201" ]] || fail "creating a metric on a table column returned $status, expected 201"
+status="$(request_as "$designer_jar" GET "/api/v1/metrics/smoke_lines_$stamp/result")"
+[[ "$status" == "200" ]] || fail "reading the metric result returned $status, expected 200"
+python3 - "$body_file" <<'PY' || fail "the metric did not measure the column of the table"
+import json, sys
+
+result = json.load(open(sys.argv[1], encoding="utf-8"))
+if result["total"] != 2500000:
+    sys.exit(f"the metric measured {result['total']!r}, want 2500000")
+if result["records"] != 1:
+    sys.exit(f"the metric counted {result['records']!r} records, want 1")
+PY
+
+echo "smoke: the search reaches a cell inside a table (ADR 0036)"
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects/$smart_key/records?q=M%C3%A0n%20h%C3%ACnh")"
+[[ "$status" == "200" ]] || fail "searching for a cell of a table returned $status, expected 200"
+python3 - "$body_file" <<'PY' || fail "the search did not reach the cell of the table"
+import json, sys
+
+records = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+if not records:
+    sys.exit("the search did not find the record by a cell of its table")
+if not records[0]["values"].get("items"):
+    sys.exit(f"the record found by its cell does not hold the table: {records}")
+PY
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects/$smart_key/records?q=2500000")"
+[[ "$status" == "200" ]] || fail "searching for a number inside a table returned $status, expected 200"
+python3 - "$body_file" <<'PY' || fail "the search did not reach the number cell of the table"
+import json, sys
+
+records = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+if not records:
+    sys.exit("the search did not find the record by a number in its table")
+PY
+
 echo "smoke: POST records (after the edit -> binds to version 2)"
 status="$(request_as "$designer_jar" POST "/api/v1/business-objects/$object_key/records" '{"values":{"amount":5000,"note":"ghi chú v2"}}')"
 [[ "$status" == "201" ]] || fail "creating a record after the update returned $status, expected 201"
@@ -813,6 +881,29 @@ status="$(request_as "$designer_jar" GET /api/v1/tasks)"
 if grep -q "$deadline_task" "$body_file"; then
   fail "the role that had the task must not keep it after the handover"
 fi
+
+echo "smoke: the inbox puts the most urgent work first (ADR 0036)"
+# The designer still holds the tasks of the flow; give them different priorities and
+# read the inbox again: the urgent one has to come first, whatever its age.
+psql -c "UPDATE process_tasks SET priority = 'low' WHERE assignee_role = '$designer_role' AND status = 'open'" >/dev/null ||
+  fail "lowering the priority of the open tasks failed"
+psql -c "UPDATE process_tasks SET priority = 'urgent' WHERE id = '$approver_task'" >/dev/null ||
+  fail "raising the priority of one task failed"
+status="$(request_as "$designer_jar" GET /api/v1/tasks)"
+[[ "$status" == "200" ]] || fail "reading the inbox returned $status, expected 200"
+python3 - "$body_file" "$approver_task" <<'PY' || fail "the inbox does not put the urgent task first"
+import json, sys
+
+items = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+if not items:
+    sys.exit("the inbox is empty")
+if items[0]["task"]["id"] != sys.argv[2]:
+    sys.exit(f"the first task of the inbox is {items[0]['task']['id']}, want {sys.argv[2]}")
+if items[0]["task"].get("priority") != "urgent":
+    sys.exit(f"the first task of the inbox has the priority {items[0]['task'].get('priority')!r}")
+PY
+psql -c "UPDATE process_tasks SET priority = 'normal' WHERE assignee_role = '$designer_role' AND status = 'open'" >/dev/null ||
+  fail "restoring the priority of the open tasks failed"
 
 echo "smoke: return without a reason -> 400"
 status="$(request_as "$designer_jar" POST "/api/v1/process-instances/$instance_id/tasks/$approver_task/decisions" '{"decision":"return"}')"

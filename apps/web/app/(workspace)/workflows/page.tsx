@@ -47,7 +47,11 @@ const NODE_CATALOG: readonly { node: string; behavior: string; phase: string }[]
     phase: 'V1.x',
   },
   { node: 'Subprocess', behavior: 'Khởi tạo và liên kết quy trình con', phase: 'V1.x / V2' },
-  { node: 'Timer / Escalation', behavior: 'Timeout, SLA, chuyển cấp hoặc giao lại', phase: 'V1.x' },
+  {
+    node: 'Timer / Escalation',
+    behavior: 'Timeout, chuyển cấp hoặc giao lại',
+    phase: 'Đã có hạn và chuyển cấp',
+  },
 ];
 
 interface PageProps {

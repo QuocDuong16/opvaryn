@@ -162,6 +162,42 @@ func TestCreateRejectsInvalidInput(t *testing.T) {
 			},
 			wantProblem: "duplicate option value",
 		},
+		{
+			name: "a computed field must produce a number",
+			mutate: func(in *NewBusinessObjectInput) {
+				in.Fields = append(in.Fields, domain.FieldDefinition{
+					Key: "check", Label: "Kiểm tra", Type: domain.FieldTypeFormula,
+					Formula: "amount > 100",
+				})
+			},
+			wantProblem: "must produce a number",
+		},
+		{
+			name: "a computed field cannot be read by a visibility rule",
+			mutate: func(in *NewBusinessObjectInput) {
+				in.Fields = append(in.Fields, domain.FieldDefinition{
+					Key: "check", Label: "Kiểm tra", Type: domain.FieldTypeFormula,
+					Formula: "amount * 2",
+				})
+				in.Fields = append(in.Fields, domain.FieldDefinition{
+					Key: "note", Label: "Ghi chú", Type: domain.FieldTypeText,
+					VisibleWhen: &domain.FieldCondition{Field: "check", Op: "gt", Value: 1},
+				})
+			},
+			wantProblem: "whose value is only known after saving",
+		},
+		{
+			name: "a table column must hold text, a number or a date",
+			mutate: func(in *NewBusinessObjectInput) {
+				in.Fields = append(in.Fields, domain.FieldDefinition{
+					Key: "lines", Label: "Dòng hàng", Type: domain.FieldTypeTable,
+					Columns: []domain.FieldColumn{
+						{Key: "price", Label: "Giá", Type: domain.FieldType("money")},
+					},
+				})
+			},
+			wantProblem: "a column holds text, a number or a date",
+		},
 	}
 
 	for _, test := range tests {

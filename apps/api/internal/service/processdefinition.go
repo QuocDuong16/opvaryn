@@ -531,15 +531,16 @@ func validateProcessCondition(
 		return problems
 	}
 
-	if field.Type == domain.FieldTypeRows {
+	if field.Type == domain.FieldTypeRows || field.Type == domain.FieldTypeTable {
 		problems = append(problems,
-			fmt.Sprintf("%s.field: rows fields cannot be used in a condition", where))
+			fmt.Sprintf("%s.field: %s fields cannot be used in a condition", where, field.Type))
 		return problems
 	}
 
 	ordered := condition.Op == "gt" || condition.Op == "gte" || condition.Op == "lt" || condition.Op == "lte"
 	switch field.Type {
-	case domain.FieldTypeNumber:
+	case domain.FieldTypeNumber, domain.FieldTypeFormula:
+		// A computed field holds a number (ADR 0036), so it is compared like one.
 		value, ok := numberLiteral(condition.Value)
 		if !ok {
 			problems = append(problems, fmt.Sprintf("%s.value: must be a number for field %q", where, field.Key))

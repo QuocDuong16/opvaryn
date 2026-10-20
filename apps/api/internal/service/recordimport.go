@@ -145,6 +145,7 @@ func (s *ObjectRecords) Import(
 
 	records := make([]domain.ObjectRecord, len(rows))
 	projections := make([][]domain.RecordFieldValue, len(rows))
+	tableProjections := make([][]domain.RecordTableValue, len(rows))
 	audits := make([]domain.RecordAudit, len(rows))
 	for i, values := range rows {
 		normalized := normalizeRecordValues(object, values)
@@ -159,6 +160,7 @@ func (s *ObjectRecords) Import(
 			DepartmentKey:   principal.DepartmentKey,
 		}
 		projections[i] = projectRecordValues(object.Fields, normalized)
+		tableProjections[i] = projectTableValues(object.Fields, normalized)
 		audits[i] = domain.RecordAudit{
 			RecordID:  records[i].ID,
 			ObjectKey: object.Key,
@@ -167,7 +169,7 @@ func (s *ObjectRecords) Import(
 			Action:    domain.RecordCreated,
 		}
 	}
-	if err := s.store.CreateObjectRecords(ctx, records, projections, audits); err != nil {
+	if err := s.store.CreateObjectRecords(ctx, records, projections, tableProjections, audits); err != nil {
 		return ImportResult{}, err
 	}
 	result.Created = len(records)

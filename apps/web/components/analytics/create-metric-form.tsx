@@ -22,6 +22,18 @@ const AGGREGATIONS = [
 const OPERATORS = ['eq', 'ne', 'gt', 'gte', 'lt', 'lte'] as const;
 
 /**
+ * MeasureChoice is one thing a metric can measure: a number field, a computed field or
+ * a number column of a table (ADR 0036). The value names the choice in the form; the
+ * field and the column are what the API receives.
+ */
+interface MeasureChoice {
+  value: string;
+  label: string;
+  field: string;
+  column?: string;
+}
+
+/**
  * CreateMetricForm builds a metric from the object's own fields: the aggregation, an
  * optional numeric measure, an optional filter (the same shape process branches use) and
  * an optional grouping. Field choices come from the definition, never a hard-coded list,
@@ -32,12 +44,40 @@ export function CreateMetricForm({ objects }: { objects: readonly BusinessObject
   const [state, formAction] = useActionState(createMetricAction, INITIAL_CREATE_METRIC_STATE);
   const [objectKey, setObjectKey] = useState(objects[0]?.key ?? '');
   const [aggregation, setAggregation] = useState<(typeof AGGREGATIONS)[number]['value']>('count');
+  const [measure, setMeasure] = useState('');
 
   const object = objects.find((candidate) => candidate.key === objectKey);
   // `rows` carries no scalar value, so it is not projected and cannot be measured.
-  const scalarFields = (object?.fields ?? []).filter((field) => field.type !== 'rows');
-  const numberFields = scalarFields.filter((field) => field.type === 'number');
-  const groupableFields = scalarFields.filter((field) => field.type !== 'number');
+  // A computed field holds a number, so it is measured like a number field (ADR 0036).
+  const scalarFields = (object?.fields ?? []).filter(
+    (field) => field.type !== 'rows' && field.type !== 'table',
+  );
+  const groupableFields = scalarFields.filter(
+    (field) => field.type !== 'number' && field.type !== 'formula',
+  );
+
+  // What a metric can measure: a number field, a computed field, or a number column of
+  // a table (ADR 0036). Each choice names the field and, for a column, the column.
+  const measures: MeasureChoice[] = [];
+  for (const field of object?.fields ?? []) {
+    if (field.type === 'number' || field.type === 'formula') {
+      measures.push({ value: field.key, label: field.label, field: field.key });
+    }
+    if (field.type === 'table') {
+      for (const column of field.columns ?? []) {
+        if (column.type !== 'number') {
+          continue;
+        }
+        measures.push({
+          value: `${field.key}.${column.key}`,
+          label: `${column.label} (${field.label})`,
+          field: field.key,
+          column: column.key,
+        });
+      }
+    }
+  }
+  const selectedMeasure = measures.find((choice) => choice.value === measure);
 
   if (objects.length === 0) {
     return (
@@ -108,16 +148,24 @@ export function CreateMetricForm({ objects }: { objects: readonly BusinessObject
         {aggregation === 'count' ? null : (
           <label className="text-xs">
             <span className="font-medium tracking-wide uppercase">Đo trường nào (trường số)</span>
-            <select name="field" className={cn(INPUT_CLASS, 'mt-1.5 font-mono')}>
-              {numberFields.length === 0 ? (
+            <select
+              name="field"
+              value={measure}
+              onChange={(event) => setMeasure(event.target.value)}
+              className={cn(INPUT_CLASS, 'mt-1.5 font-mono')}
+            >
+              {measures.length === 0 ? (
                 <option value="">— loại dữ liệu này không có trường số —</option>
               ) : null}
-              {numberFields.map((field) => (
-                <option key={field.key} value={field.key}>
-                  {`${field.label} (${field.key})`}
+              {measures.map((choice) => (
+                <option key={choice.value} value={choice.value}>
+                  {`${choice.label} (${choice.field})`}
                 </option>
               ))}
             </select>
+            {/* The column of a table is named apart from the field, so the API knows
+                which cells to measure (ADR 0036). */}
+            <input type="hidden" name="column" value={selectedMeasure?.column ?? ''} />
           </label>
         )}
         <label className="text-xs">

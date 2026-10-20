@@ -17,7 +17,7 @@ import (
 // metricDefinitionColumns is the read shape of a saved metric.
 const metricDefinitionColumns = `
 	id, key, name, coalesce(description, ''), object_key, aggregation,
-	field_key, field_kind, filter_field, filter_kind, filter_op, filter_value,
+	field_key, field_kind, field_column, filter_field, filter_kind, filter_op, filter_value,
 	group_by, group_kind, coalesce(created_by, '00000000-0000-0000-0000-000000000000'::uuid),
 	created_at, updated_at`
 
@@ -34,12 +34,12 @@ func (s *Store) CreateMetricDefinition(ctx context.Context, metric domain.Metric
 	row := s.pool.QueryRow(ctx, `
 		INSERT INTO metric_definitions
 		       (key, name, description, object_key, aggregation,
-		        field_key, field_kind, filter_field, filter_kind, filter_op, filter_value,
+		        field_key, field_kind, field_column, filter_field, filter_kind, filter_op, filter_value,
 		        group_by, group_kind, created_by)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10, $11, $12, $13, $14, $15)
 		RETURNING `+metricDefinitionColumns,
 		metric.Key, metric.Name, nullableText(metric.Description), metric.ObjectKey, metric.Aggregation,
-		metricFieldKey(metric.Measure), metricFieldKind(metric.Measure),
+		metricFieldKey(metric.Measure), metricFieldKind(metric.Measure), metricFieldColumn(metric.Measure),
 		metricFilterField(metric.Filter), metricFilterKind(metric.Filter), metricFilterOp(metric.Filter), filterValue,
 		metricFieldKey(metric.GroupBy), metricFieldKind(metric.GroupBy), nullableUUID(metric.CreatedBy))
 
@@ -71,13 +71,13 @@ func (s *Store) UpdateMetricDefinition(ctx context.Context, metric domain.Metric
 	row := s.pool.QueryRow(ctx, `
 		UPDATE metric_definitions
 		   SET name = $2, description = $3, object_key = $4, aggregation = $5,
-		       field_key = $6, field_kind = $7, filter_field = $8, filter_kind = $9,
-		       filter_op = $10, filter_value = $11, group_by = $12, group_kind = $13,
-		       updated_at = now()
+		       field_key = $6, field_kind = $7, field_column = $8, filter_field = $9,
+		       filter_kind = $10, filter_op = $11, filter_value = $12, group_by = $13,
+		       group_kind = $14, updated_at = now()
 		 WHERE key = $1
 		RETURNING `+metricDefinitionColumns,
 		metric.Key, metric.Name, nullableText(metric.Description), metric.ObjectKey, metric.Aggregation,
-		metricFieldKey(metric.Measure), metricFieldKind(metric.Measure),
+		metricFieldKey(metric.Measure), metricFieldKind(metric.Measure), metricFieldColumn(metric.Measure),
 		metricFilterField(metric.Filter), metricFilterKind(metric.Filter), metricFilterOp(metric.Filter), filterValue,
 		metricFieldKey(metric.GroupBy), metricFieldKind(metric.GroupBy))
 
@@ -183,12 +183,16 @@ type metricPlan struct {
 	joins      []string
 	conditions []string
 	groupBy    string
-	args       []any
+	// records counts the records the number rests on. Measuring a column of a table
+	// reads one row per cell, so the count has to be the distinct records (ADR 0036).
+	records string
+	args    []any
 }
 
 func newMetricPlan(query domain.MetricQuery, scope domain.RecordScope) metricPlan {
 	plan := metricPlan{
-		args: []any{query.ObjectKey, scope.All, scope.DepartmentKey, scope.UserID},
+		args:    []any{query.ObjectKey, scope.All, scope.DepartmentKey, scope.UserID},
+		records: "count(*)",
 		// Records carry the object id, so the metric addresses the object by joining it.
 		joins:      []string{"JOIN business_objects o ON o.id = r.object_id"},
 		conditions: []string{"o.key = $1", recordVisibleToScope},
@@ -199,9 +203,18 @@ func newMetricPlan(query domain.MetricQuery, scope domain.RecordScope) metricPla
 		plan.aggregate = aggregateExpression(query.Aggregation, "m."+column)
 		// The measured field must exist on a record for it to count towards sum/avg;
 		// count does not join at all, so it counts records.
-		plan.joins = append(plan.joins, fmt.Sprintf(
-			"JOIN record_field_values m ON m.record_id = r.id AND m.field_key = %s AND m.%s IS NOT NULL",
-			plan.bind(query.Measure.Key), column))
+		if query.Measure.Column != "" {
+			// A column of a table lives in the projection of the cells: one row per
+			// cell, so the records are counted apart (ADR 0036).
+			plan.records = "count(DISTINCT r.id)"
+			plan.joins = append(plan.joins, fmt.Sprintf(
+				"JOIN record_table_values m ON m.record_id = r.id AND m.field_key = %s AND m.column_key = %s AND m.%s IS NOT NULL",
+				plan.bind(query.Measure.Key), plan.bind(query.Measure.Column), column))
+		} else {
+			plan.joins = append(plan.joins, fmt.Sprintf(
+				"JOIN record_field_values m ON m.record_id = r.id AND m.field_key = %s AND m.%s IS NOT NULL",
+				plan.bind(query.Measure.Key), column))
+		}
 	} else {
 		plan.aggregate = aggregateExpression(query.Aggregation, "")
 	}
@@ -234,11 +247,12 @@ func (p *metricPlan) bind(value any) string {
 // metricTotal answers the metric over every visible record at once.
 func (s *Store) metricTotal(ctx context.Context, plan metricPlan) (float64, int64, error) {
 	sql := fmt.Sprintf(`
-		SELECT count(*), %s
+		SELECT %s, %s
 		  FROM business_object_records r
 		  %s
 		 WHERE %s`,
-		plan.aggregate, strings.Join(plan.joins, "\n"), strings.Join(plan.conditions, " AND "))
+		plan.records, plan.aggregate, strings.Join(plan.joins, "\n"),
+		strings.Join(plan.conditions, " AND "))
 
 	var records int64
 	var value *float64
@@ -254,14 +268,14 @@ func (s *Store) metricTotal(ctx context.Context, plan metricPlan) (float64, int6
 // metricBuckets answers the metric per grouping value, biggest bucket first.
 func (s *Store) metricBuckets(ctx context.Context, plan metricPlan) ([]domain.MetricBucket, error) {
 	sql := fmt.Sprintf(`
-		SELECT %s AS bucket, count(*), %s
+		SELECT %s AS bucket, %s, %s
 		  FROM business_object_records r
 		  %s
 		 WHERE %s
 		 GROUP BY 1
 		 ORDER BY 3 DESC, 1
 		 LIMIT %d`,
-		plan.groupBy, plan.aggregate, strings.Join(plan.joins, "\n"),
+		plan.groupBy, plan.records, plan.aggregate, strings.Join(plan.joins, "\n"),
 		strings.Join(plan.conditions, " AND "), metricBucketLimit)
 
 	rows, err := s.pool.Query(ctx, sql, plan.args...)
@@ -387,6 +401,7 @@ func scanMetricDefinition(row rowScanner) (domain.MetricDefinition, error) {
 		aggregation string
 		fieldKey    *string
 		fieldKind   *string
+		fieldColumn *string
 		filterField *string
 		filterKind  *string
 		filterOp    *string
@@ -396,7 +411,7 @@ func scanMetricDefinition(row rowScanner) (domain.MetricDefinition, error) {
 	)
 	err := row.Scan(
 		&metric.ID, &metric.Key, &metric.Name, &metric.Description, &metric.ObjectKey, &aggregation,
-		&fieldKey, &fieldKind, &filterField, &filterKind, &filterOp, &filterValue,
+		&fieldKey, &fieldKind, &fieldColumn, &filterField, &filterKind, &filterOp, &filterValue,
 		&groupBy, &groupKind, &metric.CreatedBy, &metric.CreatedAt, &metric.UpdatedAt,
 	)
 	if err != nil {
@@ -404,7 +419,11 @@ func scanMetricDefinition(row rowScanner) (domain.MetricDefinition, error) {
 	}
 	metric.Aggregation = domain.MetricAggregation(aggregation)
 	if fieldKey != nil && fieldKind != nil {
-		metric.Measure = &domain.MetricFieldRef{Key: *fieldKey, Kind: domain.MetricValueKind(*fieldKind)}
+		metric.Measure = &domain.MetricFieldRef{
+			Key:    *fieldKey,
+			Kind:   domain.MetricValueKind(*fieldKind),
+			Column: optionalString(fieldColumn),
+		}
 	}
 	if groupBy != nil && groupKind != nil {
 		metric.GroupBy = &domain.MetricFieldRef{Key: *groupBy, Kind: domain.MetricValueKind(*groupKind)}
@@ -448,6 +467,22 @@ func metricFieldKind(field *domain.MetricFieldRef) any {
 		return nil
 	}
 	return string(field.Kind)
+}
+
+// metricFieldColumn keeps the column of a table field, empty for a plain field.
+func metricFieldColumn(field *domain.MetricFieldRef) any {
+	if field == nil || field.Column == "" {
+		return nil
+	}
+	return field.Column
+}
+
+// optionalString reads a nullable column of the database as a plain string.
+func optionalString(value *string) string {
+	if value == nil {
+		return ""
+	}
+	return *value
 }
 
 func metricFilterField(filter *domain.MetricFilter) any {

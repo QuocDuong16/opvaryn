@@ -7,6 +7,19 @@ import type {
 } from '@opvaryn/contracts';
 
 /**
+ * The kinds a table column can hold. A column is a number, a date or text, and the
+ * form asks for that kind (ADR 0036).
+ */
+export type ColumnType = 'text' | 'number' | 'date';
+
+/** ColumnDraft is one column of a table field while it is being written. */
+export interface ColumnDraft {
+  key: string;
+  label: string;
+  type: ColumnType;
+}
+
+/**
  * FieldDraft is one row of the schema editor. It mirrors FieldDefinition, except
  * that select options are edited as text (one option per line) because that is
  * faster to type than a nested list of inputs.
@@ -21,8 +34,8 @@ export interface FieldDraft {
   formula: string;
   /** The condition that shows the field, written as `field op value` (ADR 0032). */
   visibleWhen: string;
-  /** The columns of a table field, one per line, `key = Nhãn` (ADR 0032). */
-  columns: string;
+  /** The columns of a table field, each with the kind it holds (ADR 0036). */
+  columns: ColumnDraft[];
 }
 
 export const EMPTY_FIELD_DRAFT: FieldDraft = {
@@ -33,7 +46,7 @@ export const EMPTY_FIELD_DRAFT: FieldDraft = {
   options: '',
   formula: '',
   visibleWhen: '',
-  columns: '',
+  columns: [],
 };
 
 /**
@@ -57,29 +70,6 @@ export function parseOptionLines(text: string): FieldOption[] {
     options.push({ value, label: label === '' ? value : label });
   }
   return options;
-}
-
-/**
- * parseColumnLines reads the columns of a table field, one per line, written
- * `key = Nhãn`. The type of a column is not written here: the first version of a table
- * holds text, and the server keeps the column kinds it is given.
- */
-export function parseColumnLines(text: string): FieldColumn[] {
-  const columns: FieldColumn[] = [];
-  for (const line of text.split('\n')) {
-    const trimmed = line.trim();
-    if (trimmed === '') {
-      continue;
-    }
-    const separator = trimmed.indexOf('=');
-    const key = (separator === -1 ? trimmed : trimmed.slice(0, separator)).trim();
-    const label = (separator === -1 ? key : trimmed.slice(separator + 1).trim()).trim();
-    if (key === '') {
-      continue;
-    }
-    columns.push({ key, label: label === '' ? key : label, type: 'text' });
-  }
-  return columns;
 }
 
 /**
@@ -130,8 +120,11 @@ export function fieldDraftsToDefinitions(drafts: FieldDraft[]): FieldDefinition[
     if (draft.type === 'formula' && draft.formula.trim() !== '') {
       definition.formula = draft.formula.trim();
     }
-    if (draft.type === 'table' && draft.columns.trim() !== '') {
-      definition.columns = parseColumnLines(draft.columns);
+    if (draft.type === 'table') {
+      const columns = columnDraftsToColumns(draft.columns);
+      if (columns.length > 0) {
+        definition.columns = columns;
+      }
     }
     if (draft.visibleWhen.trim() !== '') {
       const condition = parseConditionLine(draft.visibleWhen);
@@ -165,10 +158,28 @@ export function definitionsToDrafts(fields: readonly FieldDefinition[]): FieldDr
     visibleWhen: field.visibleWhen
       ? `${field.visibleWhen.field} ${field.visibleWhen.op} ${String(field.visibleWhen.value ?? '')}`
       : '',
-    columns: (field.columns ?? [])
-      .map((column) =>
-        column.label === column.key ? column.key : `${column.key} = ${column.label}`,
-      )
-      .join('\n'),
+    columns: (field.columns ?? []).map((column) => ({
+      key: column.key,
+      label: column.label,
+      type: column.type,
+    })),
   }));
+}
+
+/**
+ * columnDraftsToColumns turns the columns of the editor into the definition the
+ * server reads. A column without a key is dropped; the rest keep the kind the
+ * designer chose (ADR 0036).
+ */
+export function columnDraftsToColumns(drafts: readonly ColumnDraft[]): FieldColumn[] {
+  const columns: FieldColumn[] = [];
+  for (const draft of drafts) {
+    const key = draft.key.trim();
+    if (key === '') {
+      continue;
+    }
+    const label = draft.label.trim();
+    columns.push({ key, label: label === '' ? key : label, type: draft.type });
+  }
+  return columns;
 }

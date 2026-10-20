@@ -77,6 +77,13 @@ export function formatFieldValue(
     case 'file':
       // The stored value is the attachment identifier; a table shows the way in, not the id.
       return 'Tệp đính kèm';
+    case 'formula':
+      // A computed field holds a number (ADR 0036), so it reads like one.
+      return typeof value === 'number' ? NUMBER_FORMAT.format(value) : String(value);
+    case 'table':
+      // The rows of a table are shown in full on the record's own screen; in a list, a
+      // count says how much there is without spilling the cells into the cell.
+      return Array.isArray(value) ? `${value.length} dòng` : String(value);
     default:
       return String(value);
   }

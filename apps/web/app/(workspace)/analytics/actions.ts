@@ -76,11 +76,16 @@ export async function createMetricAction(
   const description = String(formData.get('description') ?? '').trim();
   const objectKey = String(formData.get('objectKey') ?? '').trim();
   const aggregation = String(formData.get('aggregation') ?? '').trim();
-  const field = String(formData.get('field') ?? '').trim();
+  const measure = String(formData.get('field') ?? '').trim();
+  const column = String(formData.get('column') ?? '').trim();
   const groupBy = String(formData.get('groupBy') ?? '').trim();
   const filterField = String(formData.get('filterField') ?? '').trim();
   const filterOp = String(formData.get('filterOp') ?? '').trim();
   const filterValue = String(formData.get('filterValue') ?? '').trim();
+
+  // A measure is either a field or a column of a table. The form names the column
+  // apart, so the field it belongs to is what the API receives (ADR 0036).
+  const field = column === '' ? measure : (measure.split('.')[0] ?? '');
 
   // A numeric filter has to reach the API as a number, so it is typed here by the shape
   // of what was typed; anything else stays text and the service decides. `Number` is the
@@ -95,6 +100,7 @@ export async function createMetricAction(
       aggregation: aggregation as 'count' | 'sum' | 'avg',
       ...(description === '' ? {} : { description }),
       ...(field === '' ? {} : { field }),
+      ...(column === '' ? {} : { column }),
       ...(groupBy === '' ? {} : { groupBy }),
       ...(filterField === '' || filterOp === ''
         ? {}

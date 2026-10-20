@@ -717,7 +717,11 @@ type CreateBusinessObjectRequest struct {
 type CreateMetricDefinitionRequest struct {
 	// Aggregation Count records, or measure one numeric field.
 	Aggregation MetricAggregation `json:"aggregation"`
-	Description *string           `json:"description,omitempty"`
+
+	// Column The column of a table field to measure, when the metric measures the cells
+	// of a table column (ADR 0036). Empty for a plain field.
+	Column      *string `json:"column,omitempty"`
+	Description *string `json:"description,omitempty"`
 
 	// Field The numeric field to measure; must be empty for count.
 	Field *string `json:"field,omitempty"`
@@ -1013,7 +1017,11 @@ type MetricDefinitionList struct {
 type MetricDefinitionRequest struct {
 	// Aggregation Count records, or measure one numeric field.
 	Aggregation MetricAggregation `json:"aggregation"`
-	Description *string           `json:"description,omitempty"`
+
+	// Column The column of a table field to measure, when the metric measures the cells
+	// of a table column (ADR 0036). Empty for a plain field.
+	Column      *string `json:"column,omitempty"`
+	Description *string `json:"description,omitempty"`
 
 	// Field The numeric field to measure; must be empty for count.
 	Field *string `json:"field,omitempty"`
@@ -1031,7 +1039,10 @@ type MetricDefinitionRequest struct {
 
 // MetricFieldRef defines model for MetricFieldRef.
 type MetricFieldRef struct {
-	Key string `json:"key"`
+	// Column The key of a column inside a table field. When it is present, the metric
+	// measures the cells of that column rather than the field itself (ADR 0036).
+	Column *string `json:"column,omitempty"`
+	Key    string  `json:"key"`
 
 	// Kind The kind of a field, resolved when the metric was saved. It decides which typed
 	// column the metric filters, groups or measures on.
