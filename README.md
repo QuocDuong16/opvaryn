@@ -70,9 +70,12 @@ tiếp trên cùng nền đó. Mỗi màn hình gắn nhãn trạng thái:
 - **Live (MVP)**: cooldown đăng nhập sau 5 lần sai trong 15 phút, trả lời giống hệt sai mật khẩu;
   quản trị thấy tài khoản nào đang chờ và mở khoá ngay trong khu vực **Quản trị**, hoặc bằng
   `make useradm ARGS="-unlock -email ..."` khi cần đường phục hồi ngoài sản phẩm (ADR 0028).
-- **Concept**: điều kiện hiển thị và calculated field của Form Builder, tab Cấu hình của Application
-  Builder, template library, và nội dung Roadmap — các phần phụ thuộc quyết định còn mở hoặc thuộc
-  V1.x.
+- **Live (MVP)**: ô công thức (hệ thống tự tính từ các trường khác), ô ẩn theo điều kiện, và
+  bảng nhiều dòng có cột có kiểu trong Form Builder (ADR 0032).
+- **Live (MVP)**: ô công thức (hệ thống tự tính từ các trường khác), ô ẩn theo điều kiện, và
+  bảng nhiều dòng có cột có kiểu trong Form Builder (ADR 0032).
+- **Concept**: tra cứu dữ liệu từ hệ thống ngoài, tab Cấu hình của Application Builder, template
+  library, và nội dung Roadmap — các phần phụ thuộc quyết định còn mở hoặc thuộc V1.x.
 
 Toàn bộ D04–D10 đã chốt và đang chạy trong code (ADR 0005–0010). Chi tiết phạm vi demo ở
 [ADR 0002](docs/adr/0002-demo-scope-and-labels.md),

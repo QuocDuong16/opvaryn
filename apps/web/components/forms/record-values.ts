@@ -38,6 +38,19 @@ export function recordValuesFromForm(
           .filter((line) => line !== '');
         break;
       }
+      case 'table': {
+        // The rows of a table travel as one JSON value (ADR 0032).
+        try {
+          const rows = JSON.parse(text);
+          if (Array.isArray(rows)) {
+            values[field.key] = rows;
+          }
+        } catch {
+          // A table that is not JSON is left out; the server refuses the record anyway
+          // if the rows do not fit the columns.
+        }
+        break;
+      }
       default:
         values[field.key] = text;
     }

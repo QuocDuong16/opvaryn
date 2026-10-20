@@ -24,7 +24,7 @@ const CAPABILITIES: readonly { title: string; body: string }[] = [
   },
   {
     title: 'Biểu mẫu sinh từ định nghĩa',
-    body: 'Mỗi định nghĩa có ngay màn hình nhập liệu tương ứng, không phải viết code cho từng biểu mẫu. Kiểm tra dữ liệu nằm ở máy chủ, theo đúng phiên bản định nghĩa của bản ghi.',
+    body: 'Mỗi định nghĩa có ngay màn hình nhập liệu tương ứng, không phải viết code cho từng biểu mẫu. Ô công thức tự tính, ô ẩn theo điều kiện, bảng nhiều dòng có cột có kiểu. Kiểm tra dữ liệu nằm ở máy chủ, theo đúng phiên bản định nghĩa của bản ghi.',
   },
   {
     title: 'Quy trình phê duyệt chạy thật',
@@ -70,7 +70,7 @@ const STATUS: readonly { title: string; body: string }[] = [
   },
   {
     title: 'Chưa có',
-    body: 'Đăng nhập qua OIDC/SSO (chờ IdP của tổ chức), kết nối hai chiều với hệ thống ngoài, các dạng xem kanban/connector đang ở mức minh hoạ, và những phần của quy trình nhiều nhánh song song.',
+    body: 'Đăng nhập qua OIDC/SSO (chờ IdP của tổ chức), kết nối hai chiều với hệ thống ngoài, tra cứu dữ liệu từ hệ thống ngoài, các dạng xem kanban/connector đang ở mức minh hoạ, và những phần của quy trình nhiều nhánh song song.',
   },
 ];
 

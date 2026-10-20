@@ -37,6 +37,9 @@ describe('fieldDraftsToDefinitions', () => {
         type: 'select',
         required: true,
         options: 'ky_thuat = Kỹ thuật',
+        formula: '',
+        visibleWhen: '',
+        columns: '',
       },
     ]);
 

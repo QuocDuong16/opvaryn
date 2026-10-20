@@ -1,6 +1,6 @@
 'use client';
 
-import { useActionState } from 'react';
+import { useActionState, useState } from 'react';
 import { useFormStatus } from 'react-dom';
 import type { BusinessObject, FieldDefinition, ObjectRecord } from '@opvaryn/contracts';
 
@@ -10,6 +10,8 @@ import {
 } from '@/app/(workspace)/objects/actions';
 import { FileField } from '@/components/forms/file-field';
 import { INITIAL_CREATE_RECORD_STATE } from '@/components/forms/object-form-state';
+import { TableField } from '@/components/forms/table-field';
+import { evaluateCondition } from '@/lib/conditions';
 
 const INPUT_CLASS =
   'mt-1.5 w-full rounded-lg border border-border bg-surface px-3 py-2 text-sm ' +
@@ -27,6 +29,11 @@ export function ObjectForm({ object, record }: { object: BusinessObject; record?
   const [state, formAction] = useActionState(
     record ? updateObjectRecordAction : createObjectRecordAction,
     INITIAL_CREATE_RECORD_STATE,
+  );
+  // The values the person has entered so far. A field whose condition does not hold is not
+  // shown, and a computed field is filled in by the server (ADR 0032).
+  const [values, setValues] = useState<Record<string, unknown>>(() =>
+    initialValues(object, record),
   );
 
   return (
@@ -46,6 +53,8 @@ export function ObjectForm({ object, record }: { object: BusinessObject; record?
           objectKey={object.key}
           defaultValue={record?.values[field.key]}
           attachmentNames={record?.attachmentNames}
+          visible={evaluateCondition(field.visibleWhen, values)}
+          onValueChange={(value) => setValues((current) => ({ ...current, [field.key]: value }))}
         />
       ))}
 
@@ -86,15 +95,44 @@ function FieldControl({
   objectKey,
   defaultValue,
   attachmentNames,
+  visible,
+  onValueChange,
 }: {
   field: FieldDefinition;
   objectKey: string;
   defaultValue?: unknown;
   attachmentNames?: Record<string, string>;
+  /** False when the field's condition does not hold (ADR 0032). */
+  visible: boolean;
+  onValueChange: (value: unknown) => void;
 }) {
   const controlId = `field-${field.key}`;
   const describedBy = `field-${field.key}-hint`;
   const attachmentId = typeof defaultValue === 'string' ? defaultValue : '';
+
+  if (!visible) {
+    return null;
+  }
+
+  if (field.type === 'formula') {
+    return (
+      <div>
+        <span className="text-xs font-medium tracking-wide uppercase">{field.label}</span>
+        <p className="mt-1.5 rounded-lg border border-dashed border-border-strong px-3 py-2 text-sm text-on-surface-muted">
+          Tính tự động khi lưu: <span className="font-mono text-xs">{field.formula}</span>
+        </p>
+      </div>
+    );
+  }
+
+  if (field.type === 'table') {
+    return (
+      <div>
+        <label className="text-xs font-medium tracking-wide uppercase">{field.label}</label>
+        <TableField field={field} defaultValue={defaultValue} />
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -132,6 +170,21 @@ function FieldControl({
       ) : null}
     </div>
   );
+}
+
+/**
+ * initialValues reads the values a form starts with: the ones of the record being edited,
+ * or nothing for a new one.
+ */
+function initialValues(object: BusinessObject, record?: ObjectRecord): Record<string, unknown> {
+  const values: Record<string, unknown> = {};
+  for (const field of object.fields) {
+    const value = record?.values?.[field.key];
+    if (value !== undefined && value !== null) {
+      values[field.key] = value;
+    }
+  }
+  return values;
 }
 
 /**

@@ -253,6 +253,12 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   transaction: the old task is cancelled, the new one created for the other role, and a
   `task_escalated` event appended. `process_tasks.escalated` keeps a step from bouncing
   between roles.
+- The form's field kinds (ADR 0032): a `formula` field is computed by the server (the
+  expression is parsed into a tree and walked — never evaluated as code; `internal/formula`),
+  a field with `visibleWhen` is not shown and not stored when its condition does not hold,
+  and a `table` field holds rows of typed cells. `service.prepareValues` applies the three
+  rules before the record is validated; the web mirrors the condition rule in
+  `lib/conditions.ts`.
 - `store/search.go` holds `likeTerm`: a search term is escaped (`%`, `_`, `\`) and every
   ILIKE filter declares `ESCAPE '\'`, so a person searching for "50%" finds that text and not
   everything. A term is escaped in the store method that owns the query.

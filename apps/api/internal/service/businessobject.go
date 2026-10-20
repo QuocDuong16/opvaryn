@@ -10,6 +10,7 @@ import (
 	"github.com/google/uuid"
 
 	"github.com/QuocDuong16/opvaryn/api/internal/domain"
+	"github.com/QuocDuong16/opvaryn/api/internal/formula"
 )
 
 // KeyPattern is the allowed shape of every machine key in the platform: lowercase
@@ -225,9 +226,139 @@ func validateFields(fields []domain.FieldDefinition) []string {
 		}
 
 		problems = append(problems, validateFieldOptions(field, where)...)
+		problems = append(problems, validateComputedField(field, fields, where)...)
+		problems = append(problems, validateTableField(field, where)...)
+		problems = append(problems, validateVisibleWhen(field, fields, where)...)
 	}
 	return problems
 }
+
+// validateComputedField keeps a computed field usable (ADR 0032): the expression must
+// parse, and it may only read fields of the same definition.
+func validateComputedField(
+	field domain.FieldDefinition,
+	fields []domain.FieldDefinition,
+	where string,
+) []string {
+	if field.Type != domain.FieldTypeFormula {
+		if strings.TrimSpace(field.Formula) != "" {
+			return []string{fmt.Sprintf("%s.formula: only allowed on formula fields", where)}
+		}
+		return nil
+	}
+	if field.Required {
+		return []string{fmt.Sprintf("%s.required: a computed field is filled in by the system", where)}
+	}
+	expression := strings.TrimSpace(field.Formula)
+	if expression == "" {
+		return []string{fmt.Sprintf("%s.formula: must not be empty", where)}
+	}
+	keys, err := formula.Fields(expression)
+	if err != nil {
+		return []string{fmt.Sprintf("%s.formula: %v", where, err)}
+	}
+	problems := make([]string, 0)
+	known := make(map[string]domain.FieldDefinition, len(fields))
+	for _, other := range fields {
+		known[other.Key] = other
+	}
+	for _, key := range keys {
+		other, ok := known[key]
+		if !ok {
+			problems = append(problems, fmt.Sprintf("%s.formula: reads the unknown field %q", where, key))
+			continue
+		}
+		if other.Key == field.Key {
+			problems = append(problems, fmt.Sprintf("%s.formula: reads itself", where))
+			continue
+		}
+		if other.Type == domain.FieldTypeText || other.Type == domain.FieldTypeSelect ||
+			other.Type == domain.FieldTypeDate {
+			problems = append(problems,
+				fmt.Sprintf("%s.formula: %q is a text field, so it cannot be used in an expression", where, key))
+		}
+	}
+	return problems
+}
+
+// validateTableField keeps a table field usable (ADR 0032): it needs typed columns, and
+// only the kinds a cell can hold.
+func validateTableField(field domain.FieldDefinition, where string) []string {
+	if field.Type != domain.FieldTypeTable {
+		if len(field.Columns) > 0 {
+			return []string{fmt.Sprintf("%s.columns: only allowed on table fields", where)}
+		}
+		return nil
+	}
+	if len(field.Columns) == 0 {
+		return []string{fmt.Sprintf("%s.columns: a table field must define at least one column", where)}
+	}
+	if len(field.Columns) > maxTableColumns {
+		return []string{fmt.Sprintf("%s.columns: must contain at most %d entries", where, maxTableColumns)}
+	}
+	problems := make([]string, 0)
+	seen := make(map[string]struct{}, len(field.Columns))
+	for i, column := range field.Columns {
+		at := fmt.Sprintf("%s.columns[%d]", where, i)
+		key := strings.TrimSpace(column.Key)
+		switch {
+		case !KeyPattern.MatchString(key):
+			problems = append(problems, fmt.Sprintf("%s.key: must match %s", at, KeyPattern))
+		case column.Label == "":
+			problems = append(problems, fmt.Sprintf("%s.label: must not be empty", at))
+		}
+		if _, ok := seen[key]; ok {
+			problems = append(problems, fmt.Sprintf("%s.key: duplicate column key %q", at, key))
+		}
+		seen[key] = struct{}{}
+		switch column.Type {
+		case domain.FieldTypeText, domain.FieldTypeNumber, domain.FieldTypeDate:
+		default:
+			problems = append(problems,
+				fmt.Sprintf("%s.type: a column holds text, a number or a date", at))
+		}
+	}
+	return problems
+}
+
+// validateVisibleWhen keeps a visibility rule usable (ADR 0032): it reads a field of the
+// same definition, and it compares like the conditions of a process step.
+func validateVisibleWhen(
+	field domain.FieldDefinition,
+	fields []domain.FieldDefinition,
+	where string,
+) []string {
+	if field.VisibleWhen == nil {
+		return nil
+	}
+	condition := *field.VisibleWhen
+	condition.Field = strings.TrimSpace(condition.Field)
+	switch condition.Field {
+	case "":
+		return []string{fmt.Sprintf("%s.visibleWhen.field: must not be empty", where)}
+	case field.Key:
+		return []string{fmt.Sprintf("%s.visibleWhen.field: a field cannot depend on itself", where)}
+	}
+	known := false
+	for _, other := range fields {
+		if other.Key == condition.Field {
+			known = true
+			break
+		}
+	}
+	if !known {
+		return []string{fmt.Sprintf("%s.visibleWhen.field: reads the unknown field %q", where, condition.Field)}
+	}
+	switch condition.Op {
+	case "eq", "ne", "gt", "gte", "lt", "lte":
+		return nil
+	default:
+		return []string{fmt.Sprintf("%s.visibleWhen.op: %q is not a comparison", where, condition.Op)}
+	}
+}
+
+// maxTableColumns bounds the columns of a table field (ADR 0032).
+const maxTableColumns = 12
 
 // validateFieldOptions keeps select fields usable: a select without options cannot
 // be entered, and options on other field types would never be shown.

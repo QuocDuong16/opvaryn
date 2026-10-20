@@ -48,14 +48,67 @@ func (e DecideProcessTaskRequestDecision) Valid() bool {
 	}
 }
 
+// Defines values for FieldColumnType.
+const (
+	FieldColumnTypeDate   FieldColumnType = "date"
+	FieldColumnTypeNumber FieldColumnType = "number"
+	FieldColumnTypeText   FieldColumnType = "text"
+)
+
+// Valid indicates whether the value is a known member of the FieldColumnType enum.
+func (e FieldColumnType) Valid() bool {
+	switch e {
+	case FieldColumnTypeDate:
+		return true
+	case FieldColumnTypeNumber:
+		return true
+	case FieldColumnTypeText:
+		return true
+	default:
+		return false
+	}
+}
+
+// Defines values for FieldConditionOp.
+const (
+	FieldConditionOpEq  FieldConditionOp = "eq"
+	FieldConditionOpGt  FieldConditionOp = "gt"
+	FieldConditionOpGte FieldConditionOp = "gte"
+	FieldConditionOpLt  FieldConditionOp = "lt"
+	FieldConditionOpLte FieldConditionOp = "lte"
+	FieldConditionOpNe  FieldConditionOp = "ne"
+)
+
+// Valid indicates whether the value is a known member of the FieldConditionOp enum.
+func (e FieldConditionOp) Valid() bool {
+	switch e {
+	case FieldConditionOpEq:
+		return true
+	case FieldConditionOpGt:
+		return true
+	case FieldConditionOpGte:
+		return true
+	case FieldConditionOpLt:
+		return true
+	case FieldConditionOpLte:
+		return true
+	case FieldConditionOpNe:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for FieldType.
 const (
-	FieldTypeDate   FieldType = "date"
-	FieldTypeFile   FieldType = "file"
-	FieldTypeNumber FieldType = "number"
-	FieldTypeRows   FieldType = "rows"
-	FieldTypeSelect FieldType = "select"
-	FieldTypeText   FieldType = "text"
+	FieldTypeDate    FieldType = "date"
+	FieldTypeFile    FieldType = "file"
+	FieldTypeFormula FieldType = "formula"
+	FieldTypeNumber  FieldType = "number"
+	FieldTypeRows    FieldType = "rows"
+	FieldTypeSelect  FieldType = "select"
+	FieldTypeTable   FieldType = "table"
+	FieldTypeText    FieldType = "text"
 )
 
 // Valid indicates whether the value is a known member of the FieldType enum.
@@ -65,11 +118,15 @@ func (e FieldType) Valid() bool {
 		return true
 	case FieldTypeFile:
 		return true
+	case FieldTypeFormula:
+		return true
 	case FieldTypeNumber:
 		return true
 	case FieldTypeRows:
 		return true
 	case FieldTypeSelect:
+		return true
+	case FieldTypeTable:
 		return true
 	case FieldTypeText:
 		return true
@@ -640,8 +697,43 @@ type ErrorResponse struct {
 	Message string `json:"message"`
 }
 
+// FieldColumn One typed column of a `table` field (ADR 0032).
+type FieldColumn struct {
+	// Key Example: price
+	Key string `json:"key"`
+
+	// Label Example: Giá
+	Label string          `json:"label"`
+	Type  FieldColumnType `json:"type"`
+}
+
+// FieldColumnType defines model for FieldColumn.Type.
+type FieldColumnType string
+
+// FieldCondition A condition on a field: the field is shown when it holds (ADR 0032). It is the same
+// shape as the condition of a process step.
+type FieldCondition struct {
+	// Field Example: quantity
+	Field string           `json:"field"`
+	Op    FieldConditionOp `json:"op"`
+	Value interface{}      `json:"value,omitempty"`
+}
+
+// FieldConditionOp defines model for FieldCondition.Op.
+type FieldConditionOp string
+
 // FieldDefinition defines model for FieldDefinition.
 type FieldDefinition struct {
+	// Columns The typed columns of a `table` field (ADR 0032).
+	Columns *[]FieldColumn `json:"columns,omitempty"`
+
+	// Formula The expression of a computed field (ADR 0032), for example "quantity * unit_price".
+	// The server calculates it; the person never types it.
+	//
+	//
+	// Example: quantity * unit_price
+	Formula *string `json:"formula,omitempty"`
+
 	// Key Example: estimated_amount
 	Key string `json:"key"`
 
@@ -654,6 +746,10 @@ type FieldDefinition struct {
 
 	// Type Field kinds supported by the form builder.
 	Type FieldType `json:"type"`
+
+	// VisibleWhen A condition on a field: the field is shown when it holds (ADR 0032). It is the same
+	// shape as the condition of a process step.
+	VisibleWhen *FieldCondition `json:"visibleWhen,omitempty"`
 }
 
 // FieldOption One selectable option of a `select` field.

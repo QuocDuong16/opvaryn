@@ -97,6 +97,8 @@ export type WebhookDeliveryList = components['schemas']['WebhookDeliveryList'];
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 /** The signed-in user with roles and department. */
 export type Me = components['schemas']['Me'];
+export type FieldColumn = components['schemas']['FieldColumn'];
+export type FieldCondition = components['schemas']['FieldCondition'];
 export type WorkingHour = components['schemas']['WorkingHour'];
 export type WorkingHours = components['schemas']['WorkingHours'];
 export type TwoFactorStatus = components['schemas']['TwoFactorStatus'];

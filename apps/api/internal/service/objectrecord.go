@@ -184,7 +184,8 @@ func (s *ObjectRecords) Create(ctx context.Context, objectKey string, values map
 		return domain.ObjectRecord{}, err
 	}
 
-	if problems := validateRecordValues(object, values); len(problems) > 0 {
+	prepared, problems := prepareValues(object, values)
+	if problems = append(problems, validateRecordValues(object, prepared)...); len(problems) > 0 {
 		return domain.ObjectRecord{}, &ValidationError{Problems: problems}
 	}
 
@@ -194,7 +195,7 @@ func (s *ObjectRecords) Create(ctx context.Context, objectKey string, values map
 		ObjectKey:       object.Key,
 		ObjectVersionID: object.VersionID,
 		ObjectVersion:   object.Version,
-		Values:          normalizeRecordValues(object, values),
+		Values:          normalizeRecordValues(object, prepared),
 		// Stamped from the session: the payload cannot choose who entered a record
 		// or which department it counts for.
 		CreatedBy:     principal.UserID,
@@ -288,11 +289,12 @@ func (s *ObjectRecords) Update(
 		Key:    record.ObjectKey,
 		Fields: version.Fields,
 	}
-	if problems := validateRecordValues(object, values); len(problems) > 0 {
+	prepared, problems := prepareValues(object, values)
+	if problems = append(problems, validateRecordValues(object, prepared)...); len(problems) > 0 {
 		return domain.ObjectRecord{}, &ValidationError{Problems: problems}
 	}
 	previous := record.Values
-	record.Values = normalizeRecordValues(object, values)
+	record.Values = normalizeRecordValues(object, prepared)
 	changes := recordChanges(previous, record.Values, object.Fields)
 
 	bindings, fileFieldKeys, err := s.fileBindings(ctx, object.Key, object.Fields,
@@ -737,6 +739,25 @@ func validateFieldValue(field domain.FieldDefinition, value any) string {
 			}
 		}
 
+	case domain.FieldTypeTable:
+		// The rows of a table are checked against its columns in prepareValues, which
+		// knows the columns; here the list itself is checked.
+		rows, ok := value.([]any)
+		if !ok {
+			return fmt.Sprintf("%s: must be a list of rows", where)
+		}
+		if len(rows) > maxRecordRows {
+			return fmt.Sprintf("%s: must contain at most %d rows", where, maxRecordRows)
+		}
+
+	case domain.FieldTypeFormula:
+		// The value was computed by the server; it is a number or a piece of text.
+		switch value.(type) {
+		case float64, int, int64, string, bool:
+		default:
+			return fmt.Sprintf("%s: must be a number", where)
+		}
+
 	default:
 		return fmt.Sprintf("%s: unsupported field type %q", where, field.Type)
 	}
@@ -779,6 +800,33 @@ func normalizeRecordValues(object domain.BusinessObject, values map[string]any) 
 				continue
 			}
 			normalized[field.Key] = strings.TrimSpace(text)
+		case domain.FieldTypeTable:
+			items, ok := value.([]any)
+			if !ok {
+				continue
+			}
+			rows := make([]any, 0, len(items))
+			for _, item := range items {
+				cells, ok := item.(map[string]any)
+				if !ok {
+					continue
+				}
+				row := make(map[string]any, len(cells))
+				for key, cell := range cells {
+					switch typed := cell.(type) {
+					case string:
+						row[key] = strings.TrimSpace(typed)
+					case float64:
+						row[key] = typed
+					case int:
+						row[key] = float64(typed)
+					default:
+						row[key] = cell
+					}
+				}
+				rows = append(rows, row)
+			}
+			normalized[field.Key] = rows
 		case domain.FieldTypeRows:
 			items, ok := value.([]any)
 			if !ok {
