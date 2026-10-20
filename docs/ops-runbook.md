@@ -202,6 +202,9 @@ docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/u
 # Gỡ xác thực hai bước khi người dùng mất điện thoại (mật khẩu của họ giữ nguyên)
 docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/useradm -reset-2fa -email user@congty.local
 
+# Chuyển cấp việc quá hạn ngay (bộ quét trong API cũng làm việc này mỗi phút)
+docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/useradm -escalate
+
 # Xem những địa chỉ đang chờ hết thời gian tạm khoá sau 5 lần sai trong 15 phút
 docker compose -f deployments/docker-compose.yml --profile pilot exec api /app/useradm -list-lockouts
 

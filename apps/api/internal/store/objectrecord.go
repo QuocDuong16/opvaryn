@@ -481,6 +481,7 @@ func (s *Store) ListOpenTasksForRoles(
 	const columns = `
 		SELECT t.id, t.instance_id, t.node_key, t.title, t.assignee_role, t.attempt,
 		       t.status, t.reason, t.decided_by, t.created_at, t.decided_at,
+		       t.due_at, t.escalated,
 		       i.id, i.definition_id, i.definition_version_id, d.key, v.version,
 		       i.object_key, i.record_id, i.state, i.current_node, i.attempt,
 		       i.started_at, i.finished_at, i.updated_at
@@ -513,6 +514,7 @@ func (s *Store) ListOpenTasksForRoles(
 			&item.Task.ID, &item.Task.InstanceID, &item.Task.NodeKey, &item.Task.Title,
 			&item.Task.AssigneeRole, &item.Task.Attempt, &taskStatus, &item.Task.Reason,
 			&decidedBy, &item.Task.CreatedAt, &item.Task.DecidedAt,
+			&item.Task.DueAt, &item.Task.Escalated,
 			&item.Instance.ID, &item.Instance.DefinitionID, &item.Instance.DefinitionVersionID,
 			&item.Instance.DefinitionKey, &item.Instance.DefinitionVersion,
 			&item.Instance.ObjectKey, &item.Instance.RecordID, &instanceState,

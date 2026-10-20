@@ -479,6 +479,56 @@ export function GraphCanvas({
                     </label>
                   ) : null}
 
+                  {selected.type === 'human_task' ? (
+                    <>
+                      <label className="block text-xs">
+                        <span className="font-medium tracking-wide uppercase">
+                          Hạn xử lý (giờ làm việc)
+                        </span>
+                        <input
+                          type="number"
+                          min={0}
+                          step={1}
+                          value={selected.dueInWorkingHours ?? 0}
+                          onChange={(event) =>
+                            onDraftChange((current) =>
+                              updateNode(current, selected.key, {
+                                dueInWorkingHours: Number(event.target.value) || 0,
+                              }),
+                            )
+                          }
+                          className={cn(INPUT, 'mt-1.5')}
+                        />
+                        <span className="mt-1 block text-[11px] text-on-surface-muted">
+                          Để 0 nếu bước này không có hạn. Hạn tính theo giờ làm việc của tổ chức.
+                        </span>
+                      </label>
+
+                      <label className="block text-xs">
+                        <span className="font-medium tracking-wide uppercase">
+                          Chuyển cấp khi quá hạn cho
+                        </span>
+                        <input
+                          value={selected.escalateToRole ?? ''}
+                          list="known-roles"
+                          placeholder="Để trống nếu không chuyển cấp"
+                          onChange={(event) =>
+                            onDraftChange((current) =>
+                              updateNode(current, selected.key, {
+                                escalateToRole: event.target.value,
+                              }),
+                            )
+                          }
+                          className={cn(INPUT, 'mt-1.5')}
+                        />
+                        <span className="mt-1 block text-[11px] text-on-surface-muted">
+                          Khi quá hạn, việc chuyển sang vai trò này. Để trống thì hệ thống chỉ báo
+                          quá hạn, không đổi người.
+                        </span>
+                      </label>
+                    </>
+                  ) : null}
+
                   {selected.type === 'condition' ? (
                     <div className="space-y-2">
                       <label className="block text-xs">

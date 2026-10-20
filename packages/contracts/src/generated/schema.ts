@@ -655,6 +655,32 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/api/v1/admin/working-hours": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * The organisation's working calendar
+         * @description The stretches that count as working time, per weekday (ADR 0031). A deadline is
+         *     counted in these hours, so the calendar decides what "four working hours" means.
+         */
+        get: operations["listWorkingHours"];
+        /**
+         * Set the organisation's working calendar
+         * @description Replaces the calendar as a whole: a half-written calendar would make deadlines mean
+         *     something nobody chose.
+         */
+        put: operations["replaceWorkingHours"];
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/api/v1/admin/roles": {
         parameters: {
             query?: never;
@@ -1289,6 +1315,18 @@ export interface components {
              */
             assigneeRole?: string;
             condition?: components["schemas"]["ProcessCondition"];
+            /**
+             * @description How many working hours the step has (ADR 0031). Zero means the step has no
+             *     deadline and is never escalated.
+             * @example 8
+             */
+            dueInWorkingHours?: number;
+            /**
+             * @description The role that takes the step over when it runs out of time (ADR 0031). Empty
+             *     means nobody takes over: the step is only reported as late.
+             * @example giam_doc
+             */
+            escalateToRole?: string;
         };
         ProcessEdge: {
             from: string;
@@ -1381,6 +1419,14 @@ export interface components {
             createdAt: string;
             /** Format: date-time */
             decidedAt?: string;
+            /**
+             * Format: date-time
+             * @description When the step runs out of time, counted in the organisation's working hours
+             *     (ADR 0031). Absent when the step has no deadline.
+             */
+            dueAt?: string;
+            /** @description Whether the step was already taken over once (ADR 0031). */
+            escalated?: boolean;
         };
         ProcessEvent: {
             /** Format: int64 */
@@ -1477,6 +1523,31 @@ export interface components {
              * @example 123456
              */
             code?: string;
+        };
+        WorkingHour: {
+            /**
+             * @description The day of the week; 0 is Sunday.
+             * @example 1
+             */
+            weekday: number;
+            /**
+             * @description When the stretch starts, in minutes from midnight.
+             * @example 540
+             */
+            start: number;
+            /**
+             * @description When the stretch ends, in minutes from midnight.
+             * @example 1020
+             */
+            end: number;
+        };
+        WorkingHours: {
+            /** @description The stretches of the week, ordered by day. */
+            data: components["schemas"]["WorkingHour"][];
+        };
+        WorkingHoursRequest: {
+            /** @description The stretches of the week; the calendar is replaced as a whole. */
+            data: components["schemas"]["WorkingHour"][];
         };
         TwoFactorStatus: {
             /** @description Whether the second step is switched on for this account. */
@@ -3000,6 +3071,54 @@ export interface operations {
                     "application/json": components["schemas"]["ErrorResponse"];
                 };
             };
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    listWorkingHours: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody?: never;
+        responses: {
+            /** @description The calendar */
+            200: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content: {
+                    "application/json": components["schemas"]["WorkingHours"];
+                };
+            };
+            401: components["responses"]["Unauthorized"];
+            503: components["responses"]["ServiceUnavailable"];
+        };
+    };
+    replaceWorkingHours: {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        requestBody: {
+            content: {
+                "application/json": components["schemas"]["WorkingHoursRequest"];
+            };
+        };
+        responses: {
+            /** @description The calendar is set */
+            204: {
+                headers: {
+                    [name: string]: unknown;
+                };
+                content?: never;
+            };
+            400: components["responses"]["BadRequest"];
+            401: components["responses"]["Unauthorized"];
+            403: components["responses"]["Forbidden"];
             503: components["responses"]["ServiceUnavailable"];
         };
     };

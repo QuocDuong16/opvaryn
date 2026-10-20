@@ -156,6 +156,10 @@
   by the first `select` field (mock policy), `Cấu hình` is the administration preview (concept:
   every control is disabled and the copy says nothing is stored), integration panel lists mock
   connectors. Status badges are per view, not per page.
+- `/admin` **live** (ADR 0022, ADR 0029, ADR 0031): the areas are Tổng quan · Người dùng ·
+  Phòng ban · Vai trò · **Giờ làm việc** (the calendar that decides what a deadline means).
+  The workflow inspector carries two fields on a human step: the deadline in working hours
+  and the role that takes the step over; the inbox shows the deadline and marks a task late.
 - `/admin` **live** (ADR 0022, ADR 0029): an account that is waiting out a sign-in cooldown
   carries `lockedUntil`; the accounts list shows it, the account page offers **Mở khoá đăng nhập**
   only while the account waits, and the action redirects to `?unlocked=1` so the confirmation

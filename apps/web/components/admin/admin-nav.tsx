@@ -10,9 +10,10 @@ const ITEMS = [
   { href: '/admin/users', label: 'Người dùng' },
   { href: '/admin/departments', label: 'Phòng ban' },
   { href: '/admin/roles', label: 'Vai trò' },
+  { href: '/admin/working-hours', label: 'Giờ làm việc' },
 ] as const;
 
-/** The four administration areas, with the current one marked. */
+/** The administration areas, with the current one marked. */
 export function AdminNav() {
   const pathname = usePathname();
 

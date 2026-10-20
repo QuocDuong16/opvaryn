@@ -244,6 +244,15 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   `0012_record_audit.sql` (append-only `record_audit`; no FK on `record_id`; actor name snapshot;
   `changes` jsonb) and `0013_login_failures.sql` (`login_failures(email, failed_at)` for the
   cooldown).
+- Working hours and deadlines (ADR 0031): the calendar is `working_hours` (weekday, start and
+  end minute), edited in the `/admin` area; `service.WorkingCalendar.AddWorkingHours` is the pure
+  arithmetic (weekends and nights are skipped) and `service.WorkingHours.Deadline` turns a
+  step's `dueInWorkingHours` into a moment. A `human_task` node may carry `dueInWorkingHours`
+  and `escalateToRole`; the runtime stamps `due_at` on the task, and the escalation worker
+  (`service.Escalation`, also `useradm -escalate`) hands an overdue task over in one
+  transaction: the old task is cancelled, the new one created for the other role, and a
+  `task_escalated` event appended. `process_tasks.escalated` keeps a step from bouncing
+  between roles.
 - `store/search.go` holds `likeTerm`: a search term is escaped (`%`, `_`, `\`) and every
   ILIKE filter declares `ESCAPE '\'`, so a person searching for "50%" finds that text and not
   everything. A term is escaped in the store method that owns the query.

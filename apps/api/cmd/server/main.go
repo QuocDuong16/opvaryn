@@ -67,6 +67,18 @@ func run() error {
 		log.Info("outbound webhook enabled", "maxAttempts", cfg.WebhookMaxAttempts)
 	}
 
+	// The organisation's working calendar (ADR 0031). It decides what a deadline means,
+	// and the escalation worker uses it to give the new owner a fresh window.
+	location, err := time.LoadLocation("Asia/Ho_Chi_Minh")
+	if err != nil {
+		// The timezone database is not installed: the server's own time is the next best
+		// thing, and the calendar is still editable.
+		log.Warn("the organisation's timezone is unavailable, using the server's time", "error", err)
+	}
+	workingHours := service.NewWorkingHours(st, location)
+	escalation := service.NewEscalation(st, workingHours, log)
+	go escalation.Run(ctx)
+
 	// Two-step verification for administrators (ADR 0030). Without a key the feature is
 	// simply not configured on this server: the setup endpoint says so.
 	twoFactor := service.NewTwoFactor(st, cfg.TwoFactorKey())
@@ -77,13 +89,19 @@ func run() error {
 			BusinessObjects:    service.NewBusinessObjects(st),
 			ObjectRecords:      service.NewObjectRecords(st),
 			ProcessDefinitions: service.NewProcessDefinitions(st, st),
-			ProcessRuntime: service.NewProcessRuntime(st, service.WithWebhooks(service.WebhookConfig{
-				URL:         cfg.WebhookURL,
-				Secret:      cfg.WebhookSecret,
-				Timeout:     cfg.WebhookTimeout,
-				MaxAttempts: cfg.WebhookMaxAttempts,
-			})),
+			ProcessRuntime: service.NewProcessRuntime(st,
+				service.WithWebhooks(service.WebhookConfig{
+					URL:         cfg.WebhookURL,
+					Secret:      cfg.WebhookSecret,
+					Timeout:     cfg.WebhookTimeout,
+					MaxAttempts: cfg.WebhookMaxAttempts,
+				}),
+				// The steps get a deadline, counted in the organisation's working hours
+				// (ADR 0031).
+				service.WithWorkingHours(workingHours),
+			),
 			Identity:       service.NewIdentity(st).WithTwoFactor(twoFactor),
+			WorkingHours:   workingHours,
 			TwoFactor:      twoFactor,
 			Admin:          service.NewAdmin(st),
 			Attachments:    service.NewAttachments(st),

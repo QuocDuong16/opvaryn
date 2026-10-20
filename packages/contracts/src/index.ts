@@ -97,6 +97,8 @@ export type WebhookDeliveryList = components['schemas']['WebhookDeliveryList'];
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 /** The signed-in user with roles and department. */
 export type Me = components['schemas']['Me'];
+export type WorkingHour = components['schemas']['WorkingHour'];
+export type WorkingHours = components['schemas']['WorkingHours'];
 export type TwoFactorStatus = components['schemas']['TwoFactorStatus'];
 export type TwoFactorSetup = components['schemas']['TwoFactorSetup'];
 export type TwoFactorEnabled = components['schemas']['TwoFactorEnabled'];
@@ -185,6 +187,10 @@ export interface ApiClient {
   enableMyTwoFactor(code: string): Promise<TwoFactorEnabled>;
   /** Switches the second step off. */
   disableMyTwoFactor(code: string): Promise<void>;
+  /** The organisation's working calendar (ADR 0031). */
+  listWorkingHours(): Promise<WorkingHours>;
+  /** Replaces the working calendar as a whole. */
+  replaceWorkingHours(hours: readonly WorkingHour[]): Promise<void>;
   /** Whether one account has the second step switched on. */
   getAdminUserTwoFactor(userId: string): Promise<TwoFactorStatus>;
   /** Turns the second step off for one account: the way back in when the device was lost. */
@@ -387,6 +393,14 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
       request<void>('/api/v1/me/two-factor/disable', {
         method: 'POST',
         body: { code },
+      }),
+
+    listWorkingHours: () => request<WorkingHours>('/api/v1/admin/working-hours'),
+
+    replaceWorkingHours: (hours) =>
+      request<void>('/api/v1/admin/working-hours', {
+        method: 'PUT',
+        body: { data: hours },
       }),
 
     getAdminUserTwoFactor: (userId) =>

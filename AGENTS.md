@@ -99,6 +99,12 @@ Working agreement for agents and contributors in this repository.
   Every record write appends to `record_audit` in the same transaction: action, actor snapshot,
   and only the fields whose values changed; the history has no foreign key to the record, is read
   with the record's scope, and no endpoint modifies it (ADR 0027).
+  A step of a process may declare a deadline (`dueInWorkingHours`) and a role to take it
+  over when it runs out of time (`escalateToRole`); the deadline is counted in the
+  organisation's working calendar (`working_hours`, editable in `/admin`), and an overdue
+  step is handed over in one transaction — the old task is cancelled, the new one created,
+  and an event appended (ADR 0031). A step without a deadline is never escalated, and a
+  step without a role to take over is only reported as late.
   Two-step verification for administrator accounts is opt-in per account and lives in the
   `/admin` area (ADR 0030): a TOTP secret (RFC 6238) sealed with AES-GCM under
   `TOTP_ENCRYPTION_KEY`, single-use recovery codes shown once, and a reset path for a lost

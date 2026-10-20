@@ -91,6 +91,16 @@ const ENDPOINTS: readonly { method: string; path: string; purpose: string }[] = 
     path: '/api/v1/admin/departments/{key}',
     purpose: 'Xoá phòng ban không còn ai',
   },
+  {
+    method: 'GET',
+    path: '/api/v1/admin/working-hours',
+    purpose: 'Lịch giờ làm việc của tổ chức — hạn xử lý tính theo lịch này',
+  },
+  {
+    method: 'PUT',
+    path: '/api/v1/admin/working-hours',
+    purpose: 'Đặt lại lịch giờ làm việc',
+  },
   { method: 'GET', path: '/api/v1/admin/roles', purpose: 'Danh mục vai trò' },
   { method: 'POST', path: '/api/v1/admin/roles', purpose: 'Thêm vai trò vào danh mục' },
   { method: 'PUT', path: '/api/v1/admin/roles/{key}', purpose: 'Đổi tên hiển thị của vai trò' },

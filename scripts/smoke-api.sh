@@ -613,8 +613,26 @@ status="$(curl -sS -b "$designer_jar" -o "$smoke_tmp_dir/import-header.json" -w 
 grep -q '"code":"invalid_request"' "$smoke_tmp_dir/import-header.json" ||
   fail "the header error did not use the invalid_request code"
 
+echo "smoke: the working calendar and the deadlines it decides (ADR 0031)"
+# The escalation needs a task that is already late, which no wait can produce: the deadline
+# is moved into the past in the database, the way an hour-old task would look.
+root_dir="$(cd "$(dirname "$0")/.." && pwd)"
+compose=(docker compose -f "$root_dir/deployments/docker-compose.yml" --project-directory "$root_dir")
+psql() {
+  "${compose[@]}" exec -T postgres \
+    psql -U "${POSTGRES_USER:-opvaryn}" -d "${POSTGRES_DB:-opvaryn}" -v ON_ERROR_STOP=1 "$@"
+}
+
+status="$(request_as "$admin_jar" PUT /api/v1/admin/working-hours \
+  '{"data":[{"weekday":1,"start":540,"end":1020},{"weekday":2,"start":540,"end":1020},{"weekday":3,"start":540,"end":1020},{"weekday":4,"start":540,"end":1020},{"weekday":5,"start":540,"end":1020}]}')"
+[[ "$status" == "204" ]] || fail "setting the working calendar returned $status, expected 204"
+status="$(request_as "$admin_jar" GET /api/v1/admin/working-hours)"
+[[ "$status" == "200" ]] || fail "reading the working calendar returned $status, expected 200"
+grep -q '"weekday":1' "$body_file" || fail "the working calendar lost Monday"
+
 echo "smoke: POST /api/v1/process-definitions (create + publish v1)"
 process_key="smoke_flow_$stamp"
+deadline_key="smoke_deadline_flow_$stamp"
 process_body="$(printf '{"key":"%s","name":"Smoke approval flow","description":"created by scripts/smoke-api.sh","objectKey":"%s","nodes":[{"key":"start","type":"start","title":"Nhận đề nghị"},{"key":"approve","type":"human_task","title":"Trưởng bộ phận duyệt","assigneeRole":"%s"},{"key":"gate","type":"condition","title":"Trên 1 triệu?","condition":{"field":"amount","op":"gte","value":1000000}},{"key":"escalate","type":"human_task","title":"Giám đốc duyệt","assigneeRole":"%s"},{"key":"end","type":"end","title":"Kết thúc"}],"edges":[{"from":"start","to":"approve"},{"from":"approve","to":"gate"},{"from":"gate","to":"escalate","when":"true"},{"from":"gate","to":"end","when":"false"},{"from":"escalate","to":"end"}]}' "$process_key" "$object_key" "$designer_role" "$director_role")"
 status="$(request_as "$designer_jar" POST /api/v1/process-definitions "$process_body")"
 [[ "$status" == "201" ]] || fail "creating a process definition returned $status, expected 201"
@@ -646,6 +664,42 @@ grep -q '"type":"instance_started"' "$body_file" || fail "the audit log must rec
 grep -q "$designer_email" "$body_file" || fail "the start must be attributed to the signed-in user"
 instance_id="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["instance"]["id"])' "$body_file")"
 approver_task="$(python3 -c 'import json,sys; print(next(t["id"] for t in json.load(open(sys.argv[1]))["tasks"] if t["nodeKey"]=="approve"))' "$body_file")"
+
+echo "smoke: a step with a deadline carries the moment it runs out of time (ADR 0031)"
+status="$(request_as "$designer_jar" POST /api/v1/process-definitions "$(printf '{"key":"%s","name":"Smoke deadline flow","objectKey":"%s","nodes":[{"key":"start","type":"start","title":"Bắt đầu"},{"key":"approve","type":"human_task","title":"Duyệt có hạn","assigneeRole":"%s","dueInWorkingHours":4,"escalateToRole":"%s"},{"key":"end","type":"end","title":"Kết thúc"}],"edges":[{"from":"start","to":"approve"},{"from":"approve","to":"end"}]}' "$deadline_key" "$object_key" "$designer_role" "$director_role")")"
+[[ "$status" == "201" ]] || fail "creating a definition with a deadline returned $status, expected 201"
+status="$(request_as "$designer_jar" POST /api/v1/process-instances "$(printf '{"definitionKey":"%s","recordId":"%s"}' "$deadline_key" "$above_record")")"
+[[ "$status" == "201" ]] || fail "starting a run with a deadline returned $status, expected 201"
+python3 - "$body_file" <<'PY' || fail "the step with a deadline has no deadline"
+import json, sys
+
+tasks = json.load(open(sys.argv[1], encoding="utf-8"))["tasks"]
+task = next(t for t in tasks if t["nodeKey"] == "approve")
+if not task.get("dueAt"):
+    sys.exit("a step with four working hours must carry a deadline")
+PY
+deadline_task="$(python3 -c 'import json,sys; print(next(t["id"] for t in json.load(open(sys.argv[1]))["tasks"] if t["nodeKey"]=="approve"))' "$body_file")"
+
+echo "smoke: an overdue task is handed over to the role the step names (ADR 0031)"
+psql -c "UPDATE process_tasks SET due_at = now() - interval '1 hour' WHERE id = '$deadline_task'" >/dev/null ||
+  fail "moving the deadline into the past failed"
+useradm -escalate >/dev/null || fail "the escalation pass failed"
+status="$(request_as "$director_jar" GET /api/v1/tasks)"
+[[ "$status" == "200" ]] || fail "reading the inbox of the escalation role returned $status, expected 200"
+python3 - "$body_file" <<'PY' || fail "the overdue task was not handed over"
+import json, sys
+
+items = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+escalated = [item for item in items if item["task"]["nodeKey"] == "approve"]
+if not escalated:
+    sys.exit("the role that takes over has no task")
+if not escalated[0]["task"].get("escalated"):
+    sys.exit("the task was not marked as handed over")
+PY
+status="$(request_as "$designer_jar" GET /api/v1/tasks)"
+if grep -q "$deadline_task" "$body_file"; then
+  fail "the role that had the task must not keep it after the handover"
+fi
 
 echo "smoke: return without a reason -> 400"
 status="$(request_as "$designer_jar" POST "/api/v1/process-instances/$instance_id/tasks/$approver_task/decisions" '{"decision":"return"}')"

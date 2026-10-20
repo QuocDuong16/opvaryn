@@ -208,12 +208,20 @@ func validateDefinitionMeta(name string, description string) []string {
 	return problems
 }
 
+// maxWorkingHours bounds a step's deadline: a year of working time is plenty, and the
+// bound keeps a mistyped number from reaching the calendar.
+const maxWorkingHours = 8760
+
 func normalizeProcessNodes(nodes []domain.ProcessNode) []domain.ProcessNode {
 	normalized := make([]domain.ProcessNode, len(nodes))
 	for i, node := range nodes {
 		node.Key = strings.TrimSpace(node.Key)
 		node.Title = strings.TrimSpace(node.Title)
 		node.AssigneeRole = strings.TrimSpace(node.AssigneeRole)
+		node.EscalateToRole = strings.TrimSpace(node.EscalateToRole)
+		if node.DueInWorkingHours < 0 {
+			node.DueInWorkingHours = 0
+		}
 		if node.Condition != nil {
 			condition := *node.Condition
 			condition.Field = strings.TrimSpace(condition.Field)
@@ -283,9 +291,27 @@ func validateProcessGraph(
 			if node.Condition != nil {
 				problems = append(problems, fmt.Sprintf("%s.condition: only condition nodes carry a condition", where))
 			}
+			// A deadline and a role to take over belong to a step a person works on
+			// (ADR 0031).
+			if node.DueInWorkingHours < 0 || node.DueInWorkingHours > maxWorkingHours {
+				problems = append(problems,
+					fmt.Sprintf("%s.dueInWorkingHours: must be between 0 and %d", where, maxWorkingHours))
+			}
+			if node.EscalateToRole != "" && !KeyPattern.MatchString(node.EscalateToRole) {
+				problems = append(problems,
+					fmt.Sprintf("%s.escalateToRole: must match %s", where, KeyPattern))
+			}
+			if node.EscalateToRole == node.AssigneeRole {
+				problems = append(problems,
+					fmt.Sprintf("%s.escalateToRole: must be another role than the one that has the step", where))
+			}
 		case domain.ProcessNodeCondition:
 			if node.AssigneeRole != "" {
 				problems = append(problems, fmt.Sprintf("%s.assigneeRole: only human_task nodes carry a role", where))
+			}
+			if node.DueInWorkingHours != 0 || node.EscalateToRole != "" {
+				problems = append(problems,
+					fmt.Sprintf("%s: only human_task nodes carry a deadline", where))
 			}
 			if node.Condition == nil {
 				problems = append(problems, fmt.Sprintf("%s.condition: condition nodes must declare one", where))
@@ -295,6 +321,10 @@ func validateProcessGraph(
 		case domain.ProcessNodeStart, domain.ProcessNodeEnd:
 			if node.AssigneeRole != "" {
 				problems = append(problems, fmt.Sprintf("%s.assigneeRole: only human_task nodes carry a role", where))
+			}
+			if node.DueInWorkingHours != 0 || node.EscalateToRole != "" {
+				problems = append(problems,
+					fmt.Sprintf("%s: only human_task nodes carry a deadline", where))
 			}
 			if node.Condition != nil {
 				problems = append(problems, fmt.Sprintf("%s.condition: only condition nodes carry a condition", where))

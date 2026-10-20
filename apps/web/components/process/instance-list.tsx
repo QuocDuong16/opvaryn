@@ -26,13 +26,11 @@ const STATE_STYLES: Record<string, string> = {
 export function InstanceList({
   instances,
   emptyHint,
-  recordLabels = {},
   roleLabels = {},
   definitionNames = {},
 }: {
   instances: readonly ProcessInstanceSummary[];
   emptyHint: string;
-  recordLabels?: Record<string, string>;
   /** Role key to display name; a role nobody has named keeps its key. */
   roleLabels?: Record<string, string>;
   /** Definition key to its name. */

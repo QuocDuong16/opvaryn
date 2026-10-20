@@ -326,6 +326,14 @@ func toAPIProcessNodes(nodes []domain.ProcessNode) []apiv1.ProcessNode {
 				Value: node.Condition.Value,
 			}
 		}
+		if node.DueInWorkingHours > 0 {
+			hours := node.DueInWorkingHours
+			converted.DueInWorkingHours = &hours
+		}
+		if node.EscalateToRole != "" {
+			role := node.EscalateToRole
+			converted.EscalateToRole = &role
+		}
 		result[i] = converted
 	}
 	return result
@@ -360,6 +368,10 @@ func toDomainProcessNodes(nodes []apiv1.ProcessNode) []domain.ProcessNode {
 				Value: node.Condition.Value,
 			}
 		}
+		if node.DueInWorkingHours != nil {
+			converted.DueInWorkingHours = *node.DueInWorkingHours
+		}
+		converted.EscalateToRole = stringValue(node.EscalateToRole)
 		result[i] = converted
 	}
 	return result
@@ -424,6 +436,8 @@ func toAPIInstanceView(view service.InstanceView) apiv1.ProcessInstanceView {
 			DecidedBy:    pointerOrNil(task.DecidedBy),
 			CreatedAt:    task.CreatedAt,
 			DecidedAt:    task.DecidedAt,
+			DueAt:        task.DueAt,
+			Escalated:    &task.Escalated,
 		}
 		tasks[i] = converted
 	}

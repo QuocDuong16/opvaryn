@@ -72,6 +72,10 @@ type ProcessRuntime struct {
 	// webhooks decides whether a committed write also owes the outside world a
 	// notification; the rows travel inside the same write (ADR 0012).
 	webhooks WebhookConfig
+	// workingHours turns a step's deadline into a moment (ADR 0031). Without it, steps
+	// have no deadline.
+	workingHours *WorkingHours
+	now          func() time.Time
 }
 
 // RuntimeOption configures the runtime without changing every existing caller.
@@ -82,9 +86,15 @@ func WithWebhooks(config WebhookConfig) RuntimeOption {
 	return func(runtime *ProcessRuntime) { runtime.webhooks = config }
 }
 
+// WithWorkingHours gives the steps of a process a deadline, counted in the organisation's
+// working hours (ADR 0031).
+func WithWorkingHours(hours *WorkingHours) RuntimeOption {
+	return func(runtime *ProcessRuntime) { runtime.workingHours = hours }
+}
+
 // NewProcessRuntime returns a ProcessRuntime over the given store.
 func NewProcessRuntime(st processRuntimeStore, options ...RuntimeOption) *ProcessRuntime {
-	runtime := &ProcessRuntime{store: st}
+	runtime := &ProcessRuntime{store: st, now: time.Now}
 	for _, option := range options {
 		option(runtime)
 	}
@@ -185,7 +195,11 @@ func (r *ProcessRuntime) Start(ctx context.Context, in StartInput) (InstanceView
 	var tasks []domain.ProcessTask
 	switch walk.kind {
 	case walkWait:
-		tasks = append(tasks, newTask(instanceID, walk.stopNode, 1))
+		task, taskErr := r.taskWithDeadline(ctx, instanceID, walk.stopNode, 1)
+		if taskErr != nil {
+			return InstanceView{}, taskErr
+		}
+		tasks = append(tasks, task)
 		events = append(events, newTaskEvent(instanceID, walk.stopNode, 1, actor))
 	case walkCompleted:
 		finishedAt := time.Now().UTC()
@@ -300,7 +314,11 @@ func (r *ProcessRuntime) Decide(ctx context.Context, in DecideInput) (InstanceVi
 		if walk.kind == walkWait {
 			write.NewState = domain.ProcessRunning
 			write.NewCurrentNode = walk.stopNode.Key
-			write.TasksToCreate = []domain.ProcessTask{newTask(instance.ID, walk.stopNode, instance.Attempt)}
+			task, taskErr := r.taskWithDeadline(ctx, instance.ID, walk.stopNode, instance.Attempt)
+			if taskErr != nil {
+				return InstanceView{}, taskErr
+			}
+			write.TasksToCreate = []domain.ProcessTask{task}
 			write.Events = append(write.Events, newTaskEvent(instance.ID, walk.stopNode, instance.Attempt, actor))
 		} else {
 			write.NewState = domain.ProcessCompleted
@@ -333,7 +351,11 @@ func (r *ProcessRuntime) Decide(ctx context.Context, in DecideInput) (InstanceVi
 		write.Events = append(write.Events, walkEvents(instance.ID, actor, walk)...)
 		if walk.kind == walkWait {
 			write.NewCurrentNode = walk.stopNode.Key
-			write.TasksToCreate = []domain.ProcessTask{newTask(instance.ID, walk.stopNode, attempt)}
+			task, taskErr := r.taskWithDeadline(ctx, instance.ID, walk.stopNode, attempt)
+			if taskErr != nil {
+				return InstanceView{}, taskErr
+			}
+			write.TasksToCreate = []domain.ProcessTask{task}
 			write.Events = append(write.Events, newTaskEvent(instance.ID, walk.stopNode, attempt, actor))
 		} else {
 			// The graph may run straight to an end node; the reset still completes.
@@ -574,6 +596,28 @@ func newTask(instanceID uuid.UUID, node domain.ProcessNode, attempt int) domain.
 		Attempt:      attempt,
 		Status:       domain.TaskOpen,
 	}
+}
+
+// taskWithDeadline is a task that knows when it runs out of time (ADR 0031). A step without
+// a deadline has none, and a step with one gets a moment counted in working hours.
+func (r *ProcessRuntime) taskWithDeadline(
+	ctx context.Context,
+	instanceID uuid.UUID,
+	node domain.ProcessNode,
+	attempt int,
+) (domain.ProcessTask, error) {
+	task := newTask(instanceID, node, attempt)
+	if r.workingHours == nil || node.DueInWorkingHours <= 0 {
+		return task, nil
+	}
+	due, hasDeadline, err := r.workingHours.Deadline(ctx, r.now().UTC(), node.DueInWorkingHours)
+	if err != nil {
+		return domain.ProcessTask{}, fmt.Errorf("compute the deadline of step %q: %w", node.Key, err)
+	}
+	if hasDeadline {
+		task.DueAt = &due
+	}
+	return task, nil
 }
 
 func newTaskEvent(instanceID uuid.UUID, node domain.ProcessNode, attempt int, actor string) domain.ProcessEvent {
