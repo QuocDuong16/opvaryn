@@ -175,7 +175,7 @@ func handleListRoles(identity *service.Identity, log *slog.Logger) http.HandlerF
 		if !ok {
 			return
 		}
-		opts, err := listQuery(r)
+		opts, err := listPageQuery(r)
 		if err != nil {
 			writeError(w, log, http.StatusBadRequest, codeInvalidRequest, err.Error())
 			return

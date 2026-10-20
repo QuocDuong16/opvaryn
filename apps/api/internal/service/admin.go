@@ -276,9 +276,16 @@ func (s *Admin) UpdateUser(
 	updated.PasswordHash = ""
 
 	// The sign-in counter follows the address, so the old one is forgotten when the address
-	// changes. A disabled account is not waiting for anything: it cannot sign in, and it
-	// must not come back locked when somebody enables it again.
-	if previous.Email != email || status == domain.UserDisabled {
+	// changes — and so is the new one, which may carry a wait from before the rename. A
+	// disabled account is not waiting for anything: it cannot sign in, and it must not come
+	// back locked when somebody enables it again.
+	if previous.Email != email {
+		for _, address := range []string{previous.Email, email} {
+			if err := s.store.ClearLoginFailures(ctx, address); err != nil {
+				return domain.User{}, fmt.Errorf("clear login failures: %w", err)
+			}
+		}
+	} else if status == domain.UserDisabled {
 		if err := s.store.ClearLoginFailures(ctx, previous.Email); err != nil {
 			return domain.User{}, fmt.Errorf("clear login failures: %w", err)
 		}
@@ -300,9 +307,11 @@ func (s *Admin) SetPassword(
 	if problems := validatePassword(password); len(problems) > 0 {
 		return &ValidationError{Problems: problems}
 	}
-	if _, found, err := s.store.FindUserByID(ctx, id); err != nil {
+	user, found, err := s.store.FindUserByID(ctx, id)
+	if err != nil {
 		return fmt.Errorf("look up user: %w", err)
-	} else if !found {
+	}
+	if !found {
 		return fmt.Errorf("user %s: %w", id, ErrUserNotFound)
 	}
 
@@ -312,6 +321,11 @@ func (s *Admin) SetPassword(
 	}
 	if err := s.store.UpdatePassword(ctx, id, hash); err != nil {
 		return fmt.Errorf("set password: %w", err)
+	}
+	// The wait was the wrong password. A new password ends it: otherwise the person is
+	// refused after the password was just fixed (ADR 0028).
+	if err := s.store.ClearLoginFailures(ctx, user.Email); err != nil {
+		return fmt.Errorf("clear login failures: %w", err)
 	}
 	return nil
 }

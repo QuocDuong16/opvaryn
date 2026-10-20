@@ -28,11 +28,22 @@ func recordLabel(source domain.RecordLabelSource) string {
 	if !ok || value == nil {
 		return ""
 	}
-	switch typed := value.(type) {
-	case string:
-		return strings.TrimSpace(typed)
-	case float64:
-		return strings.TrimSpace(strings.TrimSuffix(fmt.Sprintf("%v", typed), ".0"))
+	switch preferred.Type {
+	case domain.FieldTypeFile, domain.FieldTypeRows:
+		// A file identifier and a list of rows are not names. A record without a
+		// readable name says so instead of printing an id (ADR 0018).
+		return ""
+	case domain.FieldTypeSelect:
+		// A choice is stored as its value; a person reads its label (ADR 0016).
+		stored := fmt.Sprintf("%v", value)
+		for _, option := range preferred.Options {
+			if option.Value == stored {
+				return strings.TrimSpace(option.Label)
+			}
+		}
+		return ""
+	case domain.FieldTypeNumber:
+		return strings.TrimSpace(strings.TrimSuffix(fmt.Sprintf("%v", value), ".0"))
 	default:
 		return strings.TrimSpace(fmt.Sprintf("%v", value))
 	}

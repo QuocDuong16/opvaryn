@@ -35,25 +35,42 @@ const objectRecordSelect = `
 //
 // It expects $2 = scope.All, $3 = scope.DepartmentKey, $4 = scope.UserID and a
 // record alias `r` in scope.
-const recordVisibleToScope = `(
-	   $2::boolean
-	OR r.department_key = $3
-	OR r.created_by = $4
+var recordVisibleToScope = recordVisibleToScopeAt(2)
+
+// recordVisibleToScopeAt is the same rule with the placeholders starting at $base, so a
+// query whose own parameters are few does not have to leave a gap in the numbering.
+func recordVisibleToScopeAt(base int) string {
+	return fmt.Sprintf(`(
+	   $%d::boolean
+	OR r.department_key = $%d
+	OR r.created_by = $%d
 	OR EXISTS (
 	       SELECT 1
 	         FROM process_instances i
 	         JOIN process_tasks t ON t.instance_id = i.id AND t.status = 'open'
-	         JOIN user_roles ur ON ur.user_id = $4 AND ur.role = t.assignee_role
+	         JOIN user_roles ur ON ur.user_id = $%d AND ur.role = t.assignee_role
 	        WHERE i.record_id = r.id
 	   )
-	)`
+	)`, base, base+1, base+2, base+2)
+}
 
 // objectRecordFilter narrows one object's records to what the scope may see and to a search
 // term. $1 is the object, $2..$4 are the scope (see recordVisibleToScope) and $5 the search
 // term: an empty term matches everything, and a non-empty one looks inside the stored values.
-const objectRecordFilter = `
+//
+// Only the values are searched, never the field names: searching for "amount" must find the
+// records that hold that amount, not every record that has an amount field.
+//
+// The search reads the typed projection (`record_field_values`), not the raw JSONB: a field
+// that is filtered gets a projection instead of being expanded at query time (AGENTS.md), and
+// the projection's index serves the lookup.
+var objectRecordFilter = `
 		 WHERE r.object_id = $1 AND ` + recordVisibleToScope + `
-		   AND ($5 = '' OR r.values::text ILIKE '%' || $5 || '%')`
+		   AND ($5 = '' OR EXISTS (
+		         SELECT 1 FROM record_field_values f
+		          WHERE f.record_id = r.id
+		            AND (f.text_value ILIKE '%' || $5 || '%' ESCAPE '\'
+		                 OR f.number_value::text ILIKE '%' || $5 || '%' ESCAPE '\')))`
 
 // ListObjectRecords returns one page of the records of one object that the scope may see,
 // newest first, with the total behind the page.
@@ -64,17 +81,18 @@ func (s *Store) ListObjectRecords(
 	query string,
 	page domain.Page,
 ) (domain.Paged[domain.ObjectRecord], error) {
+	term := likeTerm(query)
 	var total int
 	if err := s.pool.QueryRow(ctx,
 		`SELECT count(*) FROM business_object_records r`+objectRecordFilter,
-		objectID, scope.All, scope.DepartmentKey, scope.UserID, query).Scan(&total); err != nil {
+		objectID, scope.All, scope.DepartmentKey, scope.UserID, term).Scan(&total); err != nil {
 		return domain.Paged[domain.ObjectRecord]{}, classify(fmt.Errorf("count object records: %w", err))
 	}
 
 	rows, err := s.pool.Query(ctx, objectRecordSelect+objectRecordFilter+`
 		 ORDER BY r.created_at DESC, r.id
 		 LIMIT $6 OFFSET $7`,
-		objectID, scope.All, scope.DepartmentKey, scope.UserID, query, page.Limit, page.Offset)
+		objectID, scope.All, scope.DepartmentKey, scope.UserID, term, page.Limit, page.Offset)
 	if err != nil {
 		return domain.Paged[domain.ObjectRecord]{}, classify(fmt.Errorf("query object records: %w", err))
 	}
@@ -451,13 +469,15 @@ func (s *Store) ListOpenTasksForRoles(
 	query string,
 	page domain.Page,
 ) (domain.Paged[domain.InboxItem], error) {
+	term := likeTerm(query)
 	const filter = `
 		  JOIN process_instances i ON i.id = t.instance_id
 		  JOIN process_definitions d ON d.id = i.definition_id
 		  JOIN process_definition_versions v ON v.id = i.definition_version_id
 		  JOIN user_roles ur ON ur.user_id = $1 AND ur.role = t.assignee_role
 		 WHERE t.status = 'open'
-		   AND ($2 = '' OR t.title ILIKE '%' || $2 || '%' OR d.name ILIKE '%' || $2 || '%')`
+		   AND ($2 = '' OR t.title ILIKE '%' || $2 || '%' ESCAPE '\'
+		        OR d.name ILIKE '%' || $2 || '%' ESCAPE '\')`
 	const columns = `
 		SELECT t.id, t.instance_id, t.node_key, t.title, t.assignee_role, t.attempt,
 		       t.status, t.reason, t.decided_by, t.created_at, t.decided_at,
@@ -468,13 +488,13 @@ func (s *Store) ListOpenTasksForRoles(
 
 	var total int
 	if err := s.pool.QueryRow(ctx,
-		`SELECT count(*) FROM process_tasks t`+filter, userID, query).Scan(&total); err != nil {
+		`SELECT count(*) FROM process_tasks t`+filter, userID, term).Scan(&total); err != nil {
 		return domain.Paged[domain.InboxItem]{}, classify(fmt.Errorf("count inbox tasks: %w", err))
 	}
 
 	rows, err := s.pool.Query(ctx, columns+filter+`
 		 ORDER BY t.created_at, t.id
-		 LIMIT $3 OFFSET $4`, userID, query, page.Limit, page.Offset)
+		 LIMIT $3 OFFSET $4`, userID, term, page.Limit, page.Offset)
 	if err != nil {
 		return domain.Paged[domain.InboxItem]{}, classify(fmt.Errorf("query inbox tasks: %w", err))
 	}

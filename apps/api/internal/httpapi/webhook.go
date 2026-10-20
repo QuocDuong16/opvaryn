@@ -18,7 +18,7 @@ func handleListWebhookDeliveries(webhooks *service.Webhooks, log *slog.Logger) h
 			return
 		}
 
-		opts, err := listQuery(r)
+		opts, err := listPageQuery(r)
 		if err != nil {
 			writeError(w, log, http.StatusBadRequest, codeInvalidRequest, err.Error())
 			return

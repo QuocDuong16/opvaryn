@@ -134,6 +134,7 @@ type webhookStore interface {
 	MarkWebhookFailed(ctx context.Context, id uuid.UUID, statusCode *int, reason string, nextAttemptAt time.Time, final bool) error
 	ListWebhookDeliveriesPage(
 		ctx context.Context,
+		scope domain.RecordScope,
 		page domain.Page,
 	) (domain.Paged[domain.WebhookDelivery], error)
 }
@@ -189,7 +190,7 @@ func (w *Webhooks) RecentDeliveries(
 	if err != nil {
 		return domain.Paged[domain.WebhookDelivery]{}, err
 	}
-	return w.store.ListWebhookDeliveriesPage(ctx, opts.Page)
+	return w.store.ListWebhookDeliveriesPage(ctx, domain.RecordScopeFor(principal), opts.Page)
 }
 
 // Run drains the queue until the context is cancelled. It is started by the server and

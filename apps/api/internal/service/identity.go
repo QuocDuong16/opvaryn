@@ -419,6 +419,10 @@ func (s *Identity) SetPassword(ctx context.Context, email string, password strin
 	if err := s.store.UpdatePassword(ctx, user.ID, hash); err != nil {
 		return domain.User{}, err
 	}
+	// The wait was the wrong password. A new password ends it (ADR 0028).
+	if err := s.store.ClearLoginFailures(ctx, user.Email); err != nil {
+		return domain.User{}, fmt.Errorf("clear login failures: %w", err)
+	}
 	user.PasswordHash = ""
 	return user, nil
 }

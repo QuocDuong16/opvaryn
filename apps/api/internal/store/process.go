@@ -47,7 +47,8 @@ const processInstanceSelect = `
 // processDefinitionSearch matches the key or the name of a definition; an empty term is
 // "no filter".
 const processDefinitionSearch = `
-		 WHERE ($1 = '' OR d.key ILIKE '%' || $1 || '%' OR d.name ILIKE '%' || $1 || '%')`
+		 WHERE ($1 = '' OR d.key ILIKE '%' || $1 || '%' ESCAPE '\'
+		    OR d.name ILIKE '%' || $1 || '%' ESCAPE '\')`
 
 // ListProcessDefinitions returns one page of definitions ordered by key, with the total
 // behind the page.
@@ -56,6 +57,7 @@ func (s *Store) ListProcessDefinitions(
 	query string,
 	page domain.Page,
 ) (domain.Paged[domain.ProcessDefinition], error) {
+	term := likeTerm(query)
 	var total int
 	if err := s.pool.QueryRow(ctx, `SELECT count(*) FROM process_definitions d`+processDefinitionSearch,
 		query).Scan(&total); err != nil {
@@ -64,7 +66,7 @@ func (s *Store) ListProcessDefinitions(
 
 	rows, err := s.pool.Query(ctx, processDefinitionSelect+processDefinitionSearch+`
 		 ORDER BY d.key
-		 LIMIT $2 OFFSET $3`, query, page.Limit, page.Offset)
+		 LIMIT $2 OFFSET $3`, term, page.Limit, page.Offset)
 	if err != nil {
 		return domain.Paged[domain.ProcessDefinition]{}, classify(fmt.Errorf("query process definitions: %w", err))
 	}

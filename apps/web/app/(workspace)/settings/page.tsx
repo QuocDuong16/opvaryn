@@ -305,17 +305,29 @@ export default async function SettingsPage() {
           <CardDescription>
             Hợp đồng đầy đủ nằm ở <code>apps/api/openapi/openapi.yaml</code>.
           </CardDescription>
-          <ul className="mt-4 space-y-2 text-sm">
-            {ENDPOINTS.map((endpoint) => (
-              <li key={`${endpoint.method} ${endpoint.path}`} className="flex items-baseline gap-3">
-                <span className="w-10 shrink-0 font-mono text-xs text-accent-strong">
-                  {endpoint.method}
-                </span>
-                <span className="font-mono text-xs">{endpoint.path}</span>
-                <span className="text-xs text-on-surface-muted">{endpoint.purpose}</span>
-              </li>
+          <div className="mt-4 space-y-5 text-sm">
+            {endpointGroups().map((group) => (
+              <section key={group.title}>
+                <h3 className="text-xs font-semibold tracking-wide text-on-surface-muted uppercase">
+                  {group.title}
+                </h3>
+                <ul className="mt-2 space-y-2">
+                  {group.items.map((endpoint) => (
+                    <li
+                      key={`${endpoint.method} ${endpoint.path}`}
+                      className="flex items-baseline gap-3"
+                    >
+                      <span className="w-14 shrink-0 font-mono text-xs whitespace-nowrap text-accent-strong">
+                        {endpoint.method}
+                      </span>
+                      <span className="font-mono text-xs">{endpoint.path}</span>
+                      <span className="text-xs text-on-surface-muted">{endpoint.purpose}</span>
+                    </li>
+                  ))}
+                </ul>
+              </section>
             ))}
-          </ul>
+          </div>
         </Card>
 
         <Card>
