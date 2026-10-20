@@ -92,7 +92,8 @@ func run() error {
 	}
 	defer st.Close()
 
-	identity := service.NewIdentity(st)
+	// The CLI never signs anybody in, so it needs no key for the second step.
+	identity := service.NewIdentity(st, service.NewTwoFactor(st, nil))
 
 	switch {
 	case *createDepartment:

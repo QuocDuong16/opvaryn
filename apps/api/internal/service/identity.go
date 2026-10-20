@@ -169,15 +169,13 @@ type Identity struct {
 }
 
 // NewIdentity returns an Identity service using local password auth.
-func NewIdentity(st identityStore) *Identity {
-	return &Identity{store: st, provider: &LocalProvider{users: st}, now: time.Now}
-}
-
-// WithTwoFactor attaches the second step of a login (ADR 0030). Without it, a sign-in
-// needs the password alone.
-func (s *Identity) WithTwoFactor(twoFactor *TwoFactor) *Identity {
-	s.twoFactor = twoFactor
-	return s
+//
+// The second step of a sign-in (ADR 0030) is part of the service, not an option: an
+// identity that could be built without it would let a two-step account in on its password
+// alone. A caller that does not sign anybody in (the CLI) passes a two-step service without
+// a key.
+func NewIdentity(st identityStore, twoFactor *TwoFactor) *Identity {
+	return &Identity{store: st, provider: &LocalProvider{users: st}, twoFactor: twoFactor, now: time.Now}
 }
 
 // NewUserInput is an administrator creating one user.
