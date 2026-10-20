@@ -188,8 +188,7 @@ export default async function TasksPage({ searchParams }: PageProps) {
                   </p>
                   <h2 className="mt-1.5 text-base font-semibold tracking-tight">
                     <Link href={`/tasks/${item.instance.id}`} className="hover:text-accent-strong">
-                      {item.recordName ??
-                        labelOrKey(objectNames[item.instance.objectKey], item.instance.objectKey)}
+                      {item.recordName ?? 'Bản ghi chưa có tên hiển thị'}
                     </Link>
                   </h2>
                   <p className="mt-1 text-xs text-on-surface-muted">

@@ -63,7 +63,7 @@ export default async function WorkflowDetailPage({ params, searchParams }: PageP
         { definitionKey: key },
         { limit: INSTANCES_PER_PAGE, offset: instanceOffset },
       ),
-      api.listRoles().then((page) => page.data),
+      api.listRoles({ limit: 100 }).then((page) => page.data),
       api.getBusinessObject(definition.objectKey).catch(() => null),
       api.getMe().catch(() => null),
     ]);

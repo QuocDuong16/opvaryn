@@ -155,6 +155,8 @@ const STATUS_LEGEND: readonly { kind: StatusKind; body: string }[] = [
 interface Overview {
   me: Me | null;
   inbox: InboxItem[];
+  /** How many open tasks the person has, behind the few the page shows. */
+  inboxTotal: number;
   instances: ProcessInstanceSummary[];
   /** Definition key to its name, so a run is named rather than keyed. */
   definitionNames: Record<string, string>;
@@ -176,6 +178,7 @@ async function loadOverview(): Promise<Overview> {
       return {
         me: null,
         inbox: [],
+        inboxTotal: 0,
         instances: [],
         definitionNames: {},
         error: 'Phiên làm việc đã hết hạn.',
@@ -187,6 +190,7 @@ async function loadOverview(): Promise<Overview> {
       inbox: [],
       instances: [],
       definitionNames: {},
+      inboxTotal: 0,
       error: describeApiError(cause),
       inboxFailed: true,
     };
@@ -198,14 +202,16 @@ async function loadOverview(): Promise<Overview> {
   const [inboxResult, instancesResult] = await Promise.all([
     api
       .listInboxTasks({ limit: RECENT_LIMIT })
-      .then((page) => page.data)
+      .then((page) => ({ items: page.data, total: page.total }))
       .catch(() => null),
     api
       .listProcessInstances({}, { limit: RECENT_LIMIT })
       .then((page) => page.data)
       .catch(() => null),
   ]);
-  const inbox = inboxResult ?? [];
+  const inbox = inboxResult?.items ?? [];
+  // The badge counts every open task, not only the few the page shows.
+  const inboxTotal = inboxResult?.total ?? 0;
   const instances = instancesResult ?? [];
   const inboxFailed = inboxResult === null;
 
@@ -216,12 +222,12 @@ async function loadOverview(): Promise<Overview> {
     .data;
   const definitionNames = Object.fromEntries(definitions.map((item) => [item.key, item.name]));
 
-  return { me, inbox, instances, definitionNames, error: null, inboxFailed };
+  return { me, inbox, inboxTotal, instances, definitionNames, error: null, inboxFailed };
 }
 
 export default async function OverviewPage() {
   const [overview, advanced] = await Promise.all([loadOverview(), getAdvancedMode()]);
-  const { me, inbox, instances, definitionNames, error, inboxFailed } = overview;
+  const { me, inbox, inboxTotal, instances, definitionNames, error, inboxFailed } = overview;
   const showAdvanced = advancedVisible(isAdmin(me?.roles), advanced);
 
   if (!me) {
@@ -267,7 +273,7 @@ export default async function OverviewPage() {
             </CardDescription>
           </div>
           <span className="rounded-full border border-warning/40 px-2.5 py-0.5 text-xs font-medium text-warning">
-            {inbox.length} việc
+            {inboxTotal} việc
           </span>
         </div>
 
@@ -281,7 +287,7 @@ export default async function OverviewPage() {
           </p>
         ) : (
           <ul className="mt-4 divide-y divide-border">
-            {inbox.slice(0, RECENT_LIMIT).map((item) => (
+            {inbox.map((item) => (
               <li key={item.task.id}>
                 <Link
                   href={`/tasks/${item.instance.id}`}
@@ -300,12 +306,12 @@ export default async function OverviewPage() {
           </ul>
         )}
 
-        {inbox.length > RECENT_LIMIT ? (
+        {inboxTotal > inbox.length ? (
           <Link
             href="/tasks"
             className="mt-4 inline-block text-sm font-medium text-accent-strong hover:underline"
           >
-            Xem tất cả {inbox.length} việc →
+            Xem tất cả {inboxTotal} việc →
           </Link>
         ) : null}
       </Card>

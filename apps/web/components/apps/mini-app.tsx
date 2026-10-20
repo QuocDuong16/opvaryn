@@ -290,7 +290,10 @@ function KanbanView({ app, statusFieldKey }: { app: MiniAppData; statusFieldKey?
                   key={record.id}
                   className="rounded-lg border border-border bg-surface-raised px-3 py-2 text-sm"
                 >
-                  {primaryFieldValue(app.object.fields, record)}
+                  {primaryFieldValue(
+                    fieldsForVersionNumber(app.versions, record.objectVersion),
+                    record,
+                  )}
                 </li>
               ))}
               {column.records.length === 0 ? (

@@ -96,6 +96,10 @@ export function primaryFieldValue(
   if (!preferred) {
     return 'Bản ghi chưa có tên';
   }
+  if (preferred.type === 'file' || preferred.type === 'rows') {
+    // A file identifier and a list of rows are not names — the same rule the API applies.
+    return 'Bản ghi chưa có tên';
+  }
   const rendered = formatFieldValue(preferred, record.values[preferred.key]);
   return rendered === '—' ? 'Bản ghi chưa có tên' : rendered;
 }

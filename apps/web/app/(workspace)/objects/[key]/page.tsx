@@ -106,7 +106,7 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
       // The role names are a nicety: a role nobody has named still reads as its key, so a
       // failed read must not take the screen down with it.
       api
-        .listRoles()
+        .listRoles({ limit: 100 })
         .then((page) => page.data)
         .catch(() => []),
       api.getMe().catch(() => null),
@@ -463,7 +463,7 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
               <StartInstanceForm
                 definitions={usableDefinitions}
                 records={pickerRecords}
-                fields={object.fields}
+                versions={versions}
                 recordId={recordId || undefined}
                 query={runQuery}
                 total={pickerTotal}

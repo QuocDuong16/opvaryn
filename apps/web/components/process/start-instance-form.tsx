@@ -2,9 +2,10 @@
 
 import { useActionState } from 'react';
 import { useFormStatus } from 'react-dom';
-import type { ObjectRecord } from '@opvaryn/contracts';
+import type { BusinessObjectVersion, ObjectRecord } from '@opvaryn/contracts';
 
 import { startProcessInstanceAction } from '@/app/(workspace)/objects/actions';
+import { fieldsForVersionNumber } from '@/components/objects/record-grouping';
 import { INITIAL_START_INSTANCE_STATE } from '@/components/process/start-instance-state';
 import { primaryFieldValue } from '@/lib/format';
 
@@ -21,7 +22,7 @@ const SELECT_CLASS =
 export function StartInstanceForm({
   definitions,
   records,
-  fields,
+  versions,
   recordId,
   query,
   total,
@@ -29,8 +30,8 @@ export function StartInstanceForm({
 }: {
   definitions: readonly { key: string; name: string }[];
   records: readonly ObjectRecord[];
-  /** The definition fields used to label a record in the picker. */
-  fields: Parameters<typeof primaryFieldValue>[0];
+  /** The published versions, so a record is named with the schema it has (ADR 0006). */
+  versions: readonly BusinessObjectVersion[];
   /** The record to preselect: the screen arrived from that record's own row. */
   recordId?: string;
   /** The term the picker is filtered by; the API does the filtering. */
@@ -89,7 +90,7 @@ export function StartInstanceForm({
           >
             {records.map((record) => (
               <option key={record.id} value={record.id}>
-                {primaryFieldValue(fields, record)}
+                {primaryFieldValue(fieldsForVersionNumber(versions, record.objectVersion), record)}
               </option>
             ))}
           </select>
