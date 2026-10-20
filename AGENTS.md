@@ -99,6 +99,12 @@ Working agreement for agents and contributors in this repository.
   Every record write appends to `record_audit` in the same transaction: action, actor snapshot,
   and only the fields whose values changed; the history has no foreign key to the record, is read
   with the record's scope, and no endpoint modifies it (ADR 0027).
+  Two-step verification for administrator accounts is opt-in per account and lives in the
+  `/admin` area (ADR 0030): a TOTP secret (RFC 6238) sealed with AES-GCM under
+  `TOTP_ENCRYPTION_KEY`, single-use recovery codes shown once, and a reset path for a lost
+  device (`POST /api/v1/admin/users/{userId}/two-factor/reset`, `useradm -reset-2fa`). The
+  second step is only asked for after the password was right, so it never says whether an
+  address exists; a wrong code counts like a wrong password.
   Sign-in failures are counted per address: 5 failures in 15 minutes trigger a 15-minute cooldown
   that answers exactly like a wrong password; success clears the count, an administrator lifts it
   from the `/admin` area (`POST /api/v1/admin/users/{userId}/unlock`, ADR 0029) and `useradm

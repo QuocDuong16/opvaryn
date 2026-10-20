@@ -14,6 +14,7 @@
 //	useradm -prune-orphan-attachments
 //	useradm -unlock -email lan@example.com
 //	useradm -list-lockouts
+//	useradm -reset-2fa -email lan@example.com
 //	useradm -prune-login-failures
 //	useradm -list
 package main
@@ -53,6 +54,8 @@ func run() error {
 		unlock       = flag.Bool("unlock", false, "clear the sign-in cooldown of an address")
 		listLockouts = flag.Bool("list-lockouts", false,
 			"list the addresses that are waiting out a sign-in cooldown")
+		resetTwoFactor = flag.Bool("reset-2fa", false,
+			"turn the two-step verification of an account off (the device was lost)")
 		pruneFailures = flag.Bool("prune-login-failures", false,
 			"delete sign-in failures older than the cooldown window")
 		setRoleLabel = flag.Bool("set-role-label", false, "name a role for the interface")
@@ -175,6 +178,16 @@ func run() error {
 		}
 		return nil
 
+	case *resetTwoFactor:
+		if *email == "" {
+			return fmt.Errorf("reset-2fa needs -email")
+		}
+		if err := identity.ResetTwoFactor(ctx, *email); err != nil {
+			return err
+		}
+		fmt.Printf("turned the two-step verification of %s off\n", service.NormalizeEmail(*email))
+		return nil
+
 	case *pruneFailures:
 		removed, err := identity.PruneLoginFailures(ctx, service.LoginFailureWindow)
 		if err != nil {
@@ -196,7 +209,7 @@ func run() error {
 
 	default:
 		flag.Usage()
-		return fmt.Errorf("nothing to do: pass -create, -add-role, -set-password, -create-department, -set-role-label, -prune-sessions, -prune-orphan-attachments, -unlock, -list-lockouts, -prune-login-failures or -list")
+		return fmt.Errorf("nothing to do: pass -create, -add-role, -set-password, -create-department, -set-role-label, -prune-sessions, -prune-orphan-attachments, -unlock, -list-lockouts, -reset-2fa, -prune-login-failures or -list")
 	}
 }
 

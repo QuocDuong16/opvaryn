@@ -97,8 +97,21 @@ func handleLogin(identity *service.Identity, secureCookies bool, log *slog.Logge
 			return
 		}
 
-		token, user, err := identity.Login(r.Context(), body.Email, body.Password)
+		token, user, err := identity.Login(
+			r.Context(), body.Email, body.Password, stringValue(body.Code))
 		if err != nil {
+			if errors.Is(err, service.ErrTwoFactorRequired) {
+				// The password was right and the second step is missing: the form asks
+				// for the code (ADR 0030).
+				writeError(w, log, http.StatusUnauthorized, codeTwoFactorRequired,
+					"the authenticator app code is required")
+				return
+			}
+			if errors.Is(err, service.ErrTwoFactorInvalid) {
+				writeError(w, log, http.StatusUnauthorized, codeTwoFactorInvalid,
+					"the authenticator app code does not match")
+				return
+			}
 			if errors.Is(err, service.ErrInvalidCredentials) {
 				// The address is logged without the password; the response is the
 				// same for an unknown email and a wrong password.

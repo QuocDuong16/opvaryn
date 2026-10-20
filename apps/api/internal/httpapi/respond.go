@@ -32,8 +32,12 @@ const (
 	codeInUse          = "in_use"
 	codeForbidden      = "forbidden"
 	codeUnauthorized   = "unauthorized"
-	codeUnavailable    = "service_unavailable"
-	codeInternal       = "internal_error"
+	// The second step of a sign-in (ADR 0030). These two only appear after the password
+	// was right, so they never say whether an address exists.
+	codeTwoFactorRequired = "two_factor_required"
+	codeTwoFactorInvalid  = "two_factor_invalid"
+	codeUnavailable       = "service_unavailable"
+	codeInternal          = "internal_error"
 )
 
 // parseUUIDParam reads a path parameter as a UUID. A malformed identifier is a

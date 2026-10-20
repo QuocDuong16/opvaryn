@@ -105,10 +105,16 @@ for _ in $(seq 1 20); do
   sleep 0.5
 done
 
+# The key that seals the two-step secret (ADR 0030) is generated for this run only:
+# a committed literal would read as a hardcoded secret to the secret scanners, and a
+# test key has no reason to be stable.
+totp_key="$(head -c 32 /dev/urandom | base64)"
+
 echo "smoke: starting the API (outbound webhook pointed at the receiver)"
 OPVARYN_WEBHOOK_URL="http://127.0.0.1:$receiver_port/" \
   OPVARYN_WEBHOOK_SECRET="smoke-webhook-secret" \
   OPVARYN_WEBHOOK_MAX_ATTEMPTS=3 \
+  TOTP_ENCRYPTION_KEY="$totp_key" \
   "$api_dir/bin/server" >"$log_file" 2>&1 &
 server_pid=$!
 
@@ -1049,6 +1055,55 @@ admin_user_id="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1])
 admin_user_jar="$smoke_tmp_dir/adminuser.cookies"
 status="$(login_as "$admin_user_jar" "$admin_user_email" "$admin_user_password")"
 [[ "$status" == "200" ]] || fail "the account created through the API could not sign in (status $status)"
+
+echo "smoke: two-step verification (ADR 0030)"
+status="$(request_as "$admin_jar" GET /api/v1/me/two-factor)"
+[[ "$status" == "200" ]] || fail "reading the two-step state returned $status, expected 200"
+grep -q '"enabled":false' "$body_file" || fail "an account without the second step must report it"
+
+# The administrator enrols an authenticator app: the secret comes once, the app's code
+# switches the second step on, and the recovery codes come once.
+status="$(request_as "$admin_jar" POST /api/v1/me/two-factor)"
+[[ "$status" == "200" ]] || fail "setting up the second step returned $status, expected 200"
+totp_secret="$(python3 -c 'import json, sys; print(json.load(open(sys.argv[1]))["secret"])' "$body_file")"
+[[ -n "$totp_secret" ]] || fail "the setup did not hand out a secret"
+totp_code="$(python3 - "$totp_secret" <<'TOTP'
+import base64, hashlib, hmac, struct, sys, time
+
+secret = base64.b32decode(sys.argv[1] + "=" * ((8 - len(sys.argv[1]) % 8) % 8))
+counter = struct.pack(">Q", int(time.time()) // 30)
+digest = hmac.new(secret, counter, hashlib.sha1).digest()
+offset = digest[-1] & 0x0F
+value = struct.unpack(">I", digest[offset:offset + 4])[0] & 0x7FFFFFFF
+print(f"{value % 1000000:06d}")
+TOTP
+)"
+status="$(request_as "$admin_jar" POST /api/v1/me/two-factor/enable "{\"code\":\"$totp_code\"}")"
+[[ "$status" == "200" ]] || fail "enabling the second step returned $status, expected 200"
+python3 - "$body_file" <<'PY' || fail "the recovery codes are missing"
+import json, sys
+
+codes = json.load(open(sys.argv[1], encoding="utf-8"))["recoveryCodes"]
+if len(codes) != 8:
+    sys.exit(f"expected 8 recovery codes, got {len(codes)}")
+PY
+
+# From now on the sign-in needs the code as well.
+status="$(login_as "$smoke_tmp_dir/twofactor.cookies" "$admin_email" "$smoke_password")"
+[[ "$status" == "401" ]] || fail "a sign-in without the code returned $status, expected 401"
+grep -q '"code":"two_factor_required"' "$body_file" ||
+  fail "the sign-in must ask for the code"
+
+# And the right code opens the session.
+status="$(request_as "$admin_jar" POST /api/v1/auth/login \
+  "$(printf '{"email":"%s","password":"%s","code":"%s"}' "$admin_email" "$smoke_password" "$totp_code")")"
+[[ "$status" == "200" ]] || fail "a sign-in with the code returned $status, expected 200"
+
+# The administrator turns it off again for their own account.
+status="$(request_as "$admin_jar" POST /api/v1/me/two-factor/disable "{\"code\":\"$totp_code\"}")"
+[[ "$status" == "204" ]] || fail "turning the second step off returned $status, expected 204"
+status="$(request_as "$admin_jar" GET /api/v1/me/two-factor)"
+grep -q '"enabled":false' "$body_file" || fail "the second step is still on"
 
 echo "smoke: repeated failures trigger the cooldown, and the API and the CLI lift it"
 for _ in 1 2 3 4 5; do

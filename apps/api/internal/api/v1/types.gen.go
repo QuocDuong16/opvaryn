@@ -708,6 +708,13 @@ type InstanceCounts struct {
 
 // LoginRequest defines model for LoginRequest.
 type LoginRequest struct {
+	// Code The code of the authenticator app, when the account has the second step switched
+	// on (ADR 0030). A recovery code works here too, once.
+	//
+	//
+	// Example: 123456
+	Code *string `json:"code,omitempty"`
+
 	// Email Example: lan@example.com
 	Email string `json:"email"`
 
@@ -1198,6 +1205,33 @@ type StartProcessInstanceRequest struct {
 	RecordId      openapi_types.UUID `json:"recordId"`
 }
 
+// TwoFactorCodeRequest defines model for TwoFactorCodeRequest.
+type TwoFactorCodeRequest struct {
+	// Code The code of the authenticator app, or one of the recovery codes.
+	Code string `json:"code"`
+}
+
+// TwoFactorEnabled defines model for TwoFactorEnabled.
+type TwoFactorEnabled struct {
+	// RecoveryCodes Single-use codes, shown once. Keep them where the passwords are kept.
+	RecoveryCodes []string `json:"recoveryCodes"`
+}
+
+// TwoFactorSetup defines model for TwoFactorSetup.
+type TwoFactorSetup struct {
+	// Secret The shared secret, in base32. Type it into the authenticator app.
+	Secret string `json:"secret"`
+
+	// Uri The link an authenticator app reads.
+	Uri string `json:"uri"`
+}
+
+// TwoFactorStatus defines model for TwoFactorStatus.
+type TwoFactorStatus struct {
+	// Enabled Whether the second step is switched on for this account.
+	Enabled bool `json:"enabled"`
+}
+
 // UpdateAdminDepartmentRequest defines model for UpdateAdminDepartmentRequest.
 type UpdateAdminDepartmentRequest struct {
 	// Name Example: Kỹ thuật và hạ tầng
@@ -1552,6 +1586,12 @@ type UpdateObjectRecordJSONRequestBody = CreateObjectRecordRequest
 
 // ChangeMyPasswordJSONRequestBody defines body for ChangeMyPassword for application/json ContentType.
 type ChangeMyPasswordJSONRequestBody = ChangeMyPasswordRequest
+
+// DisableMyTwoFactorJSONRequestBody defines body for DisableMyTwoFactor for application/json ContentType.
+type DisableMyTwoFactorJSONRequestBody = TwoFactorCodeRequest
+
+// EnableMyTwoFactorJSONRequestBody defines body for EnableMyTwoFactor for application/json ContentType.
+type EnableMyTwoFactorJSONRequestBody = TwoFactorCodeRequest
 
 // CreateMetricDefinitionJSONRequestBody defines body for CreateMetricDefinition for application/json ContentType.
 type CreateMetricDefinitionJSONRequestBody = CreateMetricDefinitionRequest

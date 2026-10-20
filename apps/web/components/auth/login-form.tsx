@@ -51,6 +51,26 @@ export function LoginForm({ next = '' }: { next?: string }) {
           />
         </div>
 
+        {state.twoFactorRequired ? (
+          <div>
+            <label htmlFor="login-code" className="text-xs font-medium tracking-wide uppercase">
+              Mã xác thực
+            </label>
+            <input
+              id="login-code"
+              name="code"
+              type="text"
+              inputMode="numeric"
+              autoComplete="one-time-code"
+              placeholder="6 chữ số trong ứng dụng xác thực"
+              className={INPUT_CLASS}
+            />
+            <p className="mt-1.5 text-xs text-on-surface-muted">
+              Mở ứng dụng xác thực để lấy mã. Nếu mất điện thoại, dùng một mã cứu hộ.
+            </p>
+          </div>
+        ) : null}
+
         <SubmitButton />
 
         {state.status === 'error' && state.message ? (

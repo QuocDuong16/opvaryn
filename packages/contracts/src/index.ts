@@ -97,6 +97,9 @@ export type WebhookDeliveryList = components['schemas']['WebhookDeliveryList'];
 export type ErrorResponse = components['schemas']['ErrorResponse'];
 /** The signed-in user with roles and department. */
 export type Me = components['schemas']['Me'];
+export type TwoFactorStatus = components['schemas']['TwoFactorStatus'];
+export type TwoFactorSetup = components['schemas']['TwoFactorSetup'];
+export type TwoFactorEnabled = components['schemas']['TwoFactorEnabled'];
 /** Request body for changing the signed-in user's own password. */
 export type ChangeMyPasswordRequest = components['schemas']['ChangeMyPasswordRequest'];
 /** One entry of a record's append-only history. */
@@ -174,6 +177,18 @@ export interface ApiClient {
   listInboxTasks(query?: PageQuery): Promise<Paged<InboxItem>>;
   /** Role keys held by at least one user: what the workflow designer offers. */
   listRoles(query?: PageQuery): Promise<Paged<RoleEntry>>;
+  /** Whether the signed-in account has the second step of a sign-in switched on (ADR 0030). */
+  getMyTwoFactor(): Promise<TwoFactorStatus>;
+  /** Makes a fresh shared secret for the authenticator app. */
+  setupMyTwoFactor(): Promise<TwoFactorSetup>;
+  /** Switches the second step on and hands out the recovery codes. */
+  enableMyTwoFactor(code: string): Promise<TwoFactorEnabled>;
+  /** Switches the second step off. */
+  disableMyTwoFactor(code: string): Promise<void>;
+  /** Whether one account has the second step switched on. */
+  getAdminUserTwoFactor(userId: string): Promise<TwoFactorStatus>;
+  /** Turns the second step off for one account: the way back in when the device was lost. */
+  resetAdminUserTwoFactor(userId: string): Promise<void>;
   listAdminUsers(query?: PageQuery): Promise<Paged<AdminUser>>;
   getAdminUser(userId: string): Promise<AdminUser>;
   createAdminUser(input: CreateAdminUserRequest): Promise<AdminUser>;
@@ -357,6 +372,30 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
     async listInboxTasks(query) {
       return request<Paged<InboxItem>>(`/api/v1/tasks${pageParams(query)}`);
     },
+
+    getMyTwoFactor: () => request<TwoFactorStatus>('/api/v1/me/two-factor'),
+
+    setupMyTwoFactor: () => request<TwoFactorSetup>('/api/v1/me/two-factor', { method: 'POST' }),
+
+    enableMyTwoFactor: (code) =>
+      request<TwoFactorEnabled>('/api/v1/me/two-factor/enable', {
+        method: 'POST',
+        body: { code },
+      }),
+
+    disableMyTwoFactor: (code) =>
+      request<void>('/api/v1/me/two-factor/disable', {
+        method: 'POST',
+        body: { code },
+      }),
+
+    getAdminUserTwoFactor: (userId) =>
+      request<TwoFactorStatus>(`/api/v1/admin/users/${encodeURIComponent(userId)}/two-factor`),
+
+    resetAdminUserTwoFactor: (userId) =>
+      request<void>(`/api/v1/admin/users/${encodeURIComponent(userId)}/two-factor/reset`, {
+        method: 'POST',
+      }),
 
     async listRoles(query) {
       return request<Paged<RoleEntry>>(`/api/v1/roles${pageParams(query)}`);

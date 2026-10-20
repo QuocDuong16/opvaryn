@@ -16,6 +16,7 @@ import {
   RevokeSessionsForm,
   UnlockSignInForm,
 } from '@/components/admin/security-forms';
+import { ResetTwoFactorForm, TwoFactorForm } from '@/components/admin/two-factor-form';
 import { UserForm } from '@/components/admin/user-form';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
@@ -46,10 +47,11 @@ export default async function AdminUserPage({
   let departments: AdminDepartment[] = [];
   let roles: AdminRole[] = [];
   let me: Me | null = null;
+  let twoFactorEnabled = false;
   let error: string | null = null;
 
+  const api = createServerApiClient();
   try {
-    const api = createServerApiClient();
     const [loaded, departmentPage, rolePage, signedIn] = await Promise.all([
       api.getAdminUser(id),
       api.listAdminDepartments({ limit: 100 }),
@@ -79,6 +81,13 @@ export default async function AdminUserPage({
     roleNames.set(key, label);
   }
   const isSelf = user.id === me.id;
+  // The second step: for the signed-in person it is their own, for somebody else the
+  // administration area reads it through the admin endpoint.
+  twoFactorEnabled = (
+    await (isSelf ? api.getMyTwoFactor() : api.getAdminUserTwoFactor(user.id)).catch(() => ({
+      enabled: false,
+    }))
+  ).enabled;
   // The unlock control only appears while the account is waiting: a control that cannot do
   // anything is not rendered (ADR 0021). A disabled account is not waiting for anything.
   const cooldown = cooldownState(user.lockedUntil);
@@ -102,6 +111,19 @@ export default async function AdminUserPage({
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1.6fr)_minmax(18rem,1fr)]">
         <UserForm mode="edit" departments={departments} roles={roles} user={user} isSelf={isSelf} />
         <div className="space-y-6">
+          {isSelf ? <TwoFactorForm enabled={twoFactorEnabled} /> : null}
+          {!isSelf && twoFactorEnabled ? (
+            <Card>
+              <CardTitle>Xác thực hai bước</CardTitle>
+              <CardDescription>
+                Người này bật xác thực hai bước. Gỡ nó khi họ mất thiết bị — mật khẩu của họ vẫn giữ
+                nguyên.
+              </CardDescription>
+              <div className="mt-4">
+                <ResetTwoFactorForm userId={user.id} label={user.name} />
+              </div>
+            </Card>
+          ) : null}
           {wasUnlocked ? (
             <Card>
               <CardTitle>Đã mở khoá đăng nhập</CardTitle>

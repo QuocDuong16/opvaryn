@@ -121,6 +121,76 @@ export async function unlockAdminUserAction(
   redirect(`/admin/users/${userId}?unlocked=1`);
 }
 
+// ---------------------------------------------------------- two factor ----
+
+/**
+ * Two-step verification (ADR 0030). The secret is handed out once, here, and the recovery
+ * codes once, when the second step is switched on.
+ */
+export async function setupMyTwoFactorAction(): Promise<AdminActionState> {
+  try {
+    const setup = await createServerApiClient().setupMyTwoFactor();
+    revalidatePath(`/admin/users`);
+    return {
+      status: 'success',
+      message: 'Nhập khoá bí mật dưới đây vào ứng dụng xác thực, rồi nhập mã để bật.',
+      twoFactorSecret: setup.secret,
+      twoFactorUri: setup.uri,
+    };
+  } catch (cause) {
+    return failure(cause);
+  }
+}
+
+export async function enableMyTwoFactorAction(
+  _previous: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const code = field(formData, 'code');
+  try {
+    const enabled = await createServerApiClient().enableMyTwoFactor(code);
+    revalidatePath(`/admin/users`);
+    return {
+      status: 'success',
+      message: 'Đã bật xác thực hai bước. Lưu các mã cứu hộ dưới đây, chúng chỉ hiện một lần.',
+      recoveryCodes: enabled.recoveryCodes,
+    };
+  } catch (cause) {
+    return failure(cause);
+  }
+}
+
+export async function disableMyTwoFactorAction(
+  _previous: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const code = field(formData, 'code');
+  try {
+    await createServerApiClient().disableMyTwoFactor(code);
+    revalidatePath(`/admin/users`);
+    return { status: 'success', message: 'Đã tắt xác thực hai bước cho tài khoản này.' };
+  } catch (cause) {
+    return failure(cause);
+  }
+}
+
+export async function resetAdminUserTwoFactorAction(
+  _previous: AdminActionState,
+  formData: FormData,
+): Promise<AdminActionState> {
+  const userId = field(formData, 'userId');
+  try {
+    await createServerApiClient().resetAdminUserTwoFactor(userId);
+    revalidatePath(`/admin/users/${userId}`);
+    return {
+      status: 'success',
+      message: 'Đã gỡ xác thực hai bước của người này. Họ có thể bật lại bất cứ lúc nào.',
+    };
+  } catch (cause) {
+    return failure(cause);
+  }
+}
+
 // ----------------------------------------------------------- departments ----
 
 export async function createAdminDepartmentAction(

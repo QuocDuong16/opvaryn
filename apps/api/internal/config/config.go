@@ -2,6 +2,7 @@
 package config
 
 import (
+	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -25,6 +26,11 @@ type Config struct {
 	WebhookSecret      string        `env:"OPVARYN_WEBHOOK_SECRET"`
 	WebhookTimeout     time.Duration `env:"OPVARYN_WEBHOOK_TIMEOUT" envDefault:"5s"`
 	WebhookMaxAttempts int           `env:"OPVARYN_WEBHOOK_MAX_ATTEMPTS" envDefault:"5"`
+
+	// Two-step verification for administrators (ADR 0030). The key encrypts the shared
+	// secret at rest: 32 bytes, base64. An empty key means the feature is not configured
+	// on this server, and the setup endpoint says so instead of storing a secret in clear.
+	TOTPEncryptionKey string `env:"TOTP_ENCRYPTION_KEY"`
 }
 
 // Load reads configuration from the environment, applying demo defaults so the
@@ -53,7 +59,38 @@ func (c Config) validate() error {
 	case c.WebhookURL != "" && c.WebhookTimeout <= 0:
 		return fmt.Errorf("OPVARYN_WEBHOOK_TIMEOUT must be positive, got %s", c.WebhookTimeout)
 	}
+	if c.TOTPEncryptionKey != "" {
+		if _, err := decodeEncryptionKey(c.TOTPEncryptionKey); err != nil {
+			return fmt.Errorf("TOTP_ENCRYPTION_KEY: %w", err)
+		}
+	}
 	return nil
+}
+
+// decodeEncryptionKey reads the base64 key that encrypts the two-step secret at rest.
+func decodeEncryptionKey(value string) ([]byte, error) {
+	decoded, err := base64.StdEncoding.DecodeString(value)
+	if err != nil {
+		return nil, fmt.Errorf("must be base64: %w", err)
+	}
+	if len(decoded) != 32 {
+		return nil, fmt.Errorf("must decode to 32 bytes, got %d", len(decoded))
+	}
+	return decoded, nil
+}
+
+// TwoFactorKey returns the key that seals the two-step secret at rest (ADR 0030). It is
+// empty when the feature is not configured on this server.
+func (c Config) TwoFactorKey() []byte {
+	if c.TOTPEncryptionKey == "" {
+		return nil
+	}
+	key, err := decodeEncryptionKey(c.TOTPEncryptionKey)
+	if err != nil {
+		// Load already refused a broken key, so this cannot happen at runtime.
+		return nil
+	}
+	return key
 }
 
 // IsDevelopment reports whether the server runs in development mode.

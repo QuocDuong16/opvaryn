@@ -598,6 +598,102 @@ paths:
       responses:
         '204':
           description: The session is gone (an unknown session is not an error)
+  /api/v1/me/two-factor:
+    get:
+      operationId: getMyTwoFactor
+      tags: [identity]
+      summary: Whether this account has the second step switched on
+      description: |
+        Two-step verification (ADR 0030). The check is for the signed-in person, so a screen
+        can say what is missing without asking for a code.
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: The state of the second step
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TwoFactorStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+    post:
+      operationId: setupMyTwoFactor
+      tags: [identity]
+      summary: Prepare the second step
+      description: |
+        Makes a fresh shared secret and returns it once, together with the link an
+        authenticator app reads. The secret is stored sealed, but the second step is not in
+        use until the person proves the app works with `enableMyTwoFactor`.
+      security:
+        - sessionCookie: []
+      responses:
+        '200':
+          description: The secret to type into the app
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TwoFactorSetup'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/me/two-factor/enable:
+    post:
+      operationId: enableMyTwoFactor
+      tags: [identity]
+      summary: Switch the second step on
+      description: |
+        Checks the code the app produced and, when it matches, switches the second step on
+        and hands out the single-use recovery codes — shown once, here.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorCodeRequest'
+      responses:
+        '200':
+          description: The recovery codes, shown once
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TwoFactorEnabled'
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/me/two-factor/disable:
+    post:
+      operationId: disableMyTwoFactor
+      tags: [identity]
+      summary: Switch the second step off
+      description: |
+        Checks the code of the app, or one of the recovery codes, and switches the second
+        step off.
+      security:
+        - sessionCookie: []
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: '#/components/schemas/TwoFactorCodeRequest'
+      responses:
+        '204':
+          description: The second step is off
+        '400':
+          $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
   /api/v1/me:
     get:
       operationId: getMe
@@ -883,6 +979,55 @@ paths:
           description: The account can sign in again
         '400':
           $ref: '#/components/responses/BadRequest'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/admin/users/{userId}/two-factor:
+    get:
+      operationId: getAdminUserTwoFactor
+      tags: [administration]
+      summary: Whether one account has the second step switched on
+      description: |
+        What the administration screen needs to decide whether to offer the reset (ADR 0030).
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '200':
+          description: The state of the second step
+          content:
+            application/json:
+              schema:
+                $ref: '#/components/schemas/TwoFactorStatus'
+        '401':
+          $ref: '#/components/responses/Unauthorized'
+        '403':
+          $ref: '#/components/responses/Forbidden'
+        '404':
+          $ref: '#/components/responses/NotFound'
+        '503':
+          $ref: '#/components/responses/ServiceUnavailable'
+  /api/v1/admin/users/{userId}/two-factor/reset:
+    post:
+      operationId: resetAdminUserTwoFactor
+      tags: [administration]
+      summary: Turn the second step off for one account
+      description: |
+        The way back in when a person lost the device (ADR 0030). The account keeps its
+        password; only the second step is removed. The person can switch it on again.
+      security:
+        - sessionCookie: []
+      parameters:
+        - $ref: '#/components/parameters/UserId'
+      responses:
+        '204':
+          description: The second step is off
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2762,6 +2907,46 @@ components:
           type: string
           minLength: 1
           example: correct horse battery staple
+        code:
+          type: string
+          description: |
+            The code of the authenticator app, when the account has the second step switched
+            on (ADR 0030). A recovery code works here too, once.
+          example: "123456"
+    TwoFactorStatus:
+      type: object
+      required: [enabled]
+      properties:
+        enabled:
+          type: boolean
+          description: Whether the second step is switched on for this account.
+    TwoFactorSetup:
+      type: object
+      required: [secret, uri]
+      properties:
+        secret:
+          type: string
+          description: The shared secret, in base32. Type it into the authenticator app.
+        uri:
+          type: string
+          description: The link an authenticator app reads.
+    TwoFactorEnabled:
+      type: object
+      required: [recoveryCodes]
+      properties:
+        recoveryCodes:
+          type: array
+          description: Single-use codes, shown once. Keep them where the passwords are kept.
+          items:
+            type: string
+    TwoFactorCodeRequest:
+      type: object
+      required: [code]
+      properties:
+        code:
+          type: string
+          minLength: 1
+          description: The code of the authenticator app, or one of the recovery codes.
     Me:
       type: object
       required: [id, email, name, department, departmentName, roles, roleLabels]
