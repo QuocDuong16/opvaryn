@@ -117,7 +117,9 @@ func (s *ObjectRecords) Import(
 		if len(rowProblems) > 0 {
 			continue
 		}
-		if problem := validateRecordValues(object, values); len(problem) > 0 {
+		// An import has no browser form, so the external catalogues are not consulted:
+		// the values are checked against the definition.
+		if problem := validateRecordValues(object, values, nil); len(problem) > 0 {
 			for _, item := range problem {
 				rowErrors = append(rowErrors, ImportRowError{
 					Row: line, Message: replaceFieldKeys(object, item),

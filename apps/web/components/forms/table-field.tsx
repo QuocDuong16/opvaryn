@@ -19,25 +19,32 @@ interface Row {
 export function TableField({
   field,
   defaultValue,
+  onChange,
 }: {
   field: FieldDefinition;
   defaultValue?: unknown;
+  /** The rows the person has entered, so a condition can read them. */
+  onChange?: (rows: unknown) => void;
 }) {
   const columns = field.columns ?? [];
   const [rows, setRows] = useState<Row[]>(() => rowsFromValue(defaultValue));
 
+  // The rows are reported upwards, so a condition can read them (ADR 0032).
+  function apply(next: Row[]) {
+    setRows(next);
+    onChange?.(next);
+  }
+
   function update(rowIndex: number, columnKey: string, value: string) {
-    setRows((current) =>
-      current.map((row, index) => (index === rowIndex ? { ...row, [columnKey]: value } : row)),
-    );
+    apply(rows.map((row, index) => (index === rowIndex ? { ...row, [columnKey]: value } : row)));
   }
 
   function addRow() {
-    setRows((current) => [...current, {}]);
+    apply([...rows, {}]);
   }
 
   function removeRow(rowIndex: number) {
-    setRows((current) => current.filter((_, index) => index !== rowIndex));
+    apply(rows.filter((_, index) => index !== rowIndex));
   }
 
   return (

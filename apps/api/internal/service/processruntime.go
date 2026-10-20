@@ -626,7 +626,7 @@ func (r *ProcessRuntime) taskWithDeadline(
 		task.Priority = node.Priority
 	}
 	if r.policies != nil && objectKey != "" {
-		policy, err := r.policies.Get(ctx, domain.Principal{}, objectKey)
+		policy, err := r.policies.lookup(ctx, objectKey)
 		if err == nil {
 			if hours <= 0 {
 				hours = policy.DefaultDueHours
@@ -711,7 +711,7 @@ func EvaluateCondition(condition domain.ProcessCondition, values map[string]any)
 }
 
 func equalValues(actual any, literal any) bool {
-	if a, ok := numberLiteral(actual); ok {
+	if a, ok := numberFromForm(actual); ok {
 		if b, ok := numberLiteral(literal); ok {
 			return a == b
 		}
@@ -721,7 +721,7 @@ func equalValues(actual any, literal any) bool {
 }
 
 func compareValues(actual any, literal any, op string) bool {
-	if a, ok := numberLiteral(actual); ok {
+	if a, ok := numberFromForm(actual); ok {
 		b, ok := numberLiteral(literal)
 		if !ok {
 			return false

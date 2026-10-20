@@ -253,6 +253,9 @@ func validateComputedField(
 	if expression == "" {
 		return []string{fmt.Sprintf("%s.formula: must not be empty", where)}
 	}
+	if len(expression) > maxFormulaLength {
+		return []string{fmt.Sprintf("%s.formula: must be at most %d characters", where, maxFormulaLength)}
+	}
 	keys, err := formula.Fields(expression)
 	if err != nil {
 		return []string{fmt.Sprintf("%s.formula: %v", where, err)}
@@ -272,10 +275,9 @@ func validateComputedField(
 			problems = append(problems, fmt.Sprintf("%s.formula: reads itself", where))
 			continue
 		}
-		if other.Type == domain.FieldTypeText || other.Type == domain.FieldTypeSelect ||
-			other.Type == domain.FieldTypeDate {
+		if other.Type != domain.FieldTypeNumber {
 			problems = append(problems,
-				fmt.Sprintf("%s.formula: %q is a text field, so it cannot be used in an expression", where, key))
+				fmt.Sprintf("%s.formula: %q is not a number field, so it cannot be used in an expression", where, key))
 		}
 	}
 	return problems
@@ -356,6 +358,9 @@ func validateVisibleWhen(
 		return []string{fmt.Sprintf("%s.visibleWhen.op: %q is not a comparison", where, condition.Op)}
 	}
 }
+
+// maxFormulaLength bounds the expression of a computed field (ADR 0032).
+const maxFormulaLength = 500
 
 // maxTableColumns bounds the columns of a table field (ADR 0032).
 const maxTableColumns = 12

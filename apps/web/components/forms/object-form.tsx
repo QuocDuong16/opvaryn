@@ -64,6 +64,7 @@ export function ObjectForm({
           attachmentNames={record?.attachmentNames}
           visible={evaluateCondition(field.visibleWhen, values)}
           lookupOptions={lookupOptions[field.key]}
+          value={values[field.key]}
           onValueChange={(value) => setValues((current) => ({ ...current, [field.key]: value }))}
         />
       ))}
@@ -107,6 +108,7 @@ function FieldControl({
   attachmentNames,
   visible,
   lookupOptions,
+  value,
   onValueChange,
 }: {
   field: FieldDefinition;
@@ -117,6 +119,8 @@ function FieldControl({
   visible: boolean;
   /** The options from an external catalogue, when the field takes them from there. */
   lookupOptions?: { value: string; label: string }[];
+  /** What the person has entered so far; the conditions are read from it. */
+  value: unknown;
   onValueChange: (value: unknown) => void;
 }) {
   const controlId = `field-${field.key}`;
@@ -142,7 +146,11 @@ function FieldControl({
     return (
       <div>
         <label className="text-xs font-medium tracking-wide uppercase">{field.label}</label>
-        <TableField field={field} defaultValue={defaultValue} />
+        <TableField
+          field={field}
+          defaultValue={defaultValue}
+          onChange={(rows) => onValueChange(rows)}
+        />
       </div>
     );
   }
@@ -171,7 +179,15 @@ function FieldControl({
           />
         </div>
       ) : (
-        renderControl(field, controlId, describedBy, defaultValue, lookupOptions)
+        renderControl(
+          field,
+          controlId,
+          describedBy,
+          defaultValue,
+          lookupOptions,
+          value,
+          onValueChange,
+        )
       )}
 
       {/* The key stays in the API payload; a person filling the form needs the rule, not
@@ -239,10 +255,16 @@ function renderControl(
   field: FieldDefinition,
   controlId: string,
   describedBy: string,
-  defaultValue?: unknown,
-  lookupOptions?: { value: string; label: string }[],
+  defaultValue: unknown,
+  lookupOptions: { value: string; label: string }[] | undefined,
+  value: unknown,
+  onValueChange: (value: unknown) => void,
 ) {
   const initial = defaultValueFor(field, defaultValue);
+  // The control is driven by the form's own state, so a condition that reads another
+  // field re-evaluates the moment that field changes (ADR 0032).
+  const current = value === undefined || value === null ? initial : String(value);
+  const onInput = (next: string) => onValueChange(next);
 
   switch (field.type) {
     case 'number':
@@ -252,7 +274,8 @@ function renderControl(
           name={field.key}
           type="number"
           step="any"
-          defaultValue={initial}
+          value={current}
+          onChange={(event) => onInput(event.target.value)}
           aria-describedby={describedBy}
           className={INPUT_CLASS}
         />
@@ -264,7 +287,8 @@ function renderControl(
           id={controlId}
           name={field.key}
           type="date"
-          defaultValue={initial}
+          value={current}
+          onChange={(event) => onInput(event.target.value)}
           aria-describedby={describedBy}
           className={INPUT_CLASS}
         />
@@ -284,7 +308,8 @@ function renderControl(
         <select
           id={controlId}
           name={field.key}
-          defaultValue={initial}
+          value={current}
+          onChange={(event) => onInput(event.target.value)}
           aria-describedby={describedBy}
           className={INPUT_CLASS}
         >
@@ -304,7 +329,8 @@ function renderControl(
           id={controlId}
           name={field.key}
           rows={3}
-          defaultValue={initial}
+          value={current}
+          onChange={(event) => onInput(event.target.value)}
           placeholder={'Mỗi dòng một mục'}
           aria-describedby={describedBy}
           className={`${INPUT_CLASS} font-mono text-xs`}
@@ -317,7 +343,8 @@ function renderControl(
           id={controlId}
           name={field.key}
           rows={2}
-          defaultValue={initial}
+          value={current}
+          onChange={(event) => onInput(event.target.value)}
           aria-describedby={describedBy}
           className={INPUT_CLASS}
         />

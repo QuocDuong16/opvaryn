@@ -36,6 +36,12 @@ func (w *WorkPolicies) Get(
 	if err := requireAuthenticated(principal); err != nil {
 		return domain.WorkPolicy{}, err
 	}
+	return w.lookup(ctx, objectKey)
+}
+
+// lookup reads the policy of one kind of work. It does not ask who is asking: the engine
+// reads the policy when it creates a task, and there is no caller there (ADR 0035).
+func (w *WorkPolicies) lookup(ctx context.Context, objectKey string) (domain.WorkPolicy, error) {
 	key := strings.TrimSpace(objectKey)
 	if !KeyPattern.MatchString(key) {
 		return domain.WorkPolicy{}, &ValidationError{Problems: []string{

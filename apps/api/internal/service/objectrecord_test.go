@@ -50,6 +50,13 @@ type fakeRecordStore struct {
 	auditPage domain.Paged[domain.RecordAudit]
 }
 
+func (f *fakeRecordStore) ListLookupSources(
+	context.Context,
+	string,
+) ([]domain.LookupSource, error) {
+	return nil, nil
+}
+
 func (f *fakeRecordStore) GetBusinessObjectByKey(context.Context, string) (domain.BusinessObject, error) {
 	if f.err != nil {
 		return domain.BusinessObject{}, f.err

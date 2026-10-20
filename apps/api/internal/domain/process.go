@@ -210,6 +210,9 @@ type EscalationCandidate struct {
 	DueInWorkingHours int
 	DueAt             time.Time
 	Priority          string
+	// ObjectKey is the kind of work the step belongs to; the policy of that kind decides
+	// who takes it over when the step names nobody (ADR 0035).
+	ObjectKey string
 }
 
 // ProcessEventType enumerates the append-only audit trail (ADR 0007 §10).

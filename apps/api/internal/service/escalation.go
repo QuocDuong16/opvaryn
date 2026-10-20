@@ -39,6 +39,7 @@ type escalationStore interface {
 type Escalation struct {
 	store        escalationStore
 	workingHours *WorkingHours
+	policies     *WorkPolicies
 	log          *slog.Logger
 	now          func() time.Time
 }
@@ -47,9 +48,16 @@ type Escalation struct {
 func NewEscalation(
 	st escalationStore,
 	hours *WorkingHours,
+	policies *WorkPolicies,
 	log *slog.Logger,
 ) *Escalation {
-	return &Escalation{store: st, workingHours: hours, log: log, now: time.Now}
+	return &Escalation{
+		store:        st,
+		workingHours: hours,
+		policies:     policies,
+		log:          log,
+		now:          time.Now,
+	}
 }
 
 // Run looks for overdue tasks until the context is cancelled. It is started by the server
@@ -81,6 +89,18 @@ func (e *Escalation) RunOnce(ctx context.Context) (int, error) {
 
 	escalated := 0
 	for _, candidate := range candidates {
+		// Who takes over: the role the step names, or else the role of the policy of
+		// its kind of work (ADR 0035).
+		takesOver := candidate.EscalateToRole
+		if takesOver == "" && e.policies != nil && candidate.ObjectKey != "" {
+			if policy, err := e.policies.lookup(ctx, candidate.ObjectKey); err == nil {
+				takesOver = policy.EscalationRole
+			}
+		}
+		if takesOver == "" || takesOver == candidate.CurrentRole {
+			// Nobody to hand it over to: the step stays late and is reported.
+			continue
+		}
 		// The role that takes over gets a fresh window of the same length: the step is
 		// still late, but the person who takes it over has time to work on it.
 		var dueAt *time.Time
@@ -94,7 +114,7 @@ func (e *Escalation) RunOnce(ctx context.Context) (int, error) {
 			}
 		}
 		if err := e.store.EscalateProcessTask(
-			ctx, candidate, candidate.EscalateToRole, dueAt, now); err != nil {
+			ctx, candidate, takesOver, dueAt, now); err != nil {
 			return escalated, fmt.Errorf("escalate task %s: %w", candidate.TaskID, err)
 		}
 		escalated++

@@ -1,6 +1,6 @@
 'use client';
 
-import { useMemo, useState, type ReactNode } from 'react';
+import { useState, type ReactNode } from 'react';
 import type {
   AppConfig,
   BusinessObject,
@@ -69,11 +69,6 @@ export function MiniApp({ apps }: { apps: readonly MiniAppData[] }) {
 
   const app = apps.find((item) => item.object.key === appKey) ?? apps[0];
   const activeView = VIEWS.find((item) => item.kind === view) ?? VIEWS[0];
-
-  const statusField = useMemo(
-    () => app?.object.fields.find((field) => field.type === 'select'),
-    [app],
-  );
 
   if (!app) {
     return null;

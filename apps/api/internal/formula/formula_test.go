@@ -2,6 +2,7 @@ package formula
 
 import (
 	"math"
+	"strings"
 	"testing"
 )
 
@@ -106,5 +107,25 @@ func TestFieldsListsWhatTheExpressionReads(t *testing.T) {
 		if !found[key] {
 			t.Fatalf("the expression reads %q, but the fields are %v", key, keys)
 		}
+	}
+}
+
+// A huge expression is refused, not parsed: the cost of a definition must stay small.
+func TestEvaluateRefusesAHugeExpression(t *testing.T) {
+	t.Parallel()
+
+	huge := strings.Repeat("1 + ", 500) + "1"
+	if _, err := Evaluate(huge, Value{Fields: map[string]any{}}); err == nil {
+		t.Fatal("a huge expression must be refused")
+	}
+}
+
+// Only numbers can be read: a text field has no number to add.
+func TestEvaluateRefusesToAddText(t *testing.T) {
+	t.Parallel()
+
+	value := Value{Fields: map[string]any{"title": "Màn hình"}}
+	if _, err := Evaluate("title + 1", value); err == nil {
+		t.Fatal("adding a text must be refused")
 	}
 }

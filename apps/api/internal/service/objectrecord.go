@@ -23,6 +23,9 @@ const (
 // recordStore is the slice of the persistence layer this service needs.
 type recordStore interface {
 	GetBusinessObjectByKey(ctx context.Context, key string) (domain.BusinessObject, error)
+	// ListLookupSources tells which fields take their options from another system
+	// (ADR 0034); their values are not checked against the declared options.
+	ListLookupSources(ctx context.Context, objectKey string) ([]domain.LookupSource, error)
 	ListBusinessObjectVersions(ctx context.Context, objectID uuid.UUID) ([]domain.BusinessObjectVersion, error)
 	ListObjectRecords(
 		ctx context.Context,
@@ -185,7 +188,8 @@ func (s *ObjectRecords) Create(ctx context.Context, objectKey string, values map
 	}
 
 	prepared, problems := prepareValues(object, values)
-	if problems = append(problems, validateRecordValues(object, prepared)...); len(problems) > 0 {
+	lookupFields := s.lookupFields(ctx, object.Key)
+	if problems = append(problems, validateRecordValues(object, prepared, lookupFields)...); len(problems) > 0 {
 		return domain.ObjectRecord{}, &ValidationError{Problems: problems}
 	}
 
@@ -290,7 +294,8 @@ func (s *ObjectRecords) Update(
 		Fields: version.Fields,
 	}
 	prepared, problems := prepareValues(object, values)
-	if problems = append(problems, validateRecordValues(object, prepared)...); len(problems) > 0 {
+	lookupFields := s.lookupFields(ctx, object.Key)
+	if problems = append(problems, validateRecordValues(object, prepared, lookupFields)...); len(problems) > 0 {
 		return domain.ObjectRecord{}, &ValidationError{Problems: problems}
 	}
 	previous := record.Values
@@ -621,7 +626,11 @@ func (s *ObjectRecords) lookup(ctx context.Context, objectKey string) (domain.Bu
 
 // validateRecordValues checks every submitted key and value against the object's
 // field definitions and reports all problems at once, like definition validation.
-func validateRecordValues(object domain.BusinessObject, values map[string]any) []string {
+func validateRecordValues(
+	object domain.BusinessObject,
+	values map[string]any,
+	lookupFields map[string]bool,
+) []string {
 	problems := make([]string, 0, 2)
 
 	known := make(map[string]struct{}, len(object.Fields))
@@ -644,17 +653,50 @@ func validateRecordValues(object domain.BusinessObject, values map[string]any) [
 	for _, field := range object.Fields {
 		value, present := values[field.Key]
 		if !present || isAbsentValue(value) {
-			if field.Required {
+			// A field that is not shown is not part of the record, so it is not
+			// required either (ADR 0032).
+			if field.Required && !isHiddenField(field, values) {
 				problems = append(problems,
 					fmt.Sprintf("values.%s: required field %q is missing", field.Key, field.Label))
 			}
 			continue
 		}
-		if problem := validateFieldValue(field, value); problem != "" {
+		if problem := validateFieldValue(field, value, lookupFields); problem != "" {
 			problems = append(problems, problem)
 		}
 	}
 	return problems
+}
+
+// lookupFields answers which fields take their options from an external catalogue
+// (ADR 0034). A source that cannot be read leaves the field as it was: the values of the
+// definition still apply.
+func (s *ObjectRecords) lookupFields(ctx context.Context, objectKey string) map[string]bool {
+	fields := map[string]bool{}
+	sources, err := s.store.ListLookupSources(ctx, objectKey)
+	if err != nil {
+		return fields
+	}
+	for _, source := range sources {
+		fields[source.FieldKey] = true
+	}
+	return fields
+}
+
+// isHiddenField reports whether a field's condition keeps it out of the record.
+func isHiddenField(
+	field domain.FieldDefinition,
+	values map[string]any,
+) bool {
+	if field.VisibleWhen == nil {
+		return false
+	}
+	shown, _ := EvaluateCondition(domain.ProcessCondition{
+		Field: field.VisibleWhen.Field,
+		Op:    field.VisibleWhen.Op,
+		Value: field.VisibleWhen.Value,
+	}, values)
+	return !shown
 }
 
 // isAbsentValue decides whether a submitted value counts as not provided. It keeps
@@ -672,7 +714,11 @@ func isAbsentValue(value any) bool {
 	}
 }
 
-func validateFieldValue(field domain.FieldDefinition, value any) string {
+func validateFieldValue(
+	field domain.FieldDefinition,
+	value any,
+	lookupFields map[string]bool,
+) string {
 	where := "values." + field.Key
 
 	switch field.Type {
@@ -718,6 +764,12 @@ func validateFieldValue(field domain.FieldDefinition, value any) string {
 			if option.Value == chosen {
 				return ""
 			}
+		}
+		// A field that takes its options from an external catalogue (ADR 0034) has
+		// options the definition does not declare: the value is checked against the
+		// catalogue when it is saved, not against a list it never saw.
+		if lookupFields[field.Key] {
+			return ""
 		}
 		return fmt.Sprintf("%s: %q is not one of the declared options", where, chosen)
 
