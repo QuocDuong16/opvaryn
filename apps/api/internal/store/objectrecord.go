@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"time"
 
 	"github.com/google/uuid"
 	"github.com/jackc/pgx/v5"
@@ -153,6 +154,7 @@ func (s *Store) CreateObjectRecord(
 	bindings []domain.AttachmentBinding,
 	audit domain.RecordAudit,
 	admin bool,
+	writebacks []domain.LookupWriteback,
 ) (domain.ObjectRecord, error) {
 	created := record
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
@@ -166,7 +168,15 @@ func (s *Store) CreateObjectRecord(
 		if err := bindAttachmentsTx(ctx, tx, record.ID, record.ObjectKey, record.CreatedBy, admin, bindings); err != nil {
 			return err
 		}
-		return insertRecordAuditTx(ctx, tx, audit)
+		if err := insertRecordAuditTx(ctx, tx, audit); err != nil {
+			return err
+		}
+		// The write-backs this change owes are queued in the same transaction, so a
+		// crash cannot lose one that already happened (ADR 0037).
+		for i := range writebacks {
+			writebacks[i].RecordUpdatedAt = stored.UpdatedAt
+		}
+		return insertLookupWritebacksTx(ctx, tx, writebacks)
 	})
 	if err != nil {
 		return domain.ObjectRecord{}, objectRecordWriteError(err, record.ObjectID)
@@ -364,62 +374,44 @@ func (s *Store) UpdateObjectRecord(
 	editorID uuid.UUID,
 	audit domain.RecordAudit,
 	admin bool,
+	writebacks []domain.LookupWriteback,
 ) (domain.ObjectRecord, error) {
 	values, err := json.Marshal(record.Values)
 	if err != nil {
 		return domain.ObjectRecord{}, fmt.Errorf("encode values: %w", err)
 	}
 
+	var updatedAt time.Time
 	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
-		tag, err := tx.Exec(ctx, `
+		row := tx.QueryRow(ctx, `
 			UPDATE business_object_records
 			   SET values = $2, updated_at = now()
-			 WHERE id = $1 AND object_id = $3`,
+			 WHERE id = $1 AND object_id = $3
+			RETURNING updated_at`,
 			record.ID, values, record.ObjectID)
-		if err != nil {
+		if err := row.Scan(&updatedAt); err != nil {
+			if errors.Is(err, pgx.ErrNoRows) {
+				return fmt.Errorf("%w: record %s", ErrNotFound, record.ID)
+			}
 			return fmt.Errorf("update record values: %w", err)
 		}
-		if tag.RowsAffected() == 0 {
-			return fmt.Errorf("%w: record %s", ErrNotFound, record.ID)
-		}
 
-		if _, err := tx.Exec(ctx,
-			`DELETE FROM record_field_values WHERE record_id = $1`, record.ID); err != nil {
-			return fmt.Errorf("clear record projection: %w", err)
-		}
-		// The cells of a table are projected apart, so they are cleared apart too
-		// (ADR 0036).
-		if _, err := tx.Exec(ctx,
-			`DELETE FROM record_table_values WHERE record_id = $1`, record.ID); err != nil {
-			return fmt.Errorf("clear record table projection: %w", err)
-		}
-		for _, field := range projection {
-			var textValue, numberValue, dateValue any
-			switch field.Kind {
-			case domain.MetricNumber:
-				numberValue = field.Number
-			case domain.MetricDate:
-				dateValue = field.Date
-			default:
-				textValue = field.Text
-			}
-			if _, err := tx.Exec(ctx, `
-				INSERT INTO record_field_values
-				       (record_id, object_key, field_key, text_value, number_value, date_value)
-				VALUES ($1, $2, $3, $4, $5, $6)`,
-				record.ID, record.ObjectKey, field.FieldKey, textValue, numberValue, dateValue,
-			); err != nil {
-				return fmt.Errorf("project field %s: %w", field.FieldKey, err)
-			}
-		}
-		if err := insertTableValuesTx(ctx, tx, record, tableProjection); err != nil {
+		if err := rewriteProjectionTx(ctx, tx, record, projection, tableProjection); err != nil {
 			return err
 		}
 		if err := replaceAttachmentsTx(ctx, tx, record.ID, record.ObjectKey, editorID, admin,
 			fileFieldKeys, bindings); err != nil {
 			return err
 		}
-		return insertRecordAuditTx(ctx, tx, audit)
+		if err := insertRecordAuditTx(ctx, tx, audit); err != nil {
+			return err
+		}
+		// The write-backs this change owes are queued in the same transaction, so a
+		// crash cannot lose one that already happened (ADR 0037).
+		for i := range writebacks {
+			writebacks[i].RecordUpdatedAt = updatedAt
+		}
+		return insertLookupWritebacksTx(ctx, tx, writebacks)
 	})
 	if err != nil {
 		return domain.ObjectRecord{}, classify(err)
@@ -433,6 +425,90 @@ func (s *Store) UpdateObjectRecord(
 		return domain.ObjectRecord{}, fmt.Errorf("%w: record %s", ErrNotFound, record.ID)
 	}
 	return updated, nil
+}
+
+// rewriteProjectionTx writes the typed projection of one record: the fields that are
+// filtered, joined or measured, and the cells of its tables (ADR 0036).
+func rewriteProjectionTx(
+	ctx context.Context,
+	tx pgx.Tx,
+	record domain.ObjectRecord,
+	projection []domain.RecordFieldValue,
+	tableProjection []domain.RecordTableValue,
+) error {
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM record_field_values WHERE record_id = $1`, record.ID); err != nil {
+		return fmt.Errorf("clear record projection: %w", err)
+	}
+	// The cells of a table are projected apart, so they are cleared apart too
+	// (ADR 0036).
+	if _, err := tx.Exec(ctx,
+		`DELETE FROM record_table_values WHERE record_id = $1`, record.ID); err != nil {
+		return fmt.Errorf("clear record table projection: %w", err)
+	}
+	for _, field := range projection {
+		var textValue, numberValue, dateValue any
+		switch field.Kind {
+		case domain.MetricNumber:
+			numberValue = field.Number
+		case domain.MetricDate:
+			dateValue = field.Date
+		default:
+			textValue = field.Text
+		}
+		if _, err := tx.Exec(ctx, `
+			INSERT INTO record_field_values
+			       (record_id, object_key, field_key, text_value, number_value, date_value)
+			VALUES ($1, $2, $3, $4, $5, $6)`,
+			record.ID, record.ObjectKey, field.FieldKey, textValue, numberValue, dateValue,
+		); err != nil {
+			return fmt.Errorf("project field %s: %w", field.FieldKey, err)
+		}
+	}
+	return insertTableValuesTx(ctx, tx, record, tableProjection)
+}
+
+// ApplyObjectRecordValues writes the values an outside system answered with. The update
+// is conditional on the record still standing at the version the delivery was queued for:
+// if a person changed the record in the meantime, nothing is written and the caller is
+// told, so a correction never overwrites a person's work (ADR 0037).
+func (s *Store) ApplyObjectRecordValues(
+	ctx context.Context,
+	record domain.ObjectRecord,
+	projection []domain.RecordFieldValue,
+	tableProjection []domain.RecordTableValue,
+	expectedUpdatedAt time.Time,
+	audit domain.RecordAudit,
+) (bool, error) {
+	values, err := json.Marshal(record.Values)
+	if err != nil {
+		return false, fmt.Errorf("encode values: %w", err)
+	}
+
+	applied := false
+	err = pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
+		tag, err := tx.Exec(ctx, `
+			UPDATE business_object_records
+			   SET values = $2, updated_at = now()
+			 WHERE id = $1 AND object_id = $3 AND updated_at = $4`,
+			record.ID, values, record.ObjectID, expectedUpdatedAt)
+		if err != nil {
+			return fmt.Errorf("update record values: %w", err)
+		}
+		if tag.RowsAffected() == 0 {
+			// The record moved on while the delivery waited: nothing is written.
+			return nil
+		}
+		applied = true
+		if err := rewriteProjectionTx(ctx, tx, record, projection, tableProjection); err != nil {
+			return err
+		}
+		return insertRecordAuditTx(ctx, tx, audit)
+	})
+	if err != nil {
+		return false, classify(err)
+	}
+	return applied, nil
 }
 
 // DeleteObjectRecord removes a record no process has ever run on. A record with a process

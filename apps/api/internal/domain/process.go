@@ -170,7 +170,12 @@ type LookupSource struct {
 	ObjectKey string
 	FieldKey  string
 	URL       string
-	UpdatedAt time.Time
+	// WriteURL is where a record is written back to that system, and WriteFields
+	// are the fields it receives (ADR 0037). An empty WriteURL means the source is
+	// read-only, which is the default.
+	WriteURL    string
+	WriteFields []string
+	UpdatedAt   time.Time
 }
 
 // LookupOption is one option of an external catalogue.

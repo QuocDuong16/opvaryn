@@ -43,5 +43,6 @@ kéo dữ liệu của hệ thống khác vào.
   người dùng vẫn nhập được bằng tay.
 - Hình dạng JSON là hợp đồng: đổi nó là đổi hợp đồng, nên nó được ghi ở đây và trong
   `docs/ops-runbook.md`.
-- Chưa có tra cứu **hai chiều**: OPVARYN không ghi ngược lại hệ thống ngoài. Việc đó thuộc V2
-  cùng với tích hợp hai chiều đã nêu ở trang giới thiệu.
+- Chiều ghi của tra cứu — ghi ngược lại hệ thống ngoài — được chốt ở
+  [0037](0037-two-way-lookup-write-back.md): bất đồng bộ, có hàng đợi và thử lại, và bản sửa của
+  hệ thống ngoài chỉ được áp dụng khi bản ghi chưa ai sửa trong lúc chờ.

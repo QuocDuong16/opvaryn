@@ -116,6 +116,14 @@ Working agreement for agents and contributors in this repository.
   from the `/admin` area (`POST /api/v1/admin/users/{userId}/unlock`, ADR 0029) and `useradm
   -unlock` lifts it from the terminal when nobody can sign in (ADR 0028, which supersedes ADR
   0008's "lockout is a manual action").
+  A lookup source may also be written back to (ADR 0037): the write-back is queued in
+  `lookup_writebacks` **in the same transaction** as the record change, so the record is never
+  blocked by an outside system; a worker sends it with the same retry and signature as the
+  outbound webhook. A correction the outside system answers with is applied only while the
+  record still stands at the version the delivery was queued for — otherwise the delivery
+  becomes a `conflict` and a person decides. A correction may only touch the fields that were
+  sent, and it is never written back again. The payload and the answer are contracts: changing
+  their shape is a new ADR.
 
 ## Database and data safety
 

@@ -153,6 +153,33 @@ func (e HealthStatusStatus) Valid() bool {
 	}
 }
 
+// Defines values for LookupWritebackStatus.
+const (
+	LookupWritebackStatusConflict  LookupWritebackStatus = "conflict"
+	LookupWritebackStatusDelivered LookupWritebackStatus = "delivered"
+	LookupWritebackStatusFailed    LookupWritebackStatus = "failed"
+	LookupWritebackStatusPending   LookupWritebackStatus = "pending"
+	LookupWritebackStatusRejected  LookupWritebackStatus = "rejected"
+)
+
+// Valid indicates whether the value is a known member of the LookupWritebackStatus enum.
+func (e LookupWritebackStatus) Valid() bool {
+	switch e {
+	case LookupWritebackStatusConflict:
+		return true
+	case LookupWritebackStatusDelivered:
+		return true
+	case LookupWritebackStatusFailed:
+		return true
+	case LookupWritebackStatusPending:
+		return true
+	case LookupWritebackStatusRejected:
+		return true
+	default:
+		return false
+	}
+}
+
 // Defines values for MetaStage.
 const (
 	Demo       MetaStage = "demo"
@@ -416,19 +443,19 @@ func (e RecordHistoryEntryAction) Valid() bool {
 
 // Defines values for WebhookDeliveryStatus.
 const (
-	Delivered WebhookDeliveryStatus = "delivered"
-	Failed    WebhookDeliveryStatus = "failed"
-	Pending   WebhookDeliveryStatus = "pending"
+	WebhookDeliveryStatusDelivered WebhookDeliveryStatus = "delivered"
+	WebhookDeliveryStatusFailed    WebhookDeliveryStatus = "failed"
+	WebhookDeliveryStatusPending   WebhookDeliveryStatus = "pending"
 )
 
 // Valid indicates whether the value is a known member of the WebhookDeliveryStatus enum.
 func (e WebhookDeliveryStatus) Valid() bool {
 	switch e {
-	case Delivered:
+	case WebhookDeliveryStatusDelivered:
 		return true
-	case Failed:
+	case WebhookDeliveryStatusFailed:
 		return true
-	case Pending:
+	case WebhookDeliveryStatusPending:
 		return true
 	default:
 		return false
@@ -921,12 +948,50 @@ type LookupField struct {
 	FieldKey string         `json:"fieldKey"`
 	Options  []LookupOption `json:"options"`
 	Url      string         `json:"url"`
+
+	// WriteFields The fields that are sent to that system.
+	WriteFields *[]string `json:"writeFields,omitempty"`
+
+	// WriteUrl Where a record is written back to that system. Empty means the source is
+	// read-only (ADR 0037).
+	WriteUrl *string `json:"writeUrl,omitempty"`
 }
 
 // LookupOption defines model for LookupOption.
 type LookupOption struct {
 	Label string `json:"label"`
 	Value string `json:"value"`
+}
+
+// LookupWriteback defines model for LookupWriteback.
+type LookupWriteback struct {
+	Attempts    int                `json:"attempts"`
+	CreatedAt   time.Time          `json:"createdAt"`
+	DeliveredAt *time.Time         `json:"deliveredAt,omitempty"`
+	FieldKey    string             `json:"fieldKey"`
+	Id          openapi_types.UUID `json:"id"`
+
+	// LastError Why the delivery did not land, or why it was not applied.
+	LastError      *string               `json:"lastError,omitempty"`
+	LastStatusCode *int                  `json:"lastStatusCode,omitempty"`
+	NextAttemptAt  time.Time             `json:"nextAttemptAt"`
+	ObjectKey      string                `json:"objectKey"`
+	RecordId       openapi_types.UUID    `json:"recordId"`
+	Status         LookupWritebackStatus `json:"status"`
+}
+
+// LookupWritebackStatus defines model for LookupWriteback.Status.
+type LookupWritebackStatus string
+
+// LookupWritebackList defines model for LookupWritebackList.
+type LookupWritebackList struct {
+	// Data Newest first.
+	Data []LookupWriteback `json:"data"`
+
+	// Total Deliveries behind the page. A caller paginates with it instead of asking for everything.
+	//
+	// Example: 12
+	Total int `json:"total"`
 }
 
 // Me defines model for Me.
@@ -1674,10 +1739,26 @@ type ListAdminDepartmentsParams struct {
 	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
 }
 
+// ListLookupWritebacksParams defines parameters for ListLookupWritebacks.
+type ListLookupWritebacksParams struct {
+	// Limit How many deliveries to return, newest first (default 25, maximum 100).
+	Limit *int `form:"limit,omitempty" json:"limit,omitempty"`
+
+	// Offset Rows to skip.
+	Offset *int `form:"offset,omitempty" json:"offset,omitempty"`
+}
+
 // SaveLookupSourceJSONBody defines parameters for SaveLookupSource.
 type SaveLookupSourceJSONBody struct {
 	// Url The address of the catalogue; empty removes the source.
 	Url string `json:"url"`
+
+	// WriteFields The fields that are sent to that system.
+	WriteFields *[]string `json:"writeFields,omitempty"`
+
+	// WriteUrl Where a record is written back to that system; empty keeps the source
+	// read-only.
+	WriteUrl *string `json:"writeUrl,omitempty"`
 }
 
 // ListAdminRolesParams defines parameters for ListAdminRoles.

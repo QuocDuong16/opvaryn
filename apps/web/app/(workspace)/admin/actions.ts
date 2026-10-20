@@ -132,11 +132,21 @@ export async function saveLookupSourceAction(
   const objectKey = field(formData, 'objectKey');
   try {
     // The form carries one address per field, named `url-<field key>`, and the field keys
-    // in `field-objectKey`.
+    // in `field-objectKey`. A source may also name where a record is written back to and
+    // which fields it carries (ADR 0037).
     const fieldKeys = formData.getAll('field-objectKey').map((value) => String(value));
     for (const fieldKey of fieldKeys) {
       const url = field(formData, `url-${fieldKey}`);
-      await createServerApiClient().saveLookupSource(objectKey, fieldKey, url);
+      const writeUrl = field(formData, `writeUrl-${fieldKey}`);
+      const writeFields = formData
+        .getAll(`writeField-${fieldKey}`)
+        .map((value) => String(value))
+        .filter((value) => value !== '');
+      await createServerApiClient().saveLookupSource(objectKey, fieldKey, {
+        url,
+        writeUrl,
+        writeFields: writeUrl === '' ? [] : writeFields,
+      });
     }
     revalidatePath('/admin/lookups');
     return { status: 'success', message: 'Đã lưu nguồn tra cứu.' };

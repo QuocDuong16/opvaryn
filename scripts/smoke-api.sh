@@ -32,6 +32,10 @@ cleanup() {
     kill "$receiver_pid" 2>/dev/null || true
     wait "$receiver_pid" 2>/dev/null || true
   fi
+  if [[ -n "${lookup_receiver_pid:-}" ]] && kill -0 "$lookup_receiver_pid" 2>/dev/null; then
+    kill "$lookup_receiver_pid" 2>/dev/null || true
+    wait "$lookup_receiver_pid" 2>/dev/null || true
+  fi
   rm -f "$log_file" "$body_file" "$tmp_records"
   rm -rf "$smoke_tmp_dir"
 }
@@ -106,6 +110,20 @@ for _ in $(seq 1 20); do
   sleep 0.5
 done
 
+# A real receiver for the write-back of the two-way lookup (ADR 0037). It answers with a
+# correction, so the smoke can prove that a correction the outside system sends back is
+# applied — and that it is not applied when the record changed in the meantime.
+lookup_receiver_file="$smoke_tmp_dir/lookup-received.jsonl"
+lookup_receiver_port=21913
+python3 "$root_dir/scripts/lookup-receiver.py" "$lookup_receiver_file" "$lookup_receiver_port" &
+lookup_receiver_pid=$!
+for _ in $(seq 1 20); do
+  if curl -s -o /dev/null "http://127.0.0.1:$lookup_receiver_port/" 2>/dev/null; then
+    break
+  fi
+  sleep 0.5
+done
+
 # The key that seals the two-step secret (ADR 0030) is generated for this run only:
 # a committed literal would read as a hardcoded secret to the secret scanners, and a
 # test key has no reason to be stable.
@@ -115,6 +133,7 @@ echo "smoke: starting the API (outbound webhook pointed at the receiver)"
 OPVARYN_WEBHOOK_URL="http://127.0.0.1:$receiver_port/" \
   OPVARYN_WEBHOOK_SECRET="smoke-webhook-secret" \
   OPVARYN_WEBHOOK_MAX_ATTEMPTS=3 \
+  OPVARYN_LOOKUP_ALLOW_INTERNAL=true \
   TOTP_ENCRYPTION_KEY="$totp_key" \
   "$api_dir/bin/server" >"$log_file" 2>&1 &
 server_pid=$!
@@ -1485,6 +1504,163 @@ echo "smoke: GET /api/v1/does-not-exist (unknown route -> 404 envelope)"
 status="$(request GET /api/v1/does-not-exist)"
 [[ "$status" == "404" ]] || fail "unknown route returned $status, expected 404"
 grep -q '"code":"not_found"' "$body_file" || fail "unknown route did not return the not_found error code"
+
+echo "smoke: two-way lookup: the record is written back to the system it came from (ADR 0037)"
+# The logout test above ended the designer's session, so both accounts sign in again.
+status="$(login_as "$designer_jar" "$designer_email" "$smoke_password")"
+[[ "$status" == "200" ]] || fail "signing the designer in again returned $status"
+status="$(login_as "$admin_jar" "$admin_email" "$smoke_password")"
+[[ "$status" == "200" ]] || fail "signing the administrator in again returned $status"
+writeback_key="smoke_writeback_$stamp"
+status="$(request_as "$designer_jar" POST /api/v1/business-objects \
+  "$(printf '{"key":"%s","name":"Smoke ghi ngược","fields":[{"key":"amount","label":"Số tiền","type":"number"},{"key":"supplier","label":"Nhà cung cấp","type":"select","options":[{"value":"sup-01","label":"Công ty Một"}]},{"key":"note","label":"Ghi chú","type":"text"}]}' "$writeback_key")")"
+[[ "$status" == "201" ]] || fail "creating the write-back object returned $status, expected 201"
+
+# A field the definition does not have is refused before anything is stored.
+status="$(request_as "$admin_jar" PUT "/api/v1/admin/lookups/$writeback_key/supplier" \
+  "$(printf '{"url":"http://127.0.0.1:%s/","writeUrl":"http://127.0.0.1:%s/","writeFields":["khong_ton_tai"]}' "$lookup_receiver_port" "$lookup_receiver_port")")"
+[[ "$status" == "400" ]] || fail "a write-back naming a field the definition does not have returned $status, expected 400"
+
+# The source reads its options from the receiver, and records are written back to it.
+status="$(request_as "$admin_jar" PUT "/api/v1/admin/lookups/$writeback_key/supplier" \
+  "$(printf '{"url":"http://127.0.0.1:%s/","writeUrl":"http://127.0.0.1:%s/","writeFields":["supplier","amount"]}' "$lookup_receiver_port" "$lookup_receiver_port")")"
+[[ "$status" == "204" ]] || fail "attaching the source with a write-back returned $status, expected 204"
+
+status="$(request_as "$designer_jar" POST "/api/v1/business-objects/$writeback_key/records" \
+  '{"values":{"amount":1000,"supplier":"sup-01","note":"ghi chú đầu"}}')"
+[[ "$status" == "201" ]] || fail "creating the record returned $status, expected 201"
+writeback_record="$(python3 -c 'import json,sys; print(json.load(open(sys.argv[1]))["id"])' "$body_file")"
+
+# The delivery is queued with the record and sent by the worker.
+for _ in $(seq 1 30); do
+  status="$(request_as "$admin_jar" GET "/api/v1/admin/lookups/writebacks?limit=20")"
+  [[ "$status" == "200" ]] || fail "reading the write-back log returned $status"
+  if python3 - "$body_file" "$writeback_record" <<'PY'
+import json, sys
+
+rows = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+sys.exit(0 if any(r["recordId"] == sys.argv[2] and r["status"] == "delivered" for r in rows) else 1)
+PY
+  then
+    break
+  fi
+  sleep 1
+done
+python3 - "$body_file" "$writeback_record" <<'PY' || fail "the record was not written back to the outside system"
+import json, sys
+
+rows = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+mine = [r for r in rows if r["recordId"] == sys.argv[2]]
+if not any(r["status"] == "delivered" for r in mine):
+    sys.exit(f"no delivered write-back for the record: {mine}")
+print("smoke: the record was written back to the outside system")
+PY
+
+# The receiver got the record, signed, with the fields that were sent.
+python3 - "$lookup_receiver_file" "$writeback_record" <<'PY' || fail "the receiver did not get the record as the contract says"
+import hashlib, hmac, json, sys
+
+lines = [json.loads(line) for line in open(sys.argv[1], encoding="utf-8")]
+mine = [line for line in lines if json.loads(line["body"]).get("record", {}).get("id") == sys.argv[2]]
+if not mine:
+    sys.exit("the receiver did not get this record")
+line = mine[-1]
+payload = json.loads(line["body"])
+if payload.get("field") != "supplier":
+    sys.exit(f"the payload must name the lookup field: {payload}")
+if payload.get("values", {}).get("amount") != 1000:
+    sys.exit(f"the payload must carry the fields that are sent: {payload}")
+expected = "sha256=" + hmac.new(b"smoke-webhook-secret", line["body"].encode("utf-8"), hashlib.sha256).hexdigest()
+if line["signature"] != expected:
+    sys.exit(f"the signature does not match the body and the shared secret: {line['signature']!r}")
+print("smoke: the receiver got the record, signed, with the fields that were sent")
+PY
+
+# The correction the outside system answered with is applied to the record, and it is in
+# the record's own history.
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects/$writeback_key/records/$writeback_record")"
+[[ "$status" == "200" ]] || fail "reading the record returned $status"
+grep -q '"amount":1001' "$body_file" || fail "the correction of the outside system was not applied to the record"
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects/$writeback_key/records/$writeback_record/history")"
+[[ "$status" == "200" ]] || fail "reading the history returned $status"
+grep -q 'Hệ thống ngoài' "$body_file" || fail "the correction must be in the record's own history"
+
+# A change that touches no sent field is not told to the outside system.
+status="$(request_as "$designer_jar" PUT "/api/v1/business-objects/$writeback_key/records/$writeback_record" \
+  '{"values":{"amount":1001,"supplier":"sup-01","note":"ghi chú đổi"}}')"
+[[ "$status" == "200" ]] || fail "updating the record returned $status"
+sleep 7
+status="$(request_as "$admin_jar" GET "/api/v1/admin/lookups/writebacks?limit=20")"
+[[ "$status" == "200" ]] || fail "reading the write-back log returned $status"
+python3 - "$body_file" "$writeback_record" <<'PY' || fail "a change that touched no sent field was written back"
+import json, sys
+
+rows = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+mine = [r for r in rows if r["recordId"] == sys.argv[2]]
+if len(mine) != 1:
+    sys.exit(f"only the creation is written back, expected one delivery, got {len(mine)}")
+print("smoke: a change that touches no sent field is not written back")
+PY
+
+# A correction is not applied when the record changed while the delivery waited. The
+# delivery is queued in the database, standing for a record that was changed in between:
+# the row carries an older version of the record than the one it is about.
+stale_id="$(python3 -c 'import uuid; print(uuid.uuid4())')"
+stale_payload="$(python3 - "$stale_id" "$writeback_record" "$writeback_key" <<'PY'
+import json, sys
+
+print(json.dumps({
+    "deliveryId": sys.argv[1],
+    "occurredAt": "2026-01-01T00:00:00Z",
+    "action": "updated",
+    "actor": {"id": sys.argv[1], "name": "Smoke"},
+    "object": {"key": sys.argv[3], "version": 1},
+    "record": {"id": sys.argv[2]},
+    "field": "supplier",
+    "values": {"amount": 5000, "supplier": "sup-01"},
+}))
+PY
+)"
+psql -c "INSERT INTO lookup_writebacks
+          (id, object_key, field_key, record_id, write_url, write_fields, payload,
+           record_updated_at, status, next_attempt_at)
+        VALUES ('$stale_id', '$writeback_key', 'supplier', '$writeback_record',
+                'http://127.0.0.1:$lookup_receiver_port/', '{supplier,amount}',
+                '$stale_payload'::jsonb, now() - interval '1 hour', 'pending', now())" >/dev/null ||
+  fail "queueing the stale write-back failed"
+for _ in $(seq 1 30); do
+  status="$(request_as "$admin_jar" GET "/api/v1/admin/lookups/writebacks?limit=20")"
+  [[ "$status" == "200" ]] || fail "reading the write-back log returned $status"
+  if python3 - "$body_file" "$stale_id" <<'PY'
+import json, sys
+
+rows = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+sys.exit(0 if any(r["id"] == sys.argv[2] and r["status"] == "conflict" for r in rows) else 1)
+PY
+  then
+    break
+  fi
+  sleep 1
+done
+python3 - "$body_file" "$stale_id" <<'PY' || fail "the correction of a changed record was applied instead of reported"
+import json, sys
+
+rows = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
+mine = [r for r in rows if r["id"] == sys.argv[2]]
+if not mine or mine[0]["status"] != "conflict":
+    sys.exit(f"the delivery must stand in conflict: {mine}")
+print("smoke: a correction for a record that changed in the meantime stands in conflict")
+PY
+status="$(request_as "$designer_jar" GET "/api/v1/business-objects/$writeback_key/records/$writeback_record")"
+[[ "$status" == "200" ]] || fail "reading the record returned $status"
+grep -q '"amount":1001' "$body_file" || fail "a conflict must not write anything to the record"
+if grep -q '"amount":5001' "$body_file"; then
+  fail "the correction of a changed record was written to the record"
+fi
+
+echo "smoke: reading the write-back log is administration work"
+status="$(request_as "$designer_jar" GET /api/v1/admin/lookups/writebacks)"
+[[ "$status" == "403" ]] || fail "reading the write-back log as a non-admin returned $status, expected 403"
 
 # The run tidied up at the start; a run that passed tidies up after itself too, so a screen
 # someone opens next does not show this run's rows. A run that failed keeps its evidence.

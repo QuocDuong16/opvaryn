@@ -190,6 +190,11 @@
 - `/settings` **live**: endpoint table (kept in sync with the OpenAPI paths), ports, toolchain pins,
   the demo-data commands, and the **webhook delivery log** (enabled/off, status, attempts, last error)
   with its own try/catch so a missing role or a stopped API only greys that card.
+- `/admin/lookups` **live**: one block per select field of every definition — where the options are
+  read from, where a record is written back to (ADR 0037), and which fields are sent; plus the log
+  of the recent write-backs with their status (`Đang chờ`, `Đã gửi`, `Không gửi được`,
+  `Xung đột`, `Bị từ chối`). A `conflict` means the record changed while the delivery waited, so
+  the correction was not applied and a person decides.
 - `/analytics` also carries the operational read model (ADR 0011): a GET form filters by process and
   window, and the KPI cards show instances, cycle time, step time, approval rate and rework rate.
   `components/analytics/process-metrics.ts` (pure, tested) owns the formatting — keep durations and

@@ -129,6 +129,16 @@ của repo). Trên host nội bộ riêng, đặt `CADDY_HTTP_PORT=80` và `CADD
 - Tích hợp webhook ra ngoài (ADR 0012) bật bằng `OPVARYN_WEBHOOK_URL` và `OPVARYN_WEBHOOK_SECRET`
   trong `.env`; URL để trống là tắt, và đó là mặc định. Lịch sử gửi (kể cả lần thử lại) xem ở trang
   Cài đặt của web, hoặc `GET /api/v1/webhook-deliveries`.
+- Tra cứu ngoài và ghi ngược hai chiều (ADR 0034, ADR 0037): nguồn và địa chỉ ghi ngược được
+  cấu hình **theo từng trường** ở khu vực Quản trị (tab **Tra cứu ngoài**), không cấu hình trong
+  `.env`. Lịch sử ghi xem ở cùng trang đó, hoặc `GET /api/v1/admin/lookups/writebacks`.
+  - Hệ thống ngoài nhận một POST JSON đã ký HMAC (cùng `OPVARYN_WEBHOOK_SECRET`) gồm
+    `deliveryId`, `occurredAt`, `action`, `actor`, `object`, `record`, `field` và `values`.
+  - Hệ thống ngoài trả lời `{"accepted": true, "values": {...}}` để **sửa** bản ghi; bản sửa chỉ
+    được áp dụng khi bản ghi chưa ai sửa trong lúc chờ, nếu không lần ghi đó thành `conflict` và
+    cần người quyết định.
+  - `OPVARYN_LOOKUP_ALLOW_INTERNAL=true` khi danh mục nằm trong mạng nội bộ; mặc định là tắt
+    (chốt chặn địa chỉ nội bộ, ADR 0034).
 
 ## 4. Cập nhật phiên bản
 

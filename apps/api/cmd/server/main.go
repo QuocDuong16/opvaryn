@@ -83,11 +83,23 @@ func run() error {
 	// simply not configured on this server: the setup endpoint says so.
 	twoFactor := service.NewTwoFactor(st, cfg.TwoFactorKey())
 
+	// The records service is shared: the write-back worker applies the corrections an
+	// outside system answers with, and it is the same service that writes a record
+	// (ADR 0037).
+	records := service.NewObjectRecords(st)
+	writebacks := service.NewLookupWritebacks(st, records, service.LookupWritebackConfig{
+		Secret:        cfg.WebhookSecret,
+		Timeout:       cfg.LookupTimeout,
+		MaxAttempts:   cfg.LookupMaxAttempts,
+		AllowInternal: cfg.LookupAllowInternal,
+	}, log)
+	go writebacks.Run(ctx)
+
 	server := &http.Server{
 		Addr: net.JoinHostPort("", strconv.Itoa(cfg.Port)),
 		Handler: httpapi.NewRouter(cfg, st, httpapi.Services{
 			BusinessObjects:    service.NewBusinessObjects(st),
-			ObjectRecords:      service.NewObjectRecords(st),
+			ObjectRecords:      records,
 			ProcessDefinitions: service.NewProcessDefinitions(st, st),
 			ProcessRuntime: service.NewProcessRuntime(st,
 				service.WithWebhooks(service.WebhookConfig{
@@ -103,17 +115,20 @@ func run() error {
 				// of a step that does not declare its own (ADR 0035).
 				service.WithWorkPolicies(service.NewWorkPolicies(st)),
 			),
-			Identity:       service.NewIdentity(st, twoFactor),
-			WorkingHours:   workingHours,
-			AppConfigs:     service.NewAppConfigs(st),
-			WorkPolicies:   service.NewWorkPolicies(st),
-			Lookups:        service.NewLookups(st),
-			TwoFactor:      twoFactor,
-			Admin:          service.NewAdmin(st),
-			Attachments:    service.NewAttachments(st),
-			Metrics:        service.NewMetrics(st, st),
-			ProcessMetrics: service.NewProcessMetrics(st, st),
-			Webhooks:       webhooks,
+			Identity:     service.NewIdentity(st, twoFactor),
+			WorkingHours: workingHours,
+			AppConfigs:   service.NewAppConfigs(st),
+			WorkPolicies: service.NewWorkPolicies(st),
+			Lookups: service.NewLookups(st, service.LookupConfig{
+				AllowInternal: cfg.LookupAllowInternal,
+			}),
+			LookupWritebacks: writebacks,
+			TwoFactor:        twoFactor,
+			Admin:            service.NewAdmin(st),
+			Attachments:      service.NewAttachments(st),
+			Metrics:          service.NewMetrics(st, st),
+			ProcessMetrics:   service.NewProcessMetrics(st, st),
+			Webhooks:         webhooks,
 		}, log),
 		ReadHeaderTimeout: 5 * time.Second,
 		ReadTimeout:       cfg.ReadTimeout,

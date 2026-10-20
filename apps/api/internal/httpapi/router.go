@@ -31,6 +31,7 @@ type Services struct {
 	AppConfigs         *service.AppConfigs
 	WorkPolicies       *service.WorkPolicies
 	Lookups            *service.Lookups
+	LookupWritebacks   *service.LookupWritebacks
 }
 
 // NewRouter builds the HTTP handler for the demo API.
@@ -114,9 +115,11 @@ func NewRouter(cfg config.Config, st *store.Store, services Services, log *slog.
 					r.Delete("/", handleDeleteAdminDepartment(services.Admin, log))
 				})
 			})
-			// The source of one field's external catalogue (ADR 0034).
+			// The source of one field's external catalogue (ADR 0034), and the log of what
+			// was written back to those systems (ADR 0037).
 			r.Route("/lookups", func(r chi.Router) {
 				r.Put("/{key}/{fieldKey}", handleSaveLookupSource(services.Lookups, log))
+				r.Get("/writebacks", handleListLookupWritebacks(services.LookupWritebacks, log))
 			})
 			// The policy of each kind of work (ADR 0035).
 			r.Route("/work-policies", func(r chi.Router) {

@@ -117,11 +117,7 @@ const NOT_YET: readonly { title: string; body: string }[] = [
   },
   {
     title: 'Ưu tiên theo từng người',
-    body: 'Mỗi loại việc có hạn và mức ưu tiên riêng, nhưng chưa có sắp xếp hộp việc theo ưu tiên.',
-  },
-  {
-    title: 'Kết nối hai chiều',
-    body: 'Hiện gửi được sự kiện ra hệ thống khác kèm thử lại và nhật ký; đọc dữ liệu từ hệ thống ngoài thì chưa.',
+    body: 'Hộp việc đã xếp theo việc gấp nhất, việc sắp đến hạn rồi tới việc cũ nhất; nhưng mỗi người chưa tự sắp thứ tự riêng.',
   },
   {
     title: 'Kéo thả trong màn Ứng dụng',

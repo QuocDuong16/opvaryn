@@ -32,7 +32,7 @@ const PHASES: readonly {
     name: 'V1.x',
     title: 'Nhiều hành vi quy trình hơn',
     scope:
-      'Duyệt song song, uỷ quyền, chuyển cấp nhiều tầng, hạn theo từng loại việc, webhook hai chiều và lịch chạy, sinh tài liệu, metric tính toán và báo cáo nâng cao.',
+      'Duyệt song song, uỷ quyền, chuyển cấp nhiều tầng, hạn theo từng loại việc, webhook nhận sự kiện vào và lịch chạy, sinh tài liệu, metric tính toán và báo cáo nâng cao.',
     goal: 'Mục tiêu: mở rộng năng lực quy trình, không chồng thêm hệ thống.',
     tone: 'blue',
   },
@@ -150,8 +150,8 @@ export default async function RoadmapPage() {
             <dt className="text-xs tracking-wide text-on-surface-muted uppercase">Chưa có</dt>
             <dd className="mt-1 text-sm">
               Kết nối hệ thống đăng nhập của tổ chức (SSO), mức ưu tiên và hạn theo từng loại việc,
-              kết nối hai chiều với hệ thống ngoài, và các tiện ích của trình soạn quy trình (hoàn
-              tác, nhiều người cùng sửa) — phần còn lại của V1.x và V2.
+              và các tiện ích của trình soạn quy trình (hoàn tác, nhiều người cùng sửa) — phần còn
+              lại của V1.x và V2.
             </dd>
           </div>
         </dl>
