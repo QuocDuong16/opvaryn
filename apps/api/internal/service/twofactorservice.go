@@ -95,6 +95,17 @@ func (t *TwoFactor) Setup(
 	if len(t.key) == 0 {
 		return SetupResult{}, ErrTwoFactorUnavailable
 	}
+	// An account that already has the second step switched on must switch it off first:
+	// a fresh secret would silently take the second step away.
+	existing, found, err := t.store.FindTwoFactor(ctx, principal.UserID)
+	if err != nil {
+		return SetupResult{}, fmt.Errorf("look up two factor: %w", err)
+	}
+	if found && existing.Enabled {
+		return SetupResult{}, &ValidationError{Problems: []string{
+			"two factor: switch the second step off before setting it up again",
+		}}
+	}
 	secret, encoded, err := newTotpSecret()
 	if err != nil {
 		return SetupResult{}, err

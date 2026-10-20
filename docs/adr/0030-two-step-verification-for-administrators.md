@@ -56,5 +56,10 @@ xác thực trên điện thoại của chính người đó.
   từng tài khoản. Nó nằm cùng chỗ với các bí mật khác trong `.env` trên host.
 - Mã cứu hộ phải được lưu ở nơi khác với mật khẩu — vào kho bí mật của tổ chức, không phải
   vào cùng một chỗ.
+- Mã TOTP dùng lại được trong khoảng 90 giây (chấp nhận lệch một bước). Đó là đặc tính của
+  TOTP: người bị đánh cắp điện thoại vẫn còn khoảng thời gian ngắn để mã bị dùng lại. Mã
+  cứu hộ thì dùng một lần, và đặt lại mật khẩu cũng xoá bộ đếm.
+- Bật xác thực hai bước cần JavaScript (nút tạo khoá bí mật gọi hành động máy chủ). Đăng nhập
+  hai bước thì không: ô mã là một trường bình thường trong form đăng nhập.
 - Test phủ: vectơ thử nghiệm RFC 6238, vòng mã hoá/giải mã, mã cứu hộ dùng một lần, và đường
   đăng nhập hai bước (thiếu mã, sai mã, đúng mã, mã cứu hộ).

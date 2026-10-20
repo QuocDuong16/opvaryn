@@ -344,7 +344,7 @@ func TestLoginAndSessionLifecycle(t *testing.T) {
 	t.Parallel()
 
 	store := newFakeIdentityStore()
-	identity := NewIdentity(store)
+	identity := NewIdentity(store, NewTwoFactor(newFakeTwoFactorStore(), nil))
 	user := createTestUser(t, identity, "lan@example.com", []string{managerRole})
 
 	token, signedIn, err := identity.Login(context.Background(), " Lan@Example.com ", "a-long-enough-password", "")
@@ -389,7 +389,7 @@ func TestLoginAndSessionLifecycle(t *testing.T) {
 func TestLogoutOfAnUnknownSessionIsNotAnError(t *testing.T) {
 	t.Parallel()
 
-	if err := NewIdentity(newFakeIdentityStore()).Logout(context.Background(), "never-existed"); err != nil {
+	if err := NewIdentity(newFakeIdentityStore(), NewTwoFactor(newFakeTwoFactorStore(), nil)).Logout(context.Background(), "never-existed"); err != nil {
 		t.Fatalf("logging out an unknown token should be a no-op, got %v", err)
 	}
 }
@@ -398,7 +398,7 @@ func TestExpiredSessionIsRefused(t *testing.T) {
 	t.Parallel()
 
 	store := newFakeIdentityStore()
-	identity := NewIdentity(store)
+	identity := NewIdentity(store, NewTwoFactor(newFakeTwoFactorStore(), nil))
 	createTestUser(t, identity, "lan@example.com", []string{managerRole})
 
 	token, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password", "")
@@ -417,7 +417,7 @@ func TestLoginRefusesUnknownWrongAndDisabled(t *testing.T) {
 	t.Parallel()
 
 	store := newFakeIdentityStore()
-	identity := NewIdentity(store)
+	identity := NewIdentity(store, NewTwoFactor(newFakeTwoFactorStore(), nil))
 	user := createTestUser(t, identity, "lan@example.com", []string{managerRole})
 
 	cases := map[string]struct{ email, password string }{
@@ -448,7 +448,7 @@ func TestLoginRefusesUnknownWrongAndDisabled(t *testing.T) {
 func TestCreateUserValidates(t *testing.T) {
 	t.Parallel()
 
-	identity := NewIdentity(newFakeIdentityStore())
+	identity := NewIdentity(newFakeIdentityStore(), NewTwoFactor(newFakeTwoFactorStore(), nil))
 
 	tests := []struct {
 		name        string
@@ -521,7 +521,7 @@ func TestCreateUserNormalisesAndStoresNoPlaintext(t *testing.T) {
 	t.Parallel()
 
 	store := newFakeIdentityStore()
-	identity := NewIdentity(store)
+	identity := NewIdentity(store, NewTwoFactor(newFakeTwoFactorStore(), nil))
 
 	user := createTestUser(t, identity, "  Lan@Example.COM ", []string{managerRole, "ke_toan"})
 
@@ -544,7 +544,7 @@ func TestSetPasswordAndListUsers(t *testing.T) {
 	t.Parallel()
 
 	store := newFakeIdentityStore()
-	identity := NewIdentity(store)
+	identity := NewIdentity(store, NewTwoFactor(newFakeTwoFactorStore(), nil))
 	createTestUser(t, identity, "lan@example.com", []string{managerRole})
 
 	if _, err := identity.SetPassword(context.Background(), "lan@example.com", "short"); !asValidationError(err, new(*ValidationError)) {
@@ -595,7 +595,7 @@ func TestListRolesIsTheRoleCatalogue(t *testing.T) {
 	t.Parallel()
 
 	store := newFakeIdentityStore()
-	identity := NewIdentity(store)
+	identity := NewIdentity(store, NewTwoFactor(newFakeTwoFactorStore(), nil))
 	createTestUser(t, identity, "lan@example.com", []string{managerRole})
 	createTestUser(t, identity, "bao@example.com", []string{managerRole, "ke_toan"})
 
@@ -635,7 +635,7 @@ func TestPruneSessionsRemovesOnlyExpiredOnes(t *testing.T) {
 	t.Parallel()
 
 	store := newFakeIdentityStore()
-	identity := NewIdentity(store)
+	identity := NewIdentity(store, NewTwoFactor(newFakeTwoFactorStore(), nil))
 	now := time.Date(2026, 10, 14, 12, 0, 0, 0, time.UTC)
 	identity.now = func() time.Time { return now }
 
@@ -661,7 +661,7 @@ func TestChangePassword(t *testing.T) {
 	t.Parallel()
 
 	store := newFakeIdentityStore()
-	identity := NewIdentity(store)
+	identity := NewIdentity(store, NewTwoFactor(newFakeTwoFactorStore(), nil))
 	createTestUser(t, identity, "lan@example.com", []string{managerRole})
 
 	token, _, err := identity.Login(context.Background(), "lan@example.com", "a-long-enough-password", "")
@@ -704,7 +704,7 @@ func TestAuthenticateRenewsASessionNearExpiry(t *testing.T) {
 	t.Parallel()
 
 	store := newFakeIdentityStore()
-	identity := NewIdentity(store)
+	identity := NewIdentity(store, NewTwoFactor(newFakeTwoFactorStore(), nil))
 	now := time.Date(2026, 10, 19, 9, 0, 0, 0, time.UTC)
 	identity.now = func() time.Time { return now }
 	createTestUser(t, identity, "lan@example.com", []string{managerRole})
@@ -738,7 +738,7 @@ func TestAddRolesIsAdditive(t *testing.T) {
 	t.Parallel()
 
 	store := newFakeIdentityStore()
-	identity := NewIdentity(store)
+	identity := NewIdentity(store, NewTwoFactor(newFakeTwoFactorStore(), nil))
 	createTestUser(t, identity, "lan@example.com", []string{managerRole})
 
 	updated, err := identity.AddRoles(context.Background(), "LAN@example.com", []string{domain.RoleProcessDesigner})
@@ -761,7 +761,7 @@ func TestLoginCooldownAfterRepeatedFailures(t *testing.T) {
 	t.Parallel()
 
 	store := newFakeIdentityStore()
-	identity := NewIdentity(store)
+	identity := NewIdentity(store, NewTwoFactor(newFakeTwoFactorStore(), nil))
 	now := time.Now().UTC()
 	identity.now = func() time.Time { return now }
 	createTestUser(t, identity, "lan@example.com", []string{managerRole})
@@ -791,7 +791,7 @@ func TestLoginCooldownDoesNotRevealTheAddress(t *testing.T) {
 	t.Parallel()
 
 	store := newFakeIdentityStore()
-	identity := NewIdentity(store)
+	identity := NewIdentity(store, NewTwoFactor(newFakeTwoFactorStore(), nil))
 	now := time.Now().UTC()
 	identity.now = func() time.Time { return now }
 
@@ -812,7 +812,7 @@ func TestUnlockEmailClearsTheCooldown(t *testing.T) {
 	t.Parallel()
 
 	store := newFakeIdentityStore()
-	identity := NewIdentity(store)
+	identity := NewIdentity(store, NewTwoFactor(newFakeTwoFactorStore(), nil))
 	identity.now = func() time.Time { return time.Now().UTC() }
 	createTestUser(t, identity, "lan@example.com", []string{managerRole})
 
@@ -833,7 +833,7 @@ func TestDisabledAccountDoesNotCountFailures(t *testing.T) {
 	t.Parallel()
 
 	store := newFakeIdentityStore()
-	identity := NewIdentity(store)
+	identity := NewIdentity(store, NewTwoFactor(newFakeTwoFactorStore(), nil))
 	now := time.Now().UTC()
 	identity.now = func() time.Time { return now }
 	createTestUser(t, identity, "lan@example.com", []string{managerRole})

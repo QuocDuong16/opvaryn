@@ -161,15 +161,14 @@ func TestLoginWithTwoFactor(t *testing.T) {
 	t.Parallel()
 
 	store := newFakeIdentityStore()
-	identity := NewIdentity(store)
 	now := time.Now().UTC()
-	identity.now = func() time.Time { return now }
-	createTestUser(t, identity, "lan@example.com", []string{managerRole})
+	createTestUser(t, identityOf(store), "lan@example.com", []string{managerRole})
 
 	twoFactorStore := newFakeTwoFactorStore()
 	twoFactor := NewTwoFactor(twoFactorStore, make([]byte, 32))
 	twoFactor.now = func() time.Time { return now }
-	identity.WithTwoFactor(twoFactor)
+	identity := NewIdentity(store, twoFactor)
+	identity.now = func() time.Time { return now }
 
 	secret, encoded, err := newTotpSecret()
 	if err != nil {
@@ -203,12 +202,19 @@ func TestLoginWithTwoFactor(t *testing.T) {
 	}
 
 	// An account without the second step signs in with its password alone.
-	plain := NewIdentity(store)
+	plain := NewIdentity(store, NewTwoFactor(newFakeTwoFactorStore(), nil))
 	plain.now = func() time.Time { return now }
 	if _, _, err := plain.Login(context.Background(), "lan@example.com", "a-long-enough-password", ""); err != nil {
 		t.Fatalf("an ordinary account was refused: %v", err)
 	}
 	_ = encoded
+}
+
+// identityOf is an identity over a fake store, for the tests that only need an account.
+func identityOf(store *fakeIdentityStore) *Identity {
+	identity := NewIdentity(store, NewTwoFactor(newFakeTwoFactorStore(), nil))
+	identity.now = func() time.Time { return time.Now().UTC() }
+	return identity
 }
 
 // mustUserID finds the id of one account in the fake store.
@@ -221,4 +227,26 @@ func mustUserID(t *testing.T, store *fakeIdentityStore, email string) uuid.UUID 
 	}
 	t.Fatalf("no account %q", email)
 	return uuid.Nil
+}
+
+// Setting up again must not silently take the second step away: the account has to switch
+// it off first.
+func TestSetupRefusesToReplaceAnEnabledSecondStep(t *testing.T) {
+	t.Parallel()
+
+	store := newFakeTwoFactorStore()
+	twoFactor := NewTwoFactor(store, make([]byte, 32))
+	principal := domain.Principal{UserID: uuid.New(), Name: "Lan", Roles: []string{domain.RoleAdmin}}
+	store.state = domain.TwoFactor{
+		UserID:  principal.UserID,
+		Secret:  "sealed",
+		Enabled: true,
+	}
+
+	if _, err := twoFactor.Setup(context.Background(), principal); err == nil {
+		t.Fatal("setting up again must not replace an enabled second step")
+	}
+	if !store.state.Enabled {
+		t.Fatal("the second step must stay switched on")
+	}
 }

@@ -100,7 +100,7 @@ func run() error {
 				// (ADR 0031).
 				service.WithWorkingHours(workingHours),
 			),
-			Identity:       service.NewIdentity(st).WithTwoFactor(twoFactor),
+			Identity:       service.NewIdentity(st, twoFactor),
 			WorkingHours:   workingHours,
 			TwoFactor:      twoFactor,
 			Admin:          service.NewAdmin(st),
