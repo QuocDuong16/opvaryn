@@ -144,7 +144,11 @@ func (s *Store) GetProcessDefinitionVersionByID(ctx context.Context, id uuid.UUI
 
 // CreateProcessDefinition inserts a definition and publishes version 1 in one
 // transaction.
-func (s *Store) CreateProcessDefinition(ctx context.Context, definition domain.ProcessDefinition) (domain.ProcessDefinition, error) {
+func (s *Store) CreateProcessDefinition(
+	ctx context.Context,
+	definition domain.ProcessDefinition,
+	publisher string,
+) (domain.ProcessDefinition, error) {
 	created := definition
 
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
@@ -158,7 +162,7 @@ func (s *Store) CreateProcessDefinition(ctx context.Context, definition domain.P
 			return mapUniqueViolation(err, fmt.Sprintf("process definition key %q already exists", definition.Key))
 		}
 
-		versionID, err := insertProcessDefinitionVersion(ctx, tx, definition, 1)
+		versionID, err := insertProcessDefinitionVersion(ctx, tx, definition, 1, publisher)
 		if err != nil {
 			return err
 		}
@@ -182,6 +186,7 @@ func (s *Store) UpdateProcessDefinition(
 	objectKey string,
 	nodes []domain.ProcessNode,
 	edges []domain.ProcessEdge,
+	publisher string,
 ) (domain.ProcessDefinition, error) {
 	updated := domain.ProcessDefinition{
 		Key: key, Name: name, Description: description, ObjectKey: objectKey, Nodes: nodes, Edges: edges,
@@ -210,7 +215,7 @@ func (s *Store) UpdateProcessDefinition(
 			ID: definitionID, Key: key, Name: name, Description: description,
 			ObjectKey: objectKey, Nodes: nodes, Edges: edges,
 		}
-		versionID, err := insertProcessDefinitionVersion(ctx, tx, current, next)
+		versionID, err := insertProcessDefinitionVersion(ctx, tx, current, next, publisher)
 		if err != nil {
 			return err
 		}
@@ -241,6 +246,7 @@ func insertProcessDefinitionVersion(
 	tx pgx.Tx,
 	definition domain.ProcessDefinition,
 	version int,
+	publisher string,
 ) (uuid.UUID, error) {
 	nodes, err := json.Marshal(definition.Nodes)
 	if err != nil {
@@ -254,10 +260,10 @@ func insertProcessDefinitionVersion(
 	versionID := uuid.New()
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO process_definition_versions
-		       (id, definition_id, version, name, description, object_key, nodes, edges)
-		VALUES ($1, $2, $3, $4, $5, $6, $7, $8)`,
+		       (id, definition_id, version, name, description, object_key, nodes, edges, published_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
 		versionID, definition.ID, version, definition.Name, definition.Description,
-		definition.ObjectKey, nodes, edges); err != nil {
+		definition.ObjectKey, nodes, edges, publisher); err != nil {
 		return uuid.Nil, fmt.Errorf("insert process definition version: %w", err)
 	}
 	return versionID, nil
@@ -476,6 +482,20 @@ func (s *Store) FindVisibleProcessInstance(
 	return instance, true, nil
 }
 
+// instanceRecordIDs returns the record ids of a page of instances, without repeats.
+func instanceRecordIDs(summaries []domain.ProcessInstanceSummary) []uuid.UUID {
+	seen := map[uuid.UUID]struct{}{}
+	ids := make([]uuid.UUID, 0, len(summaries))
+	for _, summary := range summaries {
+		if _, known := seen[summary.Instance.RecordID]; known {
+			continue
+		}
+		seen[summary.Instance.RecordID] = struct{}{}
+		ids = append(ids, summary.Instance.RecordID)
+	}
+	return ids
+}
+
 // ListVisibleProcessInstances returns the instances the scope may see, newest
 // first, optionally narrowed to one business object or one process definition. The
 // same record-visible-to-scope rule as every other read applies, so a screen cannot
@@ -532,6 +552,16 @@ func (s *Store) ListVisibleProcessInstances(
 	}
 	if len(summaries) == 0 {
 		return domain.Paged[domain.ProcessInstanceSummary]{Items: summaries, Total: total}, nil
+	}
+
+	// The record each run works on, with the schema that record has, so the list can name
+	// it instead of leaving the screen to guess.
+	sources, err := s.RecordLabelSources(ctx, instanceRecordIDs(summaries))
+	if err != nil {
+		return domain.Paged[domain.ProcessInstanceSummary]{}, err
+	}
+	for i := range summaries {
+		summaries[i].RecordSource = sources[summaries[i].Instance.RecordID]
 	}
 
 	// One extra query for the open tasks of exactly these instances, so the list can

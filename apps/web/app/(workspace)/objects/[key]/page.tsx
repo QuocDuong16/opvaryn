@@ -13,7 +13,6 @@ import { ImportRecordsForm } from '@/components/forms/import-records-form';
 import { ObjectForm } from '@/components/forms/object-form';
 import { FieldSchema } from '@/components/objects/field-schema';
 import { RecordList } from '@/components/objects/record-list';
-import { recordLabels } from '@/components/objects/record-labels';
 import { resolveObjectTab } from '@/components/objects/object-tabs';
 import { InstanceList } from '@/components/process/instance-list';
 import { StartInstanceForm } from '@/components/process/start-instance-form';
@@ -106,7 +105,10 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
       api.listBusinessObjectVersions(key),
       // The role names are a nicety: a role nobody has named still reads as its key, so a
       // failed read must not take the screen down with it.
-      api.listRoles().catch(() => []),
+      api
+        .listRoles()
+        .then((page) => page.data)
+        .catch(() => []),
       api.getMe().catch(() => null),
       api.listObjectRecords(key, { limit: 1 }),
       api.listProcessInstances({ objectKey: key }, { limit: 1 }),
@@ -178,10 +180,10 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
   // Only definitions bound to this object: the engine evaluates conditions against the
   // record's values, so a definition for another object has nothing to read.
   const usableDefinitions = definitions.filter((definition) => definition.objectKey === key);
-  const labels = recordLabels(pickerRecords, versions);
-  // The record a filtered run list is about, named when it is one of the records this
-  // screen loaded — which it is whenever someone arrived here from that record's row.
-  const filteredLabel = recordId === '' ? null : (labels[recordId] ?? null);
+  // The record a filtered run list is about: the API names every run's record with the
+  // definition version that record has, so the screen does not pick names from a sample.
+  const filteredLabel =
+    instances.find((summary) => summary.instance.recordId === recordId)?.recordName ?? null;
 
   return (
     <>
@@ -432,7 +434,6 @@ export default async function ObjectDetailPage({ params, searchParams }: PagePro
               </p>
               <InstanceList
                 instances={instances}
-                recordLabels={labels}
                 roleLabels={Object.fromEntries(namedRoles)}
                 definitionNames={Object.fromEntries(
                   definitions.map((definition) => [definition.key, definition.name]),

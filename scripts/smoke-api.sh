@@ -302,8 +302,8 @@ versions = json.load(open(sys.argv[1], encoding="utf-8"))["data"]
 numbers = [version["version"] for version in versions]
 if numbers != sorted(numbers, reverse=True) or numbers != [2, 1]:
     sys.exit(f"expected versions [2, 1], got {numbers}")
-if any(version["publishedBy"] != "system" for version in versions):
-    sys.exit("publishing should be attributed to system until identity exists")
+if any(version["publishedBy"] != "Smoke designer" for version in versions):
+    sys.exit("publishing must be attributed to the signed-in designer")
 newest = [field["key"] for field in versions[0]["fields"]]
 oldest = [field["key"] for field in versions[-1]["fields"]]
 if newest != ["amount", "note"] or oldest != ["amount", "priority"]:
@@ -792,6 +792,7 @@ grep -q 'must be a whole number' "$body_file" || fail "the refusal does not expl
 echo "smoke: GET /api/v1/roles (the catalogue the designer offers)"
 status="$(request_as "$designer_jar" GET /api/v1/roles)"
 [[ "$status" == "200" ]] || fail "listing roles returned $status, expected 200"
+grep -q '"total"' "$body_file" || fail "the role catalogue must say how many roles are behind the page"
 grep -q "\"$designer_role\"" "$body_file" || fail "the role catalogue lost the designer's role"
 grep -q "\"$director_role\"" "$body_file" || fail "the role catalogue lost the director's role"
 python3 - "$body_file" <<'PY' || fail "the role catalogue is not sorted and distinct"
@@ -811,6 +812,9 @@ status="$(request GET /api/v1/roles)"
 [[ "$status" == "401" ]] || fail "listing roles anonymously returned $status, expected 401"
 
 echo "smoke: metrics (create, scoped result, validation, permissions)"
+status="$(request_as "$designer_jar" GET /api/v1/metrics)"
+[[ "$status" == "200" ]] || fail "listing metrics returned $status, expected 200"
+grep -q '"total"' "$body_file" || fail "the metric list must say how many metrics are behind the page"
 metric_key="smoke_amount_$stamp"
 status="$(request_as "$designer_jar" POST /api/v1/metrics \
   "$(printf '{"key":"%s","name":"Tổng giá trị đề nghị","objectKey":"%s","aggregation":"sum","field":"amount"}' "$metric_key" "$object_key")")"
@@ -962,6 +966,11 @@ for line, payload in zip(lines, payloads):
         sys.exit(f"a signature does not match the body and the shared secret: {line['signature']!r}")
 print(f"smoke: the receiver accepted {len(lines)} signed notifications ({', '.join(sorted(events))})")
 CHECK_WEBHOOK_RECEIVER
+
+echo "smoke: the delivery log says how many deliveries are behind the page"
+status="$(request_as "$designer_jar" GET /api/v1/webhook-deliveries)"
+[[ "$status" == "200" ]] || fail "listing the delivery log returned $status, expected 200"
+grep -q '"total"' "$body_file" || fail "the delivery log must say how many deliveries are behind the page"
 
 echo "smoke: administration is administrators only (ADR 0022)"
 status="$(request_as "$designer_jar" GET /api/v1/admin/users)"

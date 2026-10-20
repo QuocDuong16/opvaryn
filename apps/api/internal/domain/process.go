@@ -181,6 +181,19 @@ type ProcessEvent struct {
 type InboxItem struct {
 	Task     ProcessTask
 	Instance ProcessInstance
+	// RecordSource is what the record's name is computed from: its values and the fields
+	// of the definition version it was created under. The service turns it into RecordName.
+	RecordSource RecordLabelSource
+	// RecordName identifies the record in a list. It is empty when the record has no
+	// readable name; the screen then says so instead of printing an id (ADR 0018).
+	RecordName string
+}
+
+// RecordLabelSource is what a record's name is computed from: the values the record
+// holds and the fields of the definition version it was created under (ADR 0006).
+type RecordLabelSource struct {
+	Values map[string]any
+	Fields []FieldDefinition
 }
 
 // ProcessInstanceFilter narrows a list of instances. Every field is optional; the
@@ -199,6 +212,9 @@ type ProcessInstanceFilter struct {
 type ProcessInstanceSummary struct {
 	Instance  ProcessInstance
 	OpenTasks []ProcessTask
+	// RecordSource and RecordName say which record the run is on; see InboxItem.
+	RecordSource RecordLabelSource
+	RecordName   string
 }
 
 // StartInstanceWrite is the whole write of starting one instance: the row, the

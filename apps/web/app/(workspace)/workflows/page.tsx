@@ -86,7 +86,10 @@ export default async function WorkflowsPage({ searchParams }: PageProps) {
       api.listProcessDefinitions({ q: query || undefined, limit: PER_PAGE, offset }),
       api.listBusinessObjects({ limit: 100 }),
       api.getMe(),
-      api.listRoles().catch(() => []),
+      api
+        .listRoles()
+        .then((page) => page.data)
+        .catch(() => []),
     ]);
     definitions = definitionPage.data;
     definitionTotal = definitionPage.total;

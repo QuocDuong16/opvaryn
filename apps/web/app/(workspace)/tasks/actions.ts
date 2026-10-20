@@ -55,7 +55,11 @@ export async function decideProcessTaskAction(
 
 async function loadRoleLabels(): Promise<ReadonlyMap<string, string>> {
   try {
-    return roleLabels(await createServerApiClient().listRoles());
+    return roleLabels(
+      await createServerApiClient()
+        .listRoles()
+        .then((page) => page.data),
+    );
   } catch {
     return new Map();
   }

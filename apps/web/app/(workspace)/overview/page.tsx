@@ -7,7 +7,6 @@ import {
   type ProcessInstanceSummary,
 } from '@opvaryn/contracts';
 
-import { recordLabels } from '@/components/objects/record-labels';
 import { Card, CardDescription, CardTitle } from '@/components/ui/card';
 import { PageHeader } from '@/components/ui/page-header';
 import { StatusBadge, type StatusKind } from '@/components/ui/status-badge';
@@ -159,8 +158,6 @@ interface Overview {
   instances: ProcessInstanceSummary[];
   /** Definition key to its name, so a run is named rather than keyed. */
   definitionNames: Record<string, string>;
-  /** Record id to the label that identifies it, built from the record's own version. */
-  recordNames: Record<string, string>;
   error: string | null;
   /** True when the inbox could not be read: an empty inbox and a failed read differ. */
   inboxFailed: boolean;
@@ -181,7 +178,6 @@ async function loadOverview(): Promise<Overview> {
         inbox: [],
         instances: [],
         definitionNames: {},
-        recordNames: {},
         error: 'Phiên làm việc đã hết hạn.',
         inboxFailed: true,
       };
@@ -191,7 +187,6 @@ async function loadOverview(): Promise<Overview> {
       inbox: [],
       instances: [],
       definitionNames: {},
-      recordNames: {},
       error: describeApiError(cause),
       inboxFailed: true,
     };
@@ -221,28 +216,12 @@ async function loadOverview(): Promise<Overview> {
     .data;
   const definitionNames = Object.fromEntries(definitions.map((item) => [item.key, item.name]));
 
-  const objectKeys = [...new Set(instances.map((summary) => summary.instance.objectKey))];
-  const perObject = await Promise.all(
-    objectKeys.map(async (objectKey) => {
-      try {
-        const [versions, records] = await Promise.all([
-          api.listBusinessObjectVersions(objectKey),
-          api.listObjectRecords(objectKey, { limit: 100 }).then((page) => page.data),
-        ]);
-        return recordLabels(records, versions);
-      } catch {
-        return {};
-      }
-    }),
-  );
-  const recordNames = Object.assign({}, ...perObject);
-
-  return { me, inbox, instances, definitionNames, recordNames, error: null, inboxFailed };
+  return { me, inbox, instances, definitionNames, error: null, inboxFailed };
 }
 
 export default async function OverviewPage() {
   const [overview, advanced] = await Promise.all([loadOverview(), getAdvancedMode()]);
-  const { me, inbox, instances, definitionNames, recordNames, error, inboxFailed } = overview;
+  const { me, inbox, instances, definitionNames, error, inboxFailed } = overview;
   const showAdvanced = advancedVisible(isAdmin(me?.roles), advanced);
 
   if (!me) {
@@ -311,7 +290,7 @@ export default async function OverviewPage() {
                   <span className="min-w-0">
                     <span className="block text-sm font-medium">{item.task.title}</span>
                     <span className="block text-xs text-on-surface-muted">
-                      {`${recordNames[item.instance.recordId] ?? 'Bản ghi chưa có tên hiển thị'} · từ ${formatTimestamp(item.task.createdAt)}`}
+                      {`${item.recordName ?? 'Bản ghi chưa có tên hiển thị'} · từ ${formatTimestamp(item.task.createdAt)}`}
                     </span>
                   </span>
                   <span className="text-xs font-medium">Xử lý →</span>
@@ -385,7 +364,7 @@ export default async function OverviewPage() {
                       {STATE_LABELS[summary.instance.state] ?? summary.instance.state}
                     </td>
                     <td className="px-4 py-3 text-xs text-on-surface-muted">
-                      {recordNames[summary.instance.recordId] ?? 'Bản ghi chưa có tên hiển thị'}
+                      {summary.recordName ?? 'Bản ghi chưa có tên hiển thị'}
                     </td>
                     <td className="px-4 py-3 text-xs text-on-surface-muted">
                       {formatTimestamp(summary.instance.startedAt)}

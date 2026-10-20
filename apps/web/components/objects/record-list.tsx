@@ -140,7 +140,9 @@ export function RecordList({
                       ) : null}
                       {fields.map((field) => (
                         <td key={field.key} className="px-4 py-3 align-top">
-                          {formatFieldValue(field, record.values[field.key])}
+                          {field.type === 'file'
+                            ? (record.attachmentNames?.[field.key] ?? 'Tệp đính kèm')
+                            : formatFieldValue(field, record.values[field.key])}
                         </td>
                       ))}
                       <td className="px-4 py-3 text-xs whitespace-nowrap text-on-surface-muted">

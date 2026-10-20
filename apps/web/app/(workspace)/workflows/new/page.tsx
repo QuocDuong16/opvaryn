@@ -27,7 +27,7 @@ export default async function NewWorkflowPage() {
   try {
     const [objectPage, roles, me] = await Promise.all([
       api.listBusinessObjects({ limit: 100 }),
-      api.listRoles(),
+      api.listRoles().then((page) => page.data),
       api.getMe(),
     ]);
     objects = objectPage.data;

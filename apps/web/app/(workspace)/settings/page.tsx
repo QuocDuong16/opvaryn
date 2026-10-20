@@ -283,7 +283,7 @@ export default async function SettingsPage() {
   let deliveries: WebhookDeliveryList | null = null;
   let deliveriesError: string | null = null;
   try {
-    deliveries = await api.listWebhookDeliveries(10);
+    deliveries = await api.listWebhookDeliveries({ limit: 10 });
   } catch (cause) {
     deliveriesError =
       cause instanceof ApiError && cause.code === 'forbidden'

@@ -244,6 +244,14 @@ Entry points: `cmd/server` (HTTP server, signal-aware graceful shutdown) and `cm
   `0012_record_audit.sql` (append-only `record_audit`; no FK on `record_id`; actor name snapshot;
   `changes` jsonb) and `0013_login_failures.sql` (`login_failures(email, failed_at)` for the
   cooldown).
+- `store.RecordLabelSources` reads the values and the version fields of a page of records, so a
+  list can name each record with the schema that record has (ADR 0006). `service.recordLabel`
+  (service/recordlabel.go) applies the rule — the first text field, else the first field — and
+  `ProcessRuntime.List`/`Inbox` put the result in `RecordName`; the API returns it as
+  `recordName`. The web no longer builds record names from a sample of 100 records.
+- `Principal.PublisherLabel()` is who published a definition version: the person's name, or their
+  address when nobody has named them, and `system` when there is no person. It is written to
+  `published_by` (ADR 0006, point 7).
 - `store/objectrecord.go` applies `recordVisibleToScope` to every read and write-back lookup: admin
   (`$2`) sees all, otherwise the record's department (`$3`), the caller's own records (`$4`), or a
   record whose instance has an open task for a role the caller holds — that last clause is what

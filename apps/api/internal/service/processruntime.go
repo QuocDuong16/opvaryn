@@ -395,7 +395,14 @@ func (r *ProcessRuntime) Inbox(
 	if err != nil {
 		return domain.Paged[domain.InboxItem]{}, err
 	}
-	return r.store.ListOpenTasksForRoles(ctx, principal.UserID, opts.Query, opts.Page)
+	page, err := r.store.ListOpenTasksForRoles(ctx, principal.UserID, opts.Query, opts.Page)
+	if err != nil {
+		return domain.Paged[domain.InboxItem]{}, err
+	}
+	for i := range page.Items {
+		page.Items[i].RecordName = recordLabel(page.Items[i].RecordSource)
+	}
+	return page, nil
 }
 
 // ListInput is the request to list instances, optionally narrowed to one business
@@ -455,8 +462,15 @@ func (r *ProcessRuntime) List(
 		return domain.Paged[domain.ProcessInstanceSummary]{}, &ValidationError{Problems: problems}
 	}
 
-	return r.store.ListVisibleProcessInstances(
+	instances, err := r.store.ListVisibleProcessInstances(
 		ctx, filter, domain.RecordScopeFor(in.Principal), page)
+	if err != nil {
+		return domain.Paged[domain.ProcessInstanceSummary]{}, err
+	}
+	for i := range instances.Items {
+		instances.Items[i].RecordName = recordLabel(instances.Items[i].RecordSource)
+	}
+	return instances, nil
 }
 
 // Get returns the instance with its tasks and its log, if the caller may see the

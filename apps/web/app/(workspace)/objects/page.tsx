@@ -35,7 +35,10 @@ export default async function ObjectsPage({ searchParams }: PageProps) {
     const [page, me, roles] = await Promise.all([
       api.listBusinessObjects({ q: query || undefined, limit: PER_PAGE, offset }),
       api.getMe(),
-      api.listRoles().catch(() => []),
+      api
+        .listRoles()
+        .then((page) => page.data)
+        .catch(() => []),
     ]);
     objects = page.data;
     total = page.total;

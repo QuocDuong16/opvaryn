@@ -1,6 +1,10 @@
 package domain
 
-import "github.com/google/uuid"
+import (
+	"strings"
+
+	"github.com/google/uuid"
+)
 
 // RoleProcessDesigner may create and publish business object and process
 // definitions. The owner's decision (ADR 0008) is admin plus this role, so the
@@ -31,6 +35,19 @@ func NewPrincipal(user User) Principal {
 
 // Authenticated reports whether a real user is behind the call.
 func (p Principal) Authenticated() bool { return p.UserID != uuid.Nil }
+
+// PublisherLabel is who published a version: the person's name, or their address when
+// nobody has named them yet. It is a snapshot, so a later rename does not rewrite the
+// history.
+func (p Principal) PublisherLabel() string {
+	if name := strings.TrimSpace(p.Name); name != "" {
+		return name
+	}
+	if email := strings.TrimSpace(p.Email); email != "" {
+		return email
+	}
+	return "system"
+}
 
 // HasRole reports whether the caller holds a role.
 func (p Principal) HasRole(role string) bool {

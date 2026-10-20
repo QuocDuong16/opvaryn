@@ -138,7 +138,11 @@ func (s *Store) FindBusinessObjectVersion(
 
 // CreateBusinessObject inserts a definition and publishes its first version in one
 // transaction. It returns ErrConflict when the key already exists.
-func (s *Store) CreateBusinessObject(ctx context.Context, object domain.BusinessObject) (domain.BusinessObject, error) {
+func (s *Store) CreateBusinessObject(
+	ctx context.Context,
+	object domain.BusinessObject,
+	publisher string,
+) (domain.BusinessObject, error) {
 	created := object
 
 	err := pgx.BeginFunc(ctx, s.pool, func(tx pgx.Tx) error {
@@ -156,7 +160,7 @@ func (s *Store) CreateBusinessObject(ctx context.Context, object domain.Business
 			return fmt.Errorf("insert business object: %w", err)
 		}
 
-		versionID, err := insertDefinitionVersion(ctx, tx, object, 1)
+		versionID, err := insertDefinitionVersion(ctx, tx, object, 1, publisher)
 		if err != nil {
 			return err
 		}
@@ -179,6 +183,7 @@ func (s *Store) UpdateBusinessObject(
 	name string,
 	description string,
 	fields []domain.FieldDefinition,
+	publisher string,
 ) (domain.BusinessObject, error) {
 	updated := domain.BusinessObject{Key: key, Name: name, Description: description, Fields: fields}
 
@@ -204,7 +209,7 @@ func (s *Store) UpdateBusinessObject(
 		}
 
 		current := domain.BusinessObject{ID: objectID, Key: key, Name: name, Fields: fields}
-		versionID, err := insertDefinitionVersion(ctx, tx, current, next)
+		versionID, err := insertDefinitionVersion(ctx, tx, current, next, publisher)
 		if err != nil {
 			return err
 		}
@@ -232,7 +237,13 @@ func (s *Store) UpdateBusinessObject(
 
 // insertDefinitionVersion writes one immutable snapshot inside the caller's
 // transaction and returns its id.
-func insertDefinitionVersion(ctx context.Context, tx pgx.Tx, object domain.BusinessObject, version int) (uuid.UUID, error) {
+func insertDefinitionVersion(
+	ctx context.Context,
+	tx pgx.Tx,
+	object domain.BusinessObject,
+	version int,
+	publisher string,
+) (uuid.UUID, error) {
 	fields, err := json.Marshal(object.Fields)
 	if err != nil {
 		return uuid.Nil, fmt.Errorf("encode fields: %w", err)
@@ -241,9 +252,9 @@ func insertDefinitionVersion(ctx context.Context, tx pgx.Tx, object domain.Busin
 	versionID := uuid.New()
 	if _, err := tx.Exec(ctx, `
 		INSERT INTO business_object_versions
-		       (id, object_id, version, name, description, fields)
-		VALUES ($1, $2, $3, $4, $5, $6)`,
-		versionID, object.ID, version, object.Name, object.Description, fields); err != nil {
+		       (id, object_id, version, name, description, fields, published_by)
+		VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+		versionID, object.ID, version, object.Name, object.Description, fields, publisher); err != nil {
 		return uuid.Nil, fmt.Errorf("insert definition version: %w", err)
 	}
 	return versionID, nil

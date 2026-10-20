@@ -68,8 +68,23 @@ func (f *fakeMetricStore) UpdateMetricDefinition(_ context.Context, metric domai
 	return metric, nil
 }
 
-func (f *fakeMetricStore) ListMetricDefinitions(context.Context) ([]domain.MetricDefinition, error) {
-	return f.metrics, f.err
+func (f *fakeMetricStore) ListMetricDefinitionsPage(
+	_ context.Context,
+	page domain.Page,
+) (domain.Paged[domain.MetricDefinition], error) {
+	if f.err != nil {
+		return domain.Paged[domain.MetricDefinition]{}, f.err
+	}
+	items := f.metrics
+	if page.Offset >= len(items) {
+		items = []domain.MetricDefinition{}
+	} else {
+		items = items[page.Offset:]
+	}
+	if len(items) > page.Limit && page.Limit > 0 {
+		items = items[:page.Limit]
+	}
+	return domain.Paged[domain.MetricDefinition]{Items: items, Total: len(f.metrics)}, nil
 }
 
 func (f *fakeMetricStore) GetMetricDefinitionByKey(_ context.Context, key string) (domain.MetricDefinition, error) {
@@ -116,10 +131,10 @@ func TestMetricsRequireADesigner(t *testing.T) {
 	if _, err := metrics.Create(context.Background(), input, managerPrincipal()); !errors.Is(err, ErrForbidden) {
 		t.Fatalf("a caller without a designer role must be refused, got %v", err)
 	}
-	if _, err := metrics.List(context.Background(), anonymous()); !errors.Is(err, ErrUnauthorized) {
+	if _, err := metrics.List(context.Background(), anonymous(), ListOptions{}); !errors.Is(err, ErrUnauthorized) {
 		t.Fatalf("an anonymous list must be refused, got %v", err)
 	}
-	if _, err := metrics.List(context.Background(), managerPrincipal()); err != nil {
+	if _, err := metrics.List(context.Background(), managerPrincipal(), ListOptions{}); err != nil {
 		t.Fatalf("any signed-in user may read metrics: %v", err)
 	}
 

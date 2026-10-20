@@ -224,7 +224,8 @@
   sibling modules (`components/objects/create-object-state.ts`,
   `components/forms/object-form-state.ts`, `components/forms/record-values.ts`,
   `components/objects/field-draft.ts`).
-- `lib/format.ts`: `FIELD_TYPE_LABELS`, `formatTimestamp`, `formatDate` (no timezone shift),
+- `lib/format.ts`: `FIELD_TYPE_LABELS`, `formatTimestamp`, `formatClock` (the one time format),
+  `formatDate` (no timezone shift),
   `formatFieldValue` (per field type), `primaryFieldValue` (the label that identifies a record).
 
 ## Schema-driven UI

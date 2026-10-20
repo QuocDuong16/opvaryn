@@ -173,7 +173,7 @@ export interface ApiClient {
   listProcessDefinitionVersions(key: string): Promise<ProcessDefinitionVersion[]>;
   listInboxTasks(query?: PageQuery): Promise<Paged<InboxItem>>;
   /** Role keys held by at least one user: what the workflow designer offers. */
-  listRoles(): Promise<RoleEntry[]>;
+  listRoles(query?: PageQuery): Promise<Paged<RoleEntry>>;
   listAdminUsers(query?: PageQuery): Promise<Paged<AdminUser>>;
   getAdminUser(userId: string): Promise<AdminUser>;
   createAdminUser(input: CreateAdminUserRequest): Promise<AdminUser>;
@@ -193,7 +193,7 @@ export interface ApiClient {
   createAdminRole(input: CreateAdminRoleRequest): Promise<AdminRole>;
   updateAdminRole(key: string, input: UpdateAdminRoleRequest): Promise<AdminRole>;
   deleteAdminRole(key: string): Promise<void>;
-  listMetrics(): Promise<MetricDefinition[]>;
+  listMetrics(query?: PageQuery): Promise<Paged<MetricDefinition>>;
   getMetric(key: string): Promise<MetricDefinition>;
   createMetric(input: CreateMetricDefinitionRequest): Promise<MetricDefinition>;
   updateMetric(key: string, input: UpdateMetricDefinitionRequest): Promise<MetricDefinition>;
@@ -202,7 +202,7 @@ export interface ApiClient {
     definitionKey?: string;
     windowDays?: number;
   }): Promise<ProcessMetricsOverview>;
-  listWebhookDeliveries(limit?: number): Promise<WebhookDeliveryList>;
+  listWebhookDeliveries(query?: PageQuery): Promise<WebhookDeliveryList>;
   getProcessInstance(instanceId: string): Promise<ProcessInstanceView>;
   listProcessInstances(
     filter?: { objectKey?: string; definitionKey?: string; recordId?: string },
@@ -358,9 +358,8 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
       return request<Paged<InboxItem>>(`/api/v1/tasks${pageParams(query)}`);
     },
 
-    async listRoles() {
-      const payload = await request<{ data: RoleEntry[] }>('/api/v1/roles');
-      return payload.data;
+    async listRoles(query) {
+      return request<Paged<RoleEntry>>(`/api/v1/roles${pageParams(query)}`);
     },
 
     async listAdminUsers(query) {
@@ -429,9 +428,8 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
     deleteAdminRole: (key) =>
       request<void>(`/api/v1/admin/roles/${encodeURIComponent(key)}`, { method: 'DELETE' }),
 
-    async listMetrics() {
-      const payload = await request<{ data: MetricDefinition[] }>('/api/v1/metrics');
-      return payload.data;
+    async listMetrics(query) {
+      return request<Paged<MetricDefinition>>(`/api/v1/metrics${pageParams(query)}`);
     },
 
     getMetric: (key) => request<MetricDefinition>(`/api/v1/metrics/${encodeURIComponent(key)}`),
@@ -448,10 +446,8 @@ export function createApiClient(baseUrl: string, fetchImpl: typeof fetch = fetch
     getMetricResult: (key) =>
       request<MetricResult>(`/api/v1/metrics/${encodeURIComponent(key)}/result`),
 
-    listWebhookDeliveries: (limit) =>
-      request<WebhookDeliveryList>(
-        `/api/v1/webhook-deliveries${limit ? `?limit=${limit}` : ''}`,
-      ),
+    listWebhookDeliveries: (query) =>
+      request<WebhookDeliveryList>(`/api/v1/webhook-deliveries${pageParams(query)}`),
 
     getProcessMetrics: (filter = {}) => {
       const params = new URLSearchParams();

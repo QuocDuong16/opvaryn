@@ -59,7 +59,10 @@ export default async function ProcessInstancePage({ params }: PageProps) {
     view = await api.getProcessInstance(instanceId);
     // The screen names roles, so it needs the catalogue. A missing catalogue is not fatal:
     // the chips fall back to the key rather than showing nothing.
-    const catalogue = await api.listRoles().catch(() => []);
+    const catalogue = await api
+      .listRoles()
+      .then((page) => page.data)
+      .catch(() => []);
     roleLabels = Object.fromEntries(catalogue.map((entry) => [entry.key, entry.label]));
     // Names, not keys: the process and the kind of record it runs on (ADR 0016).
     const [definition, object] = await Promise.all([
@@ -366,14 +369,12 @@ interface RecordContext {
 async function loadRecordContext(objectKey: string, recordId: string): Promise<RecordContext> {
   const api = createServerApiClient();
   try {
-    const [versions, records] = await Promise.all([
+    // The record is read directly, not picked from a page of records: a sample would say
+    // "unreadable" about a record the caller may well read.
+    const [record, versions] = await Promise.all([
+      api.getObjectRecord(objectKey, recordId),
       api.listBusinessObjectVersions(objectKey),
-      api.listObjectRecords(objectKey, { limit: 100 }).then((page) => page.data),
     ]);
-    const record = records.find((candidate) => candidate.id === recordId) ?? null;
-    if (!record) {
-      return { record: null, fields: [], error: null };
-    }
     const version = versions.find((candidate) => candidate.version === record.objectVersion);
     return { record, fields: version?.fields ?? [], error: null };
   } catch (cause) {

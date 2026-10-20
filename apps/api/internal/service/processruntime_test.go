@@ -878,3 +878,56 @@ func approverPrincipal() domain.Principal {
 		Roles:         []string{managerRole},
 	}
 }
+
+// A list names the record a run works on, with the schema that record was created under
+// (ADR 0006, ADR 0018). The name comes from the record itself, never from a sample.
+func TestRecordLabelUsesTheRecordsOwnVersion(t *testing.T) {
+	t.Parallel()
+
+	cases := []struct {
+		name   string
+		source domain.RecordLabelSource
+		want   string
+	}{
+		{
+			name: "the first text field names the record",
+			source: domain.RecordLabelSource{
+				Values: map[string]any{"title": "  Đề nghị mua hàng  ", "amount": float64(20)},
+				Fields: []domain.FieldDefinition{
+					{Key: "title", Label: "Tiêu đề", Type: domain.FieldTypeText},
+					{Key: "amount", Label: "Số tiền", Type: domain.FieldTypeNumber},
+				},
+			},
+			want: "Đề nghị mua hàng",
+		},
+		{
+			name: "a record without a text field keeps the first field's value",
+			source: domain.RecordLabelSource{
+				Values: map[string]any{"amount": float64(20)},
+				Fields: []domain.FieldDefinition{
+					{Key: "amount", Label: "Số tiền", Type: domain.FieldTypeNumber},
+				},
+			},
+			want: "20",
+		},
+		{
+			name:   "a record without a name has none",
+			source: domain.RecordLabelSource{Values: map[string]any{}, Fields: []domain.FieldDefinition{{Key: "title", Type: domain.FieldTypeText}}},
+			want:   "",
+		},
+		{
+			name:   "a record without fields has none",
+			source: domain.RecordLabelSource{Values: map[string]any{"title": "x"}},
+			want:   "",
+		},
+	}
+
+	for _, testCase := range cases {
+		t.Run(testCase.name, func(t *testing.T) {
+			t.Parallel()
+			if got := recordLabel(testCase.source); got != testCase.want {
+				t.Fatalf("recordLabel = %q, want %q", got, testCase.want)
+			}
+		})
+	}
+}

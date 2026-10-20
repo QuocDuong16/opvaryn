@@ -353,7 +353,11 @@ func (f *fakeDefinitionStore) ListProcessDefinitionVersions(context.Context, uui
 	return nil, f.err
 }
 
-func (f *fakeDefinitionStore) CreateProcessDefinition(_ context.Context, definition domain.ProcessDefinition) (domain.ProcessDefinition, error) {
+func (f *fakeDefinitionStore) CreateProcessDefinition(
+	_ context.Context,
+	definition domain.ProcessDefinition,
+	_ string,
+) (domain.ProcessDefinition, error) {
 	if f.err != nil {
 		return domain.ProcessDefinition{}, f.err
 	}
@@ -362,7 +366,7 @@ func (f *fakeDefinitionStore) CreateProcessDefinition(_ context.Context, definit
 }
 
 func (f *fakeDefinitionStore) UpdateProcessDefinition(
-	context.Context, string, string, string, string, []domain.ProcessNode, []domain.ProcessEdge,
+	context.Context, string, string, string, string, []domain.ProcessNode, []domain.ProcessEdge, string,
 ) (domain.ProcessDefinition, error) {
 	return domain.ProcessDefinition{}, f.err
 }

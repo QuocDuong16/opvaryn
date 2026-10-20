@@ -56,8 +56,20 @@ func (f *fakeWebhookStore) MarkWebhookFailed(_ context.Context, id uuid.UUID, st
 	return f.failureErr
 }
 
-func (f *fakeWebhookStore) ListWebhookDeliveries(context.Context, int) ([]domain.WebhookDelivery, error) {
-	return f.listed, nil
+func (f *fakeWebhookStore) ListWebhookDeliveriesPage(
+	_ context.Context,
+	page domain.Page,
+) (domain.Paged[domain.WebhookDelivery], error) {
+	items := f.listed
+	if page.Offset >= len(items) {
+		items = []domain.WebhookDelivery{}
+	} else {
+		items = items[page.Offset:]
+	}
+	if len(items) > page.Limit && page.Limit > 0 {
+		items = items[:page.Limit]
+	}
+	return domain.Paged[domain.WebhookDelivery]{Items: items, Total: len(f.listed)}, nil
 }
 
 // quietLogger keeps the worker's warnings out of the test output: a failing receiver is
@@ -249,17 +261,17 @@ func TestWebhookDeliveriesAreForDesigners(t *testing.T) {
 	store := &fakeWebhookStore{listed: []domain.WebhookDelivery{{ID: uuid.New()}}}
 	webhooks := newWebhooks(store, "http://example.invalid")
 
-	if _, err := webhooks.RecentDeliveries(context.Background(), 10, anonymous()); err == nil {
+	if _, err := webhooks.RecentDeliveries(context.Background(), ListOptions{}, anonymous()); err == nil {
 		t.Fatal("an anonymous caller must not read the delivery log")
 	}
-	if _, err := webhooks.RecentDeliveries(context.Background(), 10, managerPrincipal()); err == nil {
+	if _, err := webhooks.RecentDeliveries(context.Background(), ListOptions{}, managerPrincipal()); err == nil {
 		t.Fatal("a caller without a designer role must not read the delivery log")
 	}
-	deliveries, err := webhooks.RecentDeliveries(context.Background(), 10, testPrincipal())
+	deliveries, err := webhooks.RecentDeliveries(context.Background(), ListOptions{}, testPrincipal())
 	if err != nil {
 		t.Fatalf("RecentDeliveries returned error: %v", err)
 	}
-	if len(deliveries) != 1 {
-		t.Fatalf("expected the store's list, got %+v", deliveries)
+	if len(deliveries.Items) != 1 || deliveries.Total != 1 {
+		t.Fatalf("expected the store's list and its total, got %+v", deliveries)
 	}
 }

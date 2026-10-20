@@ -97,32 +97,45 @@ func (s *Store) CreateUser(ctx context.Context, user domain.User, passwordHash s
 	return created, nil
 }
 
-// ListRoles returns every role at least one user holds, sorted. It is the catalogue
-// the workflow designer offers: a definition that assigns a role nobody holds would
-// wait forever, so the editor wants the roles that actually exist.
-func (s *Store) ListRoles(ctx context.Context) ([]string, error) {
-	rows, err := s.pool.Query(ctx, `
+// ListHeldRolesPage returns one page of the roles at least one person holds. It is the
+// catalogue the workflow designer offers: a definition that assigns a role nobody holds
+// would wait forever, so the editor wants the roles that actually exist. The list is
+// paged like every other list (ADR 0017), so a caller knows how many rows are behind it.
+func (s *Store) ListHeldRolesPage(
+	ctx context.Context,
+	page domain.Page,
+) (domain.Paged[string], error) {
+	const roles = `
 		SELECT r.key
 		  FROM roles r
 		 WHERE EXISTS (SELECT 1 FROM user_roles ur WHERE ur.role = r.key)
-		 ORDER BY r.key`)
+		 ORDER BY r.key`
+
+	var total int
+	if err := s.pool.QueryRow(ctx,
+		`SELECT count(*) FROM roles r
+		 WHERE EXISTS (SELECT 1 FROM user_roles ur WHERE ur.role = r.key)`).Scan(&total); err != nil {
+		return domain.Paged[string]{}, classify(fmt.Errorf("count roles: %w", err))
+	}
+
+	rows, err := s.pool.Query(ctx, roles+` LIMIT $1 OFFSET $2`, page.Limit, page.Offset)
 	if err != nil {
-		return nil, classify(fmt.Errorf("query roles: %w", err))
+		return domain.Paged[string]{}, classify(fmt.Errorf("query roles: %w", err))
 	}
 	defer rows.Close()
 
-	roles := make([]string, 0)
+	keys := make([]string, 0, page.Limit)
 	for rows.Next() {
 		var role string
 		if err := rows.Scan(&role); err != nil {
-			return nil, classify(fmt.Errorf("scan role: %w", err))
+			return domain.Paged[string]{}, classify(fmt.Errorf("scan role: %w", err))
 		}
-		roles = append(roles, role)
+		keys = append(keys, role)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, classify(fmt.Errorf("read roles: %w", err))
+		return domain.Paged[string]{}, classify(fmt.Errorf("read roles: %w", err))
 	}
-	return roles, nil
+	return domain.Paged[string]{Items: keys, Total: total}, nil
 }
 
 // AddUserRoles grants roles without removing the ones already held.

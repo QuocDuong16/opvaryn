@@ -377,12 +377,22 @@ func toDomainProcessEdges(edges []apiv1.ProcessEdge) []domain.ProcessEdge {
 	return result
 }
 
+// optionalString answers a pointer to a string, or nothing when the text is empty: the
+// contract says an absent name means "this record has no readable name".
+func optionalString(value string) *string {
+	if value == "" {
+		return nil
+	}
+	return &value
+}
+
 func toAPIInboxItems(items []domain.InboxItem) []apiv1.InboxItem {
 	result := make([]apiv1.InboxItem, len(items))
 	for i, item := range items {
 		result[i] = apiv1.InboxItem{
-			Task:     toAPIInstanceView(service.InstanceView{Tasks: []domain.ProcessTask{item.Task}}).Tasks[0],
-			Instance: toAPIInstanceView(service.InstanceView{Instance: item.Instance}).Instance,
+			Task:       toAPIInstanceView(service.InstanceView{Tasks: []domain.ProcessTask{item.Task}}).Tasks[0],
+			Instance:   toAPIInstanceView(service.InstanceView{Instance: item.Instance}).Instance,
+			RecordName: optionalString(item.RecordName),
 		}
 	}
 	return result
@@ -392,8 +402,9 @@ func toAPIInstanceSummaries(summaries []domain.ProcessInstanceSummary) []apiv1.P
 	result := make([]apiv1.ProcessInstanceSummary, len(summaries))
 	for i, summary := range summaries {
 		result[i] = apiv1.ProcessInstanceSummary{
-			Instance:  toAPIInstanceView(service.InstanceView{Instance: summary.Instance}).Instance,
-			OpenTasks: toAPIInstanceView(service.InstanceView{Tasks: summary.OpenTasks}).Tasks,
+			Instance:   toAPIInstanceView(service.InstanceView{Instance: summary.Instance}).Instance,
+			OpenTasks:  toAPIInstanceView(service.InstanceView{Tasks: summary.OpenTasks}).Tasks,
+			RecordName: optionalString(summary.RecordName),
 		}
 	}
 	return result

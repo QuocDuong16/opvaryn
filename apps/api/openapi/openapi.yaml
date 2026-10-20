@@ -655,6 +655,24 @@ paths:
         every definition the caller can read, so this exposes nothing new.
       security:
         - sessionCookie: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Rows per page (default 25, maximum 100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: offset
+          in: query
+          required: false
+          description: Rows to skip.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         '200':
           description: Role keys, sorted
@@ -662,6 +680,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/RoleList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '503':
@@ -1279,6 +1299,24 @@ paths:
         or process definitions.
       security:
         - sessionCookie: []
+      parameters:
+        - name: limit
+          in: query
+          required: false
+          description: Rows per page (default 25, maximum 100).
+          schema:
+            type: integer
+            minimum: 1
+            maximum: 100
+            default: 25
+        - name: offset
+          in: query
+          required: false
+          description: Rows to skip.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         '200':
           description: Metric definitions, ordered by key
@@ -1286,6 +1324,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/MetricDefinitionList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '503':
@@ -1435,12 +1475,20 @@ paths:
         - name: limit
           in: query
           required: false
-          description: How many deliveries to return, newest first; 1–200, default 50.
+          description: How many deliveries to return, newest first (default 25, maximum 100).
           schema:
             type: integer
             minimum: 1
-            maximum: 200
-            default: 50
+            maximum: 100
+            default: 25
+        - name: offset
+          in: query
+          required: false
+          description: Rows to skip.
+          schema:
+            type: integer
+            minimum: 0
+            default: 0
       responses:
         '200':
           description: The delivery log
@@ -1448,6 +1496,8 @@ paths:
             application/json:
               schema:
                 $ref: '#/components/schemas/WebhookDeliveryList'
+        '400':
+          $ref: '#/components/responses/BadRequest'
         '401':
           $ref: '#/components/responses/Unauthorized'
         '403':
@@ -2330,7 +2380,9 @@ components:
           format: date-time
         publishedBy:
           type: string
-          description: Actor that published the version; "system" until identity exists.
+          description: |
+            The person who published the version: their name, or their address when nobody has
+            named them. It is a snapshot, so a later rename does not rewrite the history.
           example: system
     BusinessObjectVersionList:
       type: object
@@ -2468,6 +2520,9 @@ components:
           format: date-time
         publishedBy:
           type: string
+          description: |
+            The person who published the version: their name, or their address when nobody has
+            named them. It is a snapshot, so a later rename does not rewrite the history.
     ProcessDefinitionVersionList:
       type: object
       required: [data]
@@ -2622,6 +2677,12 @@ components:
           $ref: '#/components/schemas/ProcessTask'
         instance:
           $ref: '#/components/schemas/ProcessInstance'
+        recordName:
+          type: string
+          description: |
+            The value that identifies the record this task runs on, read with the definition
+            version that record was created under. Empty when the record has no readable
+            name; a screen then says so instead of printing an id (ADR 0018).
     InboxList:
       type: object
       required: [data, total]
@@ -2661,6 +2722,12 @@ components:
           description: The tasks of this instance still waiting on a decision.
           items:
             $ref: '#/components/schemas/ProcessTask'
+        recordName:
+          type: string
+          description: |
+            The value that identifies the record this run works on, read with the definition
+            version that record was created under. Empty when the record has no readable
+            name; a screen then says so instead of printing an id (ADR 0018).
     ProcessInstanceList:
       type: object
       required: [data, total]
@@ -2737,8 +2804,12 @@ components:
           format: uuid
     RoleList:
       type: object
-      required: [data]
+      required: [data, total]
       properties:
+        total:
+          type: integer
+          description: Roles behind the page. A caller paginates with it instead of asking for everything.
+          example: 4
         data:
           type: array
           description: Roles held by at least one user, sorted by key.
@@ -3098,11 +3169,15 @@ components:
           format: date-time
     WebhookDeliveryList:
       type: object
-      required: [enabled, data]
+      required: [enabled, data, total]
       properties:
         enabled:
           type: boolean
           description: Whether an endpoint is configured; when false nothing is queued.
+        total:
+          type: integer
+          description: Deliveries behind the page. A caller paginates with it instead of asking for everything.
+          example: 120
         data:
           type: array
           description: Newest first.
@@ -3145,8 +3220,12 @@ components:
           format: date-time
     MetricDefinitionList:
       type: object
-      required: [data]
+      required: [data, total]
       properties:
+        total:
+          type: integer
+          description: Metric definitions behind the page. A caller paginates with it instead of asking for everything.
+          example: 3
         data:
           type: array
           description: Metric definitions, ordered by key.

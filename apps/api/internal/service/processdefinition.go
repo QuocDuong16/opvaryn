@@ -27,7 +27,11 @@ type processDefinitionStore interface {
 	) (domain.Paged[domain.ProcessDefinition], error)
 	GetProcessDefinitionByKey(ctx context.Context, key string) (domain.ProcessDefinition, error)
 	ListProcessDefinitionVersions(ctx context.Context, definitionID uuid.UUID) ([]domain.ProcessDefinitionVersion, error)
-	CreateProcessDefinition(ctx context.Context, definition domain.ProcessDefinition) (domain.ProcessDefinition, error)
+	CreateProcessDefinition(
+		ctx context.Context,
+		definition domain.ProcessDefinition,
+		publisher string,
+	) (domain.ProcessDefinition, error)
 	UpdateProcessDefinition(
 		ctx context.Context,
 		key string,
@@ -36,6 +40,7 @@ type processDefinitionStore interface {
 		objectKey string,
 		nodes []domain.ProcessNode,
 		edges []domain.ProcessEdge,
+		publisher string,
 	) (domain.ProcessDefinition, error)
 }
 
@@ -150,7 +155,7 @@ func (s *ProcessDefinitions) Create(ctx context.Context, in NewProcessDefinition
 		ObjectKey:   in.ObjectKey,
 		Nodes:       normalizeProcessNodes(in.Nodes),
 		Edges:       in.Edges,
-	})
+	}, principal.PublisherLabel())
 }
 
 // Update validates the graph and publishes the next version.
@@ -180,6 +185,7 @@ func (s *ProcessDefinitions) Update(ctx context.Context, key string, in UpdatePr
 		in.ObjectKey,
 		normalizeProcessNodes(in.Nodes),
 		in.Edges,
+		principal.PublisherLabel(),
 	)
 	if err != nil {
 		return domain.ProcessDefinition{}, fmt.Errorf("update process definition %q: %w", key, err)

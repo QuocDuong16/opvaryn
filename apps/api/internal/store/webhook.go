@@ -94,29 +94,40 @@ func (s *Store) MarkWebhookFailed(
 
 // ListWebhookDeliveries returns the most recent deliveries, newest first, for the
 // operations view that makes failures visible.
-func (s *Store) ListWebhookDeliveries(ctx context.Context, limit int) ([]domain.WebhookDelivery, error) {
+// ListWebhookDeliveriesPage returns one page of the delivery log, newest first, with the
+// total behind it (ADR 0017).
+func (s *Store) ListWebhookDeliveriesPage(
+	ctx context.Context,
+	page domain.Page,
+) (domain.Paged[domain.WebhookDelivery], error) {
+	var total int
+	if err := s.pool.QueryRow(ctx,
+		`SELECT count(*) FROM webhook_deliveries`).Scan(&total); err != nil {
+		return domain.Paged[domain.WebhookDelivery]{}, classify(fmt.Errorf("count webhook deliveries: %w", err))
+	}
+
 	rows, err := s.pool.Query(ctx, `
 		SELECT `+webhookDeliveryColumns+`
 		  FROM webhook_deliveries
 		 ORDER BY created_at DESC
-		 LIMIT $1`, limit)
+		 LIMIT $1 OFFSET $2`, page.Limit, page.Offset)
 	if err != nil {
-		return nil, classify(fmt.Errorf("list webhook deliveries: %w", err))
+		return domain.Paged[domain.WebhookDelivery]{}, classify(fmt.Errorf("list webhook deliveries: %w", err))
 	}
 	defer rows.Close()
 
-	deliveries := make([]domain.WebhookDelivery, 0)
+	deliveries := make([]domain.WebhookDelivery, 0, page.Limit)
 	for rows.Next() {
 		delivery, err := scanWebhookDelivery(rows)
 		if err != nil {
-			return nil, classify(fmt.Errorf("scan webhook delivery: %w", err))
+			return domain.Paged[domain.WebhookDelivery]{}, classify(fmt.Errorf("scan webhook delivery: %w", err))
 		}
 		deliveries = append(deliveries, delivery)
 	}
 	if err := rows.Err(); err != nil {
-		return nil, classify(fmt.Errorf("read webhook deliveries: %w", err))
+		return domain.Paged[domain.WebhookDelivery]{}, classify(fmt.Errorf("read webhook deliveries: %w", err))
 	}
-	return deliveries, nil
+	return domain.Paged[domain.WebhookDelivery]{Items: deliveries, Total: total}, nil
 }
 
 func scanWebhookDelivery(row rowScanner) (domain.WebhookDelivery, error) {

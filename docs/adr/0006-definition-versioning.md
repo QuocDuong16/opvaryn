@@ -36,9 +36,9 @@ hình dạng đó:
 6. **Chưa có trạng thái nháp**: sửa là publish ngay. Tách nháp/publish có ý nghĩa nhất với definition
    của quy trình, và sẽ được quyết cùng mô hình publish của workflow sau khi chốt D05/D08
    ([ADR 0005](0005-runtime-decisions-proposal.md)).
-7. **Actor của lần publish** được lưu ở `published_by`; hiện luôn là `system`. Identity đã có
-   (ADR 0008), nhưng service chưa ghi người phát hành vào cột này — khi làm, giá trị sẽ là user thật
-   và không cần đổi schema.
+7. **Actor của lần publish** được lưu ở `published_by`: tên người phát hành (địa chỉ khi chưa
+   ai đặt tên), lấy từ phiên đăng nhập chứ không từ request. Đây là một ảnh chụp, nên đổi tên sau
+   này không viết lại lịch sử.
 8. **Cho phép thêm, đổi nhãn và bỏ field**: bản ghi cũ giữ phiên bản của nó, nên lịch sử không bị
    viết lại. Đây chính là điểm khác biệt so với sửa tại chỗ.
 
