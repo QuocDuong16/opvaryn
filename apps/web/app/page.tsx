@@ -66,11 +66,11 @@ const TRUST: readonly { title: string; body: string }[] = [
 const STATUS: readonly { title: string; body: string }[] = [
   {
     title: 'Đang chạy (MVP V1)',
-    body: 'Loại dữ liệu và bản ghi, biểu mẫu sinh từ định nghĩa, quy trình phê duyệt với hộp việc, phân quyền theo vai trò và bộ phận, chỉ số tự định nghĩa cùng số liệu vận hành, gửi sự kiện ra hệ thống ngoài, và triển khai trên một máy chủ có sao lưu.',
+    body: 'Loại dữ liệu và bản ghi, biểu mẫu sinh từ định nghĩa, quy trình phê duyệt với hộp việc và hạn xử lý theo giờ làm việc, phân quyền theo vai trò và bộ phận, xác thực hai bước cho tài khoản quản trị, chỉ số tự định nghĩa cùng số liệu vận hành, gửi sự kiện ra hệ thống ngoài, và triển khai trên một máy chủ có sao lưu.',
   },
   {
     title: 'Chưa có',
-    body: 'Đăng nhập qua OIDC/SSO (chờ IdP của tổ chức), SLA và tự động chuyển cấp (cần chính sách thời gian làm việc), kết nối hai chiều với hệ thống ngoài, và các dạng xem kanban/connector đang ở mức minh hoạ.',
+    body: 'Đăng nhập qua OIDC/SSO (chờ IdP của tổ chức), kết nối hai chiều với hệ thống ngoài, các dạng xem kanban/connector đang ở mức minh hoạ, và những phần của quy trình nhiều nhánh song song.',
   },
 ];
 
