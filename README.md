@@ -111,7 +111,7 @@ Yêu cầu: [mise](https://mise.jdx.dev) và Docker. Hướng dẫn đầy đủ
 xử lý sự cố) nằm ở [docs/demo-guide.md](docs/demo-guide.md).
 
 ```bash
-mise install                 # pin go 1.27.2, node 26.9.0, pnpm 12.12.0 + Go tools
+mise install                 # pin go 1.27.3, node 26.9.0, pnpm 12.12.0 + Go tools
 pnpm install                 # cài dependency cho apps/web và packages
 cp .env.example .env         # cổng 21xxx, không đụng project khác trên máy
 

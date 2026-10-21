@@ -1,6 +1,6 @@
 # Toolchain and dependencies
 
-- Pinned by mise (`mise.toml` + committed `mise.lock`): go 1.27.2, node 26.9.0, pnpm 12.12.0,
+- Pinned by mise (`mise.toml` + committed `mise.lock`): go 1.27.3, node 26.9.0, pnpm 12.12.0,
   plus Go analysis tools (gopls 0.23.0, govulncheck 1.8.0, gosec pinned revision,
   golangci-lint 2.14.0). `[tool_alias] pnpm = "github:pnpm/pnpm"` is intentional (aqua registry
   gap); mirrors the sibling projects' mise.toml.
