@@ -11,7 +11,7 @@ Cần [mise](https://mise.jdx.dev) và Docker. Cổng dùng dải 21xxx để kh
 web **21500**, API **21501**, PostgreSQL **21532**.
 
 ```bash
-mise install                 # go 1.27.2, node 26.9.0, pnpm 12.12.0 + công cụ Go
+mise install                 # go 1.27.3, node 26.9.0, pnpm 12.12.0 + công cụ Go
 pnpm install                 # dependency cho apps/web và packages
 cp .env.example .env         # tuỳ chọn: code đã có default khớp với file mẫu
 ```
