@@ -62,6 +62,13 @@ open playbook decision), OIDC when the organisation has an IdP, and drag-and-dro
   (`/admin` + `/api/v1/admin/*`: users, departments, the role catalogue — ADR 0022) and the task
   inbox with its approve/return/reject decisions (ADR 0007). Still fixtures: the workflow designer screen,
   Analytics numbers and the kanban/connector panels (ADR 0003, updated 2026-10-14).
+- ADR 0029–0037 are **Accepted** and implemented: unlock a sign-in cooldown from `/admin`
+  (0029), two-step verification for administrator accounts (0030), working hours with due dates and
+  escalation (0031), computed fields and conditional visibility (0032), the Application Builder's
+  configuration tab (0033), a lookup source from another system (0034), work policies per work type
+  (0035), typed table columns with measurable formulas (0036) and the two-way lookup write-back
+  (0037). ADR 0031–0032 are still partly `concept` on screen: conditional visibility and SLA
+  escalation are marked as such in the interface.
 - Applied migrations are immutable: the runner verifies sha256 per version and refuses a changed
   file. A feature adds a new migration; it never edits an applied one.
 - Local ports are fixed in the 21xxx range — web 21500, API 21501, PostgreSQL 21532, and the pilot

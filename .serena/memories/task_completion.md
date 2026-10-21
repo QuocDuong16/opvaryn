@@ -50,3 +50,16 @@
 - The repository admin role is an always-bypass actor, so the owner can still push directly to
   `main` and merge without waiting; non-admin collaborators and fork PRs cannot.
 - Merge commits are disabled repo-wide (squash or rebase only) to match the linear-history rule.
+- `main` keeps **one commit per change** (about 60 granular commits, subjects like
+  `fix(web): …`), so merge a feature branch with `--rebase`, not `--squash`: a squash collapses
+  the ADR-by-ADR story into one commit and loses it.
+- GitGuardian Security Checks is a repository check but **not** one of the four required ones, so a
+  finding there does not block a merge — read it anyway before merging. It scans the whole PR diff
+  including every commit, so a secret committed and later fixed still fails the check: the fix must
+  remove the literal from the branch's *history*, not only from its tip. Purging it means rewriting
+  the branch (`git filter-branch --tree-filter`), force-pushing with
+  `--force-with-lease=<branch>:<old-sha>`, and letting CI re-run. The branch is not merged yet at
+  that point, so the rewrite is contained; after the merge it would be permanent in `main`.
+- A secret literal in a test script does not need to be a real credential to be flagged: GitGuardian
+  reported a base64 AES key that was obviously a test value. Generate such keys at run time
+  (`head -c 32 /dev/urandom | base64`) rather than committing them.
