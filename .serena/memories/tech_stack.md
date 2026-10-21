@@ -25,6 +25,16 @@
 - PostgreSQL 18 in `deployments/docker-compose.yml`, image pinned by digest (same digest as the
   sibling repos so one update covers the family). Application processes run on the host, not in
   containers — container images await the open deployment decision (playbook D10).
+- The Go pin moves in **three places together**: `mise.toml` (`go = "…"`), `mise.lock` (regenerate
+  with `mise lock`), and `apps/api/go.mod`'s `go` directive. The Go base image in
+  `apps/api/Dockerfile` is a fourth: it is pinned by digest and must resolve to the same patch
+  release, or the build fails with `go.mod requires go >= X (running go Y; GOTOOLCHAIN=local)`.
+  A `govulncheck` failure in the standard library is therefore a toolchain bump, not a code fix —
+  the fix is the newer Go, and the image digest follows the floating `golang:1.27-alpine` tag.
+- `mise` shims own `go`, `python3`, `git`-adjacent tools in PATH. A script that runs inside a
+  temporary checkout of this repository (e.g. a `git filter-branch` tree filter) will trip mise's
+  "config files are not trusted" error, because the copied `mise.toml` is a new path. Call
+  `/usr/bin/python3` and `/bin/bash` by absolute path in such scripts.
 - CI and update tooling: GitHub Actions workflows pin every action by full commit SHA (with a
   version comment); `actionlint` is pinned in mise.toml and runs inside `make quality-check`.
   Dependabot (`.github/dependabot.yml`) covers gomod, npm, github-actions and docker-compose
