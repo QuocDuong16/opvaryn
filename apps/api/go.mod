@@ -4,12 +4,12 @@ go 1.27.3
 
 require (
 	github.com/caarlos0/env/v11 v11.4.1
-	github.com/go-chi/chi/v5 v5.4.0
+	github.com/go-chi/chi/v5 v5.5.0
 	github.com/go-chi/cors v1.2.2
 	github.com/google/uuid v1.6.0
 	github.com/jackc/pgx/v5 v5.11.0
-	github.com/oapi-codegen/runtime v1.7.0
-	golang.org/x/crypto v0.52.0
+	github.com/oapi-codegen/runtime v1.8.0
+	golang.org/x/crypto v0.58.0
 )
 
 require (
@@ -17,6 +17,6 @@ require (
 	github.com/jackc/pgservicefile v0.0.0-20240606120523-5a60cdf6a761 // indirect
 	github.com/jackc/puddle/v2 v2.2.2 // indirect
 	golang.org/x/sync v0.24.0 // indirect
-	golang.org/x/sys v0.45.0 // indirect
+	golang.org/x/sys v0.49.0 // indirect
 	golang.org/x/text v0.43.0 // indirect
 )
