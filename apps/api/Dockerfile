@@ -21,7 +21,7 @@ RUN CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags '-s -w' -o /out/se
     && CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags '-s -w' -o /out/migrate ./cmd/migrate \
     && CGO_ENABLED=0 go build -trimpath -buildvcs=false -ldflags '-s -w' -o /out/useradm ./cmd/useradm
 
-FROM alpine:3.22@sha256:5291449c3df73caf6ed85e649dec1b9e818b39a5d8c871e97afc13e9cd5e8fa8 AS runtime
+FROM alpine:3.24@sha256:294b683cb724975bec92580e1e685676bd4b50bda910ddb8c51d4cabeaec77e6 AS runtime
 
 # ca-certificates for outbound TLS, tzdata so timestamps render in the host zone.
 RUN apk add --no-cache ca-certificates tzdata \
