@@ -51,6 +51,8 @@ updates:
 
   # GitHub Actions stay fully automated, majors included: actions must keep up
   # with GitHub's runtime retirements, and every bump is a reviewed pull request.
+  # CodeQL init and analyze must run at the same version, so Dependabot proposes
+  # them together; separate PRs fail with a CodeQL configuration error.
   - package-ecosystem: github-actions
     directory: /
     schedule:
@@ -59,6 +61,9 @@ updates:
       timezone: Asia/Ho_Chi_Minh
     commit-message:
       prefix: 'deps(actions)'
+    groups:
+      codeql-action:
+        patterns: ['github/codeql-action/*']
 
   - package-ecosystem: docker-compose
     directory: /deployments
