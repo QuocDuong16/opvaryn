@@ -16,6 +16,8 @@ import { MAX_IMPORT_BYTES, MAX_IMPORT_ROWS } from '@/lib/import';
 const repoRoot = resolve(import.meta.dirname, '..', '..', '..');
 
 function goSource(relativePath: string): string {
+  // The path is a fixed test fixture relative to this file, never user input.
+  // eslint-disable-next-line security/detect-non-literal-fs-filename
   return readFileSync(join(repoRoot, relativePath), 'utf8');
 }
 

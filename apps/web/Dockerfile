@@ -7,7 +7,7 @@
 # Base images are pinned by digest (AGENTS.md). Dependabot watches this file.
 # syntax=docker/dockerfile:1
 
-FROM node:26-alpine@sha256:143494b1da2945f061539253adc65e4f1569ddf07da2d384c022c791a9d90a4a AS build
+FROM node:26.13.1-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS build
 
 WORKDIR /repo
 
@@ -19,7 +19,7 @@ COPY apps/web/package.json apps/web/
 # Node 26 images no longer ship corepack, so pnpm is installed explicitly. The
 # version is the one mise.toml pins for the host; keep the two in step, because the
 # lockfile format is pnpm's.
-RUN npm install --global pnpm@12.12.0 && pnpm install --frozen-lockfile
+RUN npm install --global pnpm@12.23.0 && pnpm install --frozen-lockfile
 
 COPY packages ./packages
 COPY apps/web ./apps/web
@@ -27,7 +27,7 @@ COPY apps/web ./apps/web
 # the quality gate is what proves they match openapi.yaml.
 RUN pnpm --filter @opvaryn/web build
 
-FROM node:26-alpine@sha256:143494b1da2945f061539253adc65e4f1569ddf07da2d384c022c791a9d90a4a AS runtime
+FROM node:26.13.1-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS runtime
 
 RUN addgroup -S -g 10001 opvaryn && adduser -S -u 10001 -G opvaryn opvaryn
 

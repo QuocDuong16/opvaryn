@@ -422,8 +422,8 @@ export default async function SettingsPage() {
             <PortRow label="PostgreSQL" value="21532" />
           </dl>
           <p className="mt-4 text-xs leading-relaxed text-on-surface-muted">
-            Toolchain được pin bằng mise (<code>go 1.27.2</code>, <code>node 26.9.0</code>,{' '}
-            <code>pnpm 12.12.0</code>). Chạy <code>mise install</code> sau khi clone.
+            Toolchain được pin bằng mise (<code>go 1.27.4</code>, <code>node 26.13.1</code>,{' '}
+            <code>pnpm 12.23.0</code>). Chạy <code>mise install</code> sau khi clone.
           </p>
         </Card>
 

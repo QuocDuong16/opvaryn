@@ -27,8 +27,7 @@ interface PageProps {
   params: Promise<{ instanceId: string }>;
 }
 
-export async function generateMetadata({ params }: PageProps) {
-  const { instanceId } = await params;
+export async function generateMetadata() {
   return { title: 'Lần chạy' };
 }
 
@@ -44,11 +43,6 @@ const TASK_STYLES: Record<string, string> = {
   returned: 'border-border-strong text-on-surface-muted',
   rejected: 'border-danger/40 text-danger',
 };
-
-/** isOverdue says whether a deadline has passed. */
-function isOverdue(dueAt: string): boolean {
-  return new Date(dueAt).getTime() <= Date.now();
-}
 
 export default async function ProcessInstancePage({ params }: PageProps) {
   const { instanceId } = await params;

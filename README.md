@@ -111,7 +111,7 @@ Yêu cầu: [mise](https://mise.jdx.dev) và Docker. Hướng dẫn đầy đủ
 xử lý sự cố) nằm ở [docs/demo-guide.md](docs/demo-guide.md).
 
 ```bash
-mise install                 # pin go 1.27.3, node 26.9.0, pnpm 12.12.0 + Go tools
+mise install                 # pin go 1.27.4, node 26.13.1, pnpm 12.23.0 + Go tools
 pnpm install                 # cài dependency cho apps/web và packages
 cp .env.example .env         # cổng 21xxx, không đụng project khác trên máy
 
@@ -172,6 +172,7 @@ Các target thường dùng:
 | `make web-check` | Lint, format, typecheck, test, build cho web |
 | `make quality-check` | Toàn bộ gate phía trên + kiểm tra docs |
 | `make contract-generate` | Sinh types Go/TypeScript từ OpenAPI |
+| `make outdated` | Báo cáo dependency Go/web và toolchain có version mới (không tự nâng) |
 | `make smoke-api` | Build API, chạy thử lát cắt business object + bản ghi trên PostgreSQL thật |
 | `make smoke-restart` | Giết API bằng SIGKILL rồi chứng minh state còn nguyên và retry không áp dụng hai lần |
 | `make smoke-demo-flows` | Build cả API và web, replay form của các luồng demo và kiểm chứng kết quả |
