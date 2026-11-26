@@ -46,16 +46,19 @@
   `/usr/bin/python3` and `/bin/bash` by absolute path in such scripts.
 - CI and update tooling: GitHub Actions workflows pin every action by full commit SHA (with a
   version comment); `actionlint` is pinned in mise.toml and runs inside `make quality-check`.
-  Dependabot (`.github/dependabot.yml`) covers gomod, npm, github-actions and docker-compose
-  weekly — it does NOT cover the mise pins (go, node, pnpm, Go tools) or image digests, which are
-  updated by hand. Never add `renovate.json` or `.forgejo/`: sibling-repo tooling that does not
-  apply here.
+  Dependabot (`.github/dependabot.yml`) covers gomod, npm, github-actions, docker-compose and the
+  two Dockerfiles weekly — it does NOT cover the mise pins (go, node, pnpm, Go tools), which are
+  updated by hand. Base-image digests may also be re-picked by hand after a Trivy scan. Never add
+  `renovate.json` or `.forgejo/`: sibling-repo tooling that does not apply here.
 - Update policy in `.github/dependabot.yml`: `version-update:semver-major` is ignored for gomod,
   npm and docker-compose — majors are deliberate decisions, not notifications (`update-types` only
   affects version updates, so Dependabot alerts and security updates still fire). GitHub Actions
-  stays fully automated because action majors must move when a runtime is retired. A major PR that
-  appears anyway means this policy was edited — check before "fixing" the config; Dependabot
-  auto-closes its own PRs when a new ignore rule applies.
+  stays fully automated because action majors must move when a runtime is retired. Dependabot
+  groups `github/codeql-action/*` so `init` and `analyze` move in one PR: bumping only one fails
+  CodeQL with a version-mismatch configuration error. A major PR that appears anyway means this
+  policy was edited — check before "fixing" the config; Dependabot auto-closes its own PRs when a
+  new ignore rule applies or when the same/newer version is already on the target branch, but it
+  can leave a conflicting PR open when a manual update used a different version or digest.
 - Known accepted risk: Dependabot alert (high) on `braces@3.0.3`, reachable only through the dev
   chain `eslint-config-next → @next/eslint-plugin-next → fast-glob → micromatch → braces`. It is
   not in the production dependency tree and 3.0.3 is the latest published version, so no patched
