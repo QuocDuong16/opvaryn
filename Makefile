@@ -7,9 +7,11 @@
         images-build pilot-up pilot-down pilot-logs backup restore-drill \
         contract-generate contract-check \
         api-tools-check api-fix api-build api-test api-lint api-vuln api-check \
+        api-outdated \
         useradm \
         smoke-api smoke-demo-flows smoke-restart seed-demo clean-smoke-data \
         web-install web-lint web-format web-typecheck web-test web-build web-check \
+        web-outdated toolchain-outdated outdated \
         actions-lint docs-check quality-check clean
 
 ##@ Getting started
@@ -175,6 +177,29 @@ web-check: ## Run web lint, format, type, test, and build checks
 	cd apps/web && pnpm test
 	@echo "Check frontend build..."
 	cd apps/web && pnpm build
+
+##@ Dependency maintenance
+
+outdated: ## List newer Go, web and mise-pinned tool versions
+	@echo "Outdated Go API dependencies..."
+	$(MAKE) --no-print-directory api-outdated
+	@echo "Outdated web dependencies..."
+	$(MAKE) --no-print-directory web-outdated
+	@echo "Outdated toolchain pins (major upgrades included; adopt them deliberately)..."
+	$(MAKE) --no-print-directory toolchain-outdated
+
+api-outdated: ## List newer direct Go dependencies
+	cd apps/api && go list -u -m -f '{{if and .Update (not .Indirect)}}{{.Path}} {{.Version}} -> {{.Update.Version}}{{end}}' all
+
+# pnpm exits 1 when it finds updates; this is a report, not a gate.
+web-outdated: ## List outdated web dependencies in the workspace
+	@pnpm -r outdated || true
+
+# --bump also shows upgrades outside the pinned version ranges (including majors):
+# Dependabot ignores majors, and a toolchain bump is a deliberate decision.
+toolchain-outdated: ## List newer versions of the mise-pinned tools
+	@command -v mise >/dev/null 2>&1 || { echo "Missing mise — install mise, then run 'mise install'." >&2; exit 1; }
+	mise outdated --bump
 
 ##@ Repository checks
 

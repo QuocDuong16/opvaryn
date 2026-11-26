@@ -8,6 +8,10 @@
   - `actions-lint`: actionlint over `.github/workflows` (actions must stay SHA-pinned).
   - `docs-check`: required files exist (README, AGENTS, LICENSE, SECURITY, CONTRIBUTING,
     CODE_OF_CONDUCT, docs/README) and every local Markdown link resolves (`scripts/check-docs.mjs`).
+- Reporting-only target: `make outdated` lists newer direct Go dependencies (`go list -u -m`,
+  no extra tool), workspace web dependencies (`pnpm -r outdated`) and newer mise tool versions
+  (`mise outdated --bump`, includes majors and tools from the global config). It never changes
+  files and is not part of `quality-check`; major upgrades remain deliberate decisions.
 - CI is GitHub Actions and runs this same gate plus an integration job (`make docker-up` →
   migrate → `make smoke-api` → `make smoke-demo-flows`). A change that passes locally but breaks a
   workflow still fails CI, so run `make actions-lint` after touching `.github/` and keep workflows

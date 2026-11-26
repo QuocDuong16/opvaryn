@@ -1,8 +1,8 @@
 # Toolchain and dependencies
 
-- Pinned by mise (`mise.toml` + committed `mise.lock`): go 1.27.3, node 26.9.0, pnpm 12.12.0,
-  plus Go analysis tools (gopls 0.23.0, govulncheck 1.8.0, gosec pinned revision,
-  golangci-lint 2.14.0). `[tool_alias] pnpm = "github:pnpm/pnpm"` is intentional (aqua registry
+- Pinned by mise (`mise.toml` + committed `mise.lock`): go 1.27.4, node 26.13.1, pnpm 12.23.0,
+  plus Go analysis tools (gopls 0.24.0, govulncheck 1.10.0, gosec 2.30.0,
+  golangci-lint 2.15.0). `[tool_alias] pnpm = "github:pnpm/pnpm"` is intentional (aqua registry
   gap); mirrors the sibling projects' mise.toml.
 - Go module `github.com/QuocDuong16/opvaryn/api` (in `apps/api`): chi/v5 router, jackc/pgx/v5
   (`pgxpool`), caarlos0/env/v11, google/uuid. Contract codegen runs as
@@ -27,10 +27,13 @@
   containers — container images await the open deployment decision (playbook D10).
 - The Go pin moves in **three places together**: `mise.toml` (`go = "…"`), `mise.lock` (regenerate
   with `mise lock`), and `apps/api/go.mod`'s `go` directive. The Go base image in
-  `apps/api/Dockerfile` is a fourth: it is pinned by digest and must resolve to the same patch
-  release, or the build fails with `go.mod requires go >= X (running go Y; GOTOOLCHAIN=local)`.
-  A `govulncheck` failure in the standard library is therefore a toolchain bump, not a code fix —
-  the fix is the newer Go, and the image digest follows the floating `golang:1.27-alpine` tag.
+  `apps/api/Dockerfile` is a fourth: it is pinned by digest to the exact patch release (tag
+  `golang:1.27.4-alpine`), or the build fails with `go.mod requires go >= X (running go Y;
+  GOTOOLCHAIN=local)`. A `govulncheck` failure in the standard library is therefore a toolchain
+  bump, not a code fix — the fix is the newer Go, and the image digest follows it.
+- The Node/pnpm pins also appear in `apps/web/Dockerfile`: the `node:26.13.1-alpine` digest and
+  `npm install --global pnpm@…`; keep both in step with `mise.toml` because the pnpm lockfile
+  format is version-sensitive. Docs and the `/settings` toolchain line repeat these numbers.
 - `mise` shims own `go`, `python3`, `git`-adjacent tools in PATH. A script that runs inside a
   temporary checkout of this repository (e.g. a `git filter-branch` tree filter) will trip mise's
   "config files are not trusted" error, because the copied `mise.toml` is a new path. Call
