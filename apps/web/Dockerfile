@@ -29,6 +29,11 @@ RUN pnpm --filter @opvaryn/web build
 
 FROM node:26.13.1-alpine@sha256:6bd9ab43c0ec0190ca7b2d193906cb8b7edf6e7f4afa43ddeccd6452710bffb5 AS runtime
 
+# The standalone server only needs node. Drop the bundled package manager: its
+# npm packages (undici, brace-expansion) carry advisories that have no fix in
+# this Node release, and nothing in the runtime image invokes npm.
+RUN rm -rf /usr/local/lib/node_modules/npm /usr/local/bin/npm /usr/local/bin/npx
+
 RUN addgroup -S -g 10001 opvaryn && adduser -S -u 10001 -G opvaryn opvaryn
 
 WORKDIR /app

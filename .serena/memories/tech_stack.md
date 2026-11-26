@@ -22,9 +22,15 @@
 - Install scripts are denied by default. Approved native packages are listed in the root
   `pnpm-workspace.yaml` (`onlyBuiltDependencies` + `allowBuilds`: currently @swc/core, sharp,
   unrs-resolver). An unapproved package makes `pnpm install` fail with ERR_PNPM_IGNORED_BUILDS.
-- PostgreSQL 18 in `deployments/docker-compose.yml`, image pinned by digest (same digest as the
-  sibling repos so one update covers the family). Application processes run on the host, not in
-  containers — container images await the open deployment decision (playbook D10).
+- PostgreSQL 18 in `deployments/docker-compose.yml`, image pinned by digest. It diverged from the
+  sibling repos when the digest was re-picked after a Trivy scan; do not assume one update covers
+  the family. Application processes run on the host, not in containers — container images await
+  the open deployment decision (playbook D10).
+- Base-image digests are chosen by scanning the candidate tags with Trivy (`trivy image`), not by
+  following the floating tag blindly. Some findings cannot be removed by a base-image bump: the
+  PostgreSQL image bundles a Go binary with old stdlib CVEs, and the Node image bundles npm
+  packages (undici, brace-expansion) with their own advisories. Those need an upstream image
+  release; do not "fix" them by editing our app dependencies.
 - The Go pin moves in **three places together**: `mise.toml` (`go = "…"`), `mise.lock` (regenerate
   with `mise lock`), and `apps/api/go.mod`'s `go` directive. The Go base image in
   `apps/api/Dockerfile` is a fourth: it is pinned by digest to the exact patch release (tag
